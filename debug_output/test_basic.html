@@ -1,0 +1,160 @@
+<html x-data="{name: &#39;John&#39;, age: 2, animals: [&#39;cat&#39;, &#39;dog&#39;, &#39;pig&#39;]}" class="plenti-tYKLyE"><head class="plenti-ogHOgm"></head><body class="body-class plenti-IHTtZ1" id="main-body">html lang=&#34;en&#34; x-data=&#34;,
+  showModal: false
+}&#34;&gt;
+
+    <meta charset="UTF-8" class="plenti-AEAGPi"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" class="plenti-El8BEU"/>
+    <title class="plenti-MX3zcW">Alpine.js Attributes Test</title>
+    <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" class="plenti-svdUw8"></script>
+    <style class="plenti-AZAo2u">
+        body 
+        .section 
+        h2 
+        button 
+        button:hover 
+        .high-count 
+        [x-cloak] 
+        .modal 
+        .modal-content 
+    </style>
+
+    <h1 class="plenti-t2xeqS">Comprehensive Alpine.js Testing</h1>
+    <p class="plenti-vGQeLb">Welcome, John! Your age is 2.</p>
+
+    
+    <div class="section plenti-vEpEY5">
+        <h2 class="plenti-mHt5JM">1. Basic Text Binding</h2>
+        <div class="plenti-rS5Znw">
+            <p class="plenti-DCPwO6">Message using x-text: <span x-text="message" class="plenti-aZfwtp"></span></p>
+            <p class="plenti-wNrPTg">Message using text interpolation: <span x-text="&#39;Current count: &#39; + count" class="plenti-Ne4eX9"></span></p>
+            <p class="plenti-UXa06h">Input with model binding: <input x-model="message" type="text" class="plenti-wmnx3c"/></p>
+            <p class="plenti-OLSWWO">Modified message: <span x-text="message + &#39; (modified)&#39;" class="plenti-SUYXEV"></span></p>
+        </div>
+    </div>
+
+    
+    <div class="section plenti-bTJksF">
+        <h2 class="plenti-lcVSwR">2. Event Handling</h2>
+        <div class="plenti-wrexSi">
+            <p class="plenti-UYIX4d">Counter: <span x-text="count" x-bind:class="{ &#39;high-count&#39;: count &gt;= 5 }" class="plenti-1yAt0p"></span></p>
+            <button x-on:click="count++" class="plenti-fuzlsl">Increment</button>
+            <button @click.prevent="count = count + 2" class="plenti-ASQXYG">Add 2</button>
+            <button x-on:click="count = 0" x-bind:disabled="count === 0" class="plenti-SonUWD">Reset</button>
+            <button x-on:mouseover="message = &#39;Hovered!&#39;" x-on:mouseleave="message = &#39;Hello Alpine!&#39;" class="plenti-uxhn6P">Hover me</button>
+        </div>
+    </div>
+
+    
+    <div class="section plenti-RZqClw">
+        <h2 class="plenti-mivJAC">3. Conditional Rendering</h2>
+        <div class="plenti-OkWaK5">
+            <p x-show="count &gt; 0" class="plenti-9MB7NT">Count is positive! (using x-show)</p>
+            <p x-show="count === 0" class="plenti-6i206r">Count is zero! (using x-show)</p>
+            
+            <template x-if="count &gt; 5" class="plenti-lAFsMD">
+                <div class="plenti-zPM1lS">
+                    <p class="plenti-sRv1Tc">Count is greater than 5! (using x-if)</p>
+                    <button x-on:click="count = 0" class="plenti-p3cHol">Reset from template</button>
+                </div>
+            </template>
+            
+            <template x-if="count &lt;= 5" class="plenti-shDR9q">
+                <p class="plenti-EsTqxZ">Count is 5 or less! (using x-if)</p>
+            </template>
+        </div>
+    </div>
+
+    
+    <div class="section plenti-xayyci">
+        <h2 class="plenti-hQpTOF">4. List Rendering</h2>
+        <div class="plenti-E3I1Cc">
+            <p class="plenti-FVKd3H">Fruit list:</p>
+            <ul class="plenti-4tMkEv">
+                <template x-for="(item, index) in items" x-bind:key="index" class="plenti-iH36Dv">
+                    <li class="plenti-JEzVfq">
+                        <span x-text="index + 1 + &#39;. &#39; + item" class="plenti-zXc6mx"></span>
+                        <button x-on:click="items = items.filter((_, i) =&gt; i !== index)" class="plenti-EaoCko">Remove</button>
+                    </li>
+                </template>
+            </ul>
+            
+            <div class="plenti-ccQna0">
+                <input x-model="newItem" type="text" placeholder="Add new item" class="plenti-QbRSnB"/>
+                <button x-on:click="items.push(newItem); newItem = &#39;&#39;" class="plenti-LZKMJX">Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="section plenti-UvZsph">
+        <h2 class="plenti-eIvnHh">5. Advanced Data Binding</h2>
+        <div class="plenti-D5MImp">
+            <p class="plenti-98Rv4j">Class binding: <span x-bind:class="count % 2 === 0 ? &#39;even-count&#39; : &#39;odd-count&#39;" class="plenti-zcwpVD">Dynamic class</span></p>
+            <p class="plenti-Ds5kcg">Style binding: <span x-bind:style="{ color: count &gt; 5 ? &#39;red&#39; : &#39;green&#39;, fontWeight: count &gt; 3 ? &#39;bold&#39; : &#39;normal&#39; }" class="plenti-DZgcAD">Dynamic style</span></p>
+            <p class="plenti-bJ7AQ7">Attribute binding: <a x-bind:href="&#39;https://example.com/&#39; + count" x-bind:title="&#39;Link to count &#39; + count" class="plenti-6hXv8H">Dynamic link</a></p>
+            <div x-data="false" class="plenti-HfKlpD">
+                <label class="plenti-RMWAUE">
+                    <input x-model="checked" type="checkbox" class="plenti-bNxYZt"/>
+                    Toggle feature
+                </label>
+                <p x-bind:class="{ &#39;high-count&#39;: checked }" class="plenti-1iKUcw">This text changes based on checkbox</p>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="section plenti-dnFCxw">
+        <h2 class="plenti-u278r7">6. Methods and Computed Values</h2>
+        <div x-data=",
+            multiply() 
+        }" class="plenti-7cpGIK">
+            <p class="plenti-I0Wy5p">First number: <input type="number" x-model.number="num1" class="plenti-PZ0ABl"/></p>
+            <p class="plenti-uRTyGH">Second number: <input type="number" x-model.number="num2" class="plenti-3hVVCK"/></p>
+            <p class="plenti-l6OP9W">Sum (computed): <span x-text="sum" class="plenti-wYRFEa"></span></p>
+            <p class="plenti-tiVj4q">Product (method): <span x-text="multiply()" class="plenti-ud0Aes"></span></p>
+        </div>
+    </div>
+
+    
+    <div class="section plenti-tGIMs2">
+        <h2 class="plenti-Crsw1p">7. Modal and DOM References</h2>
+        <div class="plenti-pyTJqK">
+            <button x-on:click="showModal = true" class="plenti-mFdk2T">Open Modal</button>
+            
+            <div x-show="showModal" class="modal plenti-1359CJ" @click.self="showModal = false">
+                <div x-ref="modalContent" class="modal-content plenti-o7heJ6">
+                    <h3 class="plenti-wZFpPm">Modal Title</h3>
+                    <p class="plenti-Rjdlod">This is a modal dialog using Alpine.js</p>
+                    <p class="plenti-rwWNNG">Your age is: <span x-text="age" class="plenti-N7CPSs"></span></p>
+                    <button x-on:click="showModal = false; $refs.modalContent.classList.add(&#39;closing&#39;)" class="plenti-LXBziO">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="section plenti-2tevXn">
+        <h2 class="plenti-fOoQcX">8. Other Alpine Directives</h2>
+        <div class="plenti-r96ajj">
+            <p x-init="console.log(&#39;Section initialized&#39;)" class="plenti-bI7zTf">Using x-init (check console)</p>
+            <div x-data="&lt;strong&gt;This is bold&lt;/strong&gt; and &lt;em&gt;this is italic&lt;/em&gt;" class="plenti-aCmnRq">
+                <p class="plenti-pr9k5f">HTML content: <span x-html="html" class="plenti-nm4kCV"></span></p>
+            </div>
+            <button x-bind="{ &#39;aria-label&#39;: &#39;Current count: &#39; + count, title: &#39;Increase count&#39; }" x-on:click="count++" class="plenti-tcTQU4">
+                Enhanced Button
+            </button>
+            <p x-cloak="" class="plenti-y17gu9">This should be hidden until Alpine initializes</p>
+        </div>
+    </div>
+
+    
+    <div class="section plenti-i9ymhd">
+        <h2 class="plenti-ZKJbFN">9. External props and data</h2>
+        <div x-init="count = age" class="plenti-VNyRAC">
+            <p class="plenti-HCuF3H">Age from props: <span x-text="age" class="plenti-DLAh3C"></span></p>
+            <p class="plenti-jvuWcZ">Name from props: <span x-text="name" class="plenti-HwRAk3"></span></p>
+            <p class="plenti-E1Btzl">Count initialized from age: <span x-text="count" class="plenti-2W2Iij"></span></p>
+            <button x-on:click="count++" class="plenti-xTnfTL">Increment</button>
+        </div>
+    </div>
+</body></html>

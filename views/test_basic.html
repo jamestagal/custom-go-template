@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{ 
+  message: 'Hello Alpine!', 
+  count: 0,
+  items: ['Apple', 'Banana', 'Cherry'],
+  user: { name: 'John', role: 'admin' },
+  showModal: false
+}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpine.js Attributes Test</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        h2 {
+            margin-top: 0;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        button {
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #e0e0e0;
+        }
+        .high-count {
+            color: red;
+            font-weight: bold;
+        }
+        [x-cloak] {
+            display: none !important;
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+        }
+    </style>
+</head>
+<body class="body-class" id="main-body">
+    <h1>Comprehensive Alpine.js Testing</h1>
+    <p>Welcome, {name}! Your age is {age}.</p>
+
+    <!-- Basic Text and Binding -->
+    <div class="section">
+        <h2>1. Basic Text Binding</h2>
+        <div>
+            <p>Message using x-text: <span x-text="message"></span></p>
+            <p>Message using text interpolation: <span x-text="'Current count: ' + count"></span></p>
+            <p>Input with model binding: <input type="text" x-model="message"></p>
+            <p>Modified message: <span x-text="message + ' (modified)'"></span></p>
+        </div>
+    </div>
+
+    <!-- Event Handling -->
+    <div class="section">
+        <h2>2. Event Handling</h2>
+        <div>
+            <p>Counter: <span x-text="count" :class="{ 'high-count': count >= 5 }"></span></p>
+            <button @click="count++">Increment</button>
+            <button @click.prevent="count = count + 2">Add 2</button>
+            <button @click="count = 0" :disabled="count === 0">Reset</button>
+            <button @mouseover="message = 'Hovered!'" @mouseleave="message = 'Hello Alpine!'">Hover me</button>
+        </div>
+    </div>
+
+    <!-- Conditional Rendering -->
+    <div class="section">
+        <h2>3. Conditional Rendering</h2>
+        <div>
+            <p x-show="count > 0">Count is positive! (using x-show)</p>
+            <p x-show="count === 0">Count is zero! (using x-show)</p>
+            
+            <template x-if="count > 5">
+                <div>
+                    <p>Count is greater than 5! (using x-if)</p>
+                    <button @click="count = 0">Reset from template</button>
+                </div>
+            </template>
+            
+            <template x-if="count <= 5">
+                <p>Count is 5 or less! (using x-if)</p>
+            </template>
+        </div>
+    </div>
+
+    <!-- List Rendering -->
+    <div class="section">
+        <h2>4. List Rendering</h2>
+        <div>
+            <p>Fruit list:</p>
+            <ul>
+                <template x-for="(item, index) in items" :key="index">
+                    <li>
+                        <span x-text="index + 1 + '. ' + item"></span>
+                        <button @click="items = items.filter((_, i) => i !== index)">Remove</button>
+                    </li>
+                </template>
+            </ul>
+            
+            <div>
+                <input type="text" placeholder="Add new item" x-model="newItem">
+                <button @click="items.push(newItem); newItem = ''">Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Binding -->
+    <div class="section">
+        <h2>5. Advanced Data Binding</h2>
+        <div>
+            <p>Class binding: <span :class="count % 2 === 0 ? 'even-count' : 'odd-count'">Dynamic class</span></p>
+            <p>Style binding: <span :style="{ color: count > 5 ? 'red' : 'green', fontWeight: count > 3 ? 'bold' : 'normal' }">Dynamic style</span></p>
+            <p>Attribute binding: <a :href="'https://example.com/' + count" :title="'Link to count ' + count">Dynamic link</a></p>
+            <div x-data="{ checked: false }">
+                <label>
+                    <input type="checkbox" x-model="checked">
+                    Toggle feature
+                </label>
+                <p :class="{ 'high-count': checked }">This text changes based on checkbox</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Component Methods -->
+    <div class="section">
+        <h2>6. Methods and Computed Values</h2>
+        <div x-data="{ 
+            num1: 5, 
+            num2: 3,
+            get sum() { 
+                return this.num1 + this.num2 
+            },
+            multiply() {
+                return this.num1 * this.num2
+            }
+        }">
+            <p>First number: <input type="number" x-model.number="num1"></p>
+            <p>Second number: <input type="number" x-model.number="num2"></p>
+            <p>Sum (computed): <span x-text="sum"></span></p>
+            <p>Product (method): <span x-text="multiply()"></span></p>
+        </div>
+    </div>
+
+    <!-- Modals and References -->
+    <div class="section">
+        <h2>7. Modal and DOM References</h2>
+        <div>
+            <button @click="showModal = true">Open Modal</button>
+            
+            <div x-show="showModal" class="modal" @click.self="showModal = false">
+                <div class="modal-content" x-ref="modalContent">
+                    <h3>Modal Title</h3>
+                    <p>This is a modal dialog using Alpine.js</p>
+                    <p>Your age is: <span x-text="age"></span></p>
+                    <button @click="showModal = false; $refs.modalContent.classList.add('closing')">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alpine.js Directives -->
+    <div class="section">
+        <h2>8. Other Alpine Directives</h2>
+        <div>
+            <p x-init="console.log('Section initialized')">Using x-init (check console)</p>
+            <div x-data="{ html: '<strong>This is bold</strong> and <em>this is italic</em>' }">
+                <p>HTML content: <span x-html="html"></span></p>
+            </div>
+            <button x-bind="{ 'aria-label': 'Current count: ' + count, title: 'Increase count' }" @click="count++">
+                Enhanced Button
+            </button>
+            <p x-cloak>This should be hidden until Alpine initializes</p>
+        </div>
+    </div>
+
+    <!-- Handling external data -->
+    <div class="section">
+        <h2>9. External props and data</h2>
+        <div x-init="count = age">
+            <p>Age from props: <span x-text="age"></span></p>
+            <p>Name from props: <span x-text="name"></span></p>
+            <p>Count initialized from age: <span x-text="count"></span></p>
+            <button @click="count++">Increment</button>
+        </div>
+    </div>
+</body>
+</html>

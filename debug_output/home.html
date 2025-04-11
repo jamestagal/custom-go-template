@@ -1,0 +1,158 @@
+<html lang="en" x-data="{salutation: &#39;hola&#39;, path: &#39;./views/mycomp.html&#39;, comp: &#39;mycomp&#39;, name: &#39;John&#39;, age: 2, animals: [&#39;cat&#39;, &#39;dog&#39;, &#39;pig&#39;], test: &#39;whatever&#39;, text: &#39;something&#39;}" class="plenti-bjrPMK"><head class="plenti-yT3i56"><title class="plenti-KzgM9g">Test 2</title>
+	<script src="//unpkg.com/alpinejs" defer="" class="plenti-lJFHvC"></script>
+	<script defer="" type="text/javascript" src="/script.js" class="plenti-FTfipi"></script>
+	<link rel="stylesheet" href="style.css" class="plenti-uAr2T8"/>
+
+	</head><body class="plenti-M1ckPm">
+		<main class="plenti-SGtaqP" x-text="`
+			${if name === &#39;John&#39;}
+				`">
+			<div id="load_cms" class="plenti-F1beIf"></div>
+			<h1 class="plenti-9HSZfn">hola John</h1>
+			<span class="plenti-iDNYQo">whatever</span>
+			{if name === &#34;John&#34;}
+				<div id="praise" class="plenti-mG1QqM">John is great</div>
+				{if age &gt; 1}
+					<div class="plenti-N5AU1u">Has been born</div>
+				{/if}
+			{else}
+				<div id="praise" class="plenti-dzIrFi">Not sure who you are, but you&#39;re probably great</div>
+			{/if}
+			{if age &gt; 0}
+				<div class="container plenti-F1r2Hw" x-text="`
+
+	${if age &gt; 300}
+		`" x-data="{get name() { return &#34;Bill&#34; }}">
+	<div class="plenti-gcQkeL">Bill&#39;s age is: </div>
+
+	{if age &gt; 300}
+		<div class="dust plenti-s8eEkL">Dust (300+)</div>
+	{else if age &gt; 200}
+		<div class="dead plenti-Qyn8sj">Dead (200+)</div>
+	{else if age &gt; 90}
+		<div class="old plenti-VYIFCs">Wow (90+)</div>
+	{else if age &gt; 80}
+		<div class="old plenti-Qd7kmC">Well done (80+)</div>
+	{else if age &gt; 40}
+		<div class="mid plenti-hdYFBw">Over the hill (40+)</div>
+	{else if age &gt;= 21}
+		<div class="young plenti-zzv081">Can drink (21+)</div>
+	{else}
+		<div class="new plenti-jSvPYX">Just a baby (Under 21)</div>
+	{/if}
+
+	<div class="container plenti-tL0bho" x-data="{get text() { return &#34;&#34; }}">
+	<div class="double plenti-yblElQ">Double age is: NaN</div>
+	<div class="plenti-bcXRma"></div>
+</div>
+</div>
+				<table class="plenti-oTV6n5" x-data="{get number() { return 7 }}">
+	<thead class="plenti-roS5Qd">
+		<tr class="plenti-CE5cTJ">
+			<th class="plenti-ELQfpE">Todo</th>
+			<th class="plenti-JzIKwj">Completed</th>
+		</tr>
+	</thead>
+	<tbody data-number="{number}" class="todos plenti-nBPZCk">
+	</tbody>
+</table>
+
+				<div class="container plenti-beYQkL" x-text="`
+
+	${if age &gt; 300}
+		`" x-data="{get name() { return &#34;Bo&#34; },get age() { return 52 }}">
+	<div class="plenti-F65qpv">Bo&#39;s age is: 52</div>
+
+	{if age &gt; 300}
+		<div class="dust plenti-G20Q24">Dust (300+)</div>
+	{else if age &gt; 200}
+		<div class="dead plenti-oceqEJ">Dead (200+)</div>
+	{else if age &gt; 90}
+		<div class="old plenti-wSQi7V">Wow (90+)</div>
+	{else if age &gt; 80}
+		<div class="old plenti-Jt2yNn">Well done (80+)</div>
+	{else if age &gt; 40}
+		<div class="mid plenti-XWnhRX">Over the hill (40+)</div>
+	{else if age &gt;= 21}
+		<div class="young plenti-KnwUJE">Can drink (21+)</div>
+	{else}
+		<div class="new plenti-Crzhcz">Just a baby (Under 21)</div>
+	{/if}
+
+	<div class="container plenti-O5VVdr" x-data="{get text() { return &#34;&#34; }}">
+	<div class="double plenti-AGyY0Z">Double age is: NaN</div>
+	<div class="plenti-27CHHa"></div>
+</div>
+</div>
+				<table class="plenti-cs13Q3" x-data="{get number() { return 14 }}">
+	<thead class="plenti-h5frM8">
+		<tr class="plenti-aqCMKH">
+			<th class="plenti-bjxewX">Todo</th>
+			<th class="plenti-uEb7ob">Completed</th>
+		</tr>
+	</thead>
+	<tbody data-number="{number}" class="todos plenti-Ngey2R">
+	</tbody>
+</table>
+
+				<div class="container plenti-biHgxZ" x-text="`
+
+	${if age &gt; 300}
+		`" x-data="{get name() { return &#34;Baggins&#34; },get age() { return 201 }}">
+	<div class="plenti-3Pdwv8">Baggins&#39;s age is: 201</div>
+
+	{if age &gt; 300}
+		<div class="dust plenti-Nw3UnP">Dust (300+)</div>
+	{else if age &gt; 200}
+		<div class="dead plenti-kHb0lR">Dead (200+)</div>
+	{else if age &gt; 90}
+		<div class="old plenti-bGxJls">Wow (90+)</div>
+	{else if age &gt; 80}
+		<div class="old plenti-xOx64t">Well done (80+)</div>
+	{else if age &gt; 40}
+		<div class="mid plenti-4Yxx1x">Over the hill (40+)</div>
+	{else if age &gt;= 21}
+		<div class="young plenti-pN4YKN">Can drink (21+)</div>
+	{else}
+		<div class="new plenti-C5epC1">Just a baby (Under 21)</div>
+	{/if}
+
+	<div class="container plenti-miF9Oy" x-data="{get text() { return &#34;yoooo&#34; }}">
+	<div class="double plenti-FBAbN1">Double age is: NaN</div>
+	<div class="plenti-y2GAmJ">yoooo</div>
+</div>
+</div>
+				<table class="plenti-POe79J" x-data="{get number() { return 5 }}">
+	<thead class="plenti-G127jq">
+		<tr class="plenti-q648I9">
+			<th class="plenti-oDi4Xi">Todo</th>
+			<th class="plenti-Bx6Jnk">Completed</th>
+		</tr>
+	</thead>
+	<tbody data-number="{number}" class="todos plenti-NMno16">
+	</tbody>
+</table>
+			{/if}
+
+			<h1 class="plenti-2aVhnO">My comp </h1>
+			&lt;=./views/mycomp.html /&gt;
+			<h1 class="plenti-W51TNr" x-data="{get age() { return 3 }}">My comp 3</h1>
+
+			<div class="animals plenti-tu8sYG" x-text="`
+				${for let animal of [&#39;new animal&#39;, ...animals]}
+					`">
+				{for let animal of [&#34;new animal&#34;, ...animals]}
+					<div class="type-{animal} plenti-ihxrTb">John likes: s</div>
+					<div class="plenti-OisuLs">Backwards: s</div>
+					<button onclick="{animals.filter(a =&gt; a !== animal)}" class="plenti-OpJpsC">Remove </button>
+					<br class="plenti-xWDyUU"/><br class="plenti-BqcROY"/>
+				{/for}
+			</div>
+			<div class="plenti-j6JNwm">
+				<h3 class="plenti-2MffDa">Add new animal:</h3>
+				<input type="text" placeholder="animal name" class="plenti-jdRzpp"/>
+				<button onclick="{animals = [&#39;new&#39;, ...animals]}" class="plenti-HjnhF5">Submit</button>
+			</div>
+		</main>
+	
+</body></html>

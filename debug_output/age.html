@@ -1,0 +1,27 @@
+<html x-data="{name: &#39;John&#39;, age: 2}" class="plenti-ze6pjJ"><head class="plenti-NHATSL"></head><body class="plenti-RcB2Fw"><div class="container plenti-G2rMuj" x-text="`
+
+	${if age &gt; 300}
+		`">
+	<div class="plenti-bS1wAf">John&#39;s age is: 2</div>
+
+	{if age &gt; 300}
+		<div class="dust plenti-CDOo6d">Dust (300+)</div>
+	{else if age &gt; 200}
+		<div class="dead plenti-0sJDT3">Dead (200+)</div>
+	{else if age &gt; 90}
+		<div class="old plenti-Ii9gOY">Wow (90+)</div>
+	{else if age &gt; 80}
+		<div class="old plenti-1z3Ory">Well done (80+)</div>
+	{else if age &gt; 40}
+		<div class="mid plenti-ef7JcJ">Over the hill (40+)</div>
+	{else if age &gt;= 21}
+		<div class="young plenti-cBe5Dv">Can drink (21+)</div>
+	{else}
+		<div class="new plenti-u7v2sn">Just a baby (Under 21)</div>
+	{/if}
+
+	<div class="container plenti-J9xR5W" x-data="{get text() { return &#34;&#34; }}">
+	<div class="double plenti-7M88VR">Double age is: NaN</div>
+	<div class="plenti-TmOQO8"></div>
+</div>
+</div></body></html>

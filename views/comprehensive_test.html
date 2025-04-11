@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{ 
+  pageTitle: 'Comprehensive Alpine.js Demo',
+  darkMode: false,
+  count: 0,
+  message: 'Hello Alpine!',
+  items: ['Apple', 'Banana', 'Cherry'],
+  user: { name: 'John', role: 'admin' },
+  showModal: false,
+  htmlContent: '<strong>This is bold</strong> and <em>this is italic</em>',
+  currentYear: new Date().getFullYear(),
+  newItem: '',
+  search: '',
+  asyncContent: 'Loading...'
+}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title x-text="pageTitle">Alpine.js Demo</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        // Global store
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('site', {
+                title: 'Alpine.js Features',
+                theme: 'light',
+                toggleTheme() {
+                    this.theme = this.theme === 'light' ? 'dark' : 'light';
+                }
+            });
+
+            // Reusable component
+            Alpine.data('dropdown', () => ({
+                open: false,
+                toggle() {
+                    this.open = !this.open;
+                },
+                close() {
+                    this.open = false;
+                }
+            }));
+        });
+    </script>
+    <style>
+        :root {
+            --bg-color: white;
+            --text-color: #333;
+            --border-color: #ddd;
+            --header-bg: #f5f5f5;
+        }
+        
+        body.dark-mode {
+            --bg-color: #1a1a1a;
+            --text-color: #f0f0f0;
+            --border-color: #444;
+            --header-bg: #2a2a2a;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        h1, h2, h3 {
+            margin-top: 0;
+            background: var(--header-bg);
+            padding: 10px;
+            border-radius: 3px;
+        }
+        
+        button {
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background: var(--header-bg);
+            cursor: pointer;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        
+        button:hover {
+            filter: brightness(0.9);
+        }
+        
+        .high-count {
+            color: red;
+            font-weight: bold;
+        }
+        
+        [x-cloak] {
+            display: none !important;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        
+        .modal-content {
+            background: var(--bg-color);
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .dropdown-menu {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            min-width: 200px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        
+        .dropdown-item {
+            padding: 8px 12px;
+            display: block;
+        }
+        
+        .dropdown-item:hover {
+            background: var(--header-bg);
+        }
+        
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.5s;
+        }
+        
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+        
+        .slide-enter-active, .slide-leave-active {
+            transition: transform 0.5s, opacity 0.5s;
+        }
+        
+        .slide-enter-from, .slide-leave-to {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px;
+            background: var(--header-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .striped-row:nth-child(odd) {
+            background-color: var(--header-bg);
+        }
+    </style>
+</head>
+<body x-bind:class="darkMode ? 'dark-mode' : ''" x-cloak>
+    <header class="section">
+        <div class="flex" style="display: flex; justify-content: space-between; align-items: center;">
+            <h1 x-text="pageTitle">Alpine.js Demo</h1>
+            <div>
+                <button @click="darkMode = !darkMode" x-text="darkMode ? 'Light Mode' : 'Dark Mode'">Theme</button>
+                <button @click="$dispatch('notify', { message: 'Hello from global notification!' })">Notify</button>
+            </div>
+        </div>
+        <p>Welcome, <span x-text="name || 'Guest'">{name}</span>! Your age is <span x-text="age || 'unknown'">{age}</span>.</p>
+        <p>Using $store: Site title from global store: <span x-text="$store.site.theme + ' theme'"></span></p>
+        <p x-data="{ now: new Date() }">Current year: <span x-text="currentYear"></span> (from initialization)</p>
+    </header>
+
+    <!-- 1. x-data -->
+    <div class="section">
+        <h2>1. x-data Attribute</h2>
+        <p>Basic declaration of Alpine component data:</p>
+        <div x-data="{ localCount: 0, localMessage: 'Local data example' }">
+            <p>Local message: <span x-text="localMessage"></span></p>
+            <p>Local counter: <span x-text="localCount"></span></p>
+            <button @click="localCount++">Increment Local</button>
+        </div>
+        
+        <p>Using reusable component with Alpine.data():</p>
+        <div x-data="dropdown">
+            <button @click="toggle">Toggle Dropdown</button>
+            <div x-show="open" class="dropdown-menu" x-transition>
+                <a href="#" class="dropdown-item">Action 1</a>
+                <a href="#" class="dropdown-item">Action 2</a>
+                <a href="#" class="dropdown-item" @click="close">Close Menu</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. x-bind -->
+    <div class="section">
+        <h2>2. x-bind Attribute</h2>
+        <p>Dynamically set HTML attributes:</p>
+        
+        <p>Using shorthand (:) - Button state:</p>
+        <div x-data="{ disabled: false }">
+            <button :disabled="disabled" :class="disabled ? 'opacity-50' : ''" x-text="disabled ? 'Disabled' : 'Enabled'">
+                Button
+            </button>
+            <button @click="disabled = !disabled">Toggle Disabled</button>
+        </div>
+        
+<!-- Replace the Binding multiple attributes section with this -->
+<p>Binding multiple attributes at once:</p>
+<div x-data="{ 
+    tooltip: 'This is a custom tooltip', 
+    isSpecial: true,
+    showTooltip: false 
+}">
+    <div style="position: relative; display: inline-block;">
+        <button 
+            x-bind="{ 
+                'data-tooltip': tooltip, 
+                class: isSpecial ? 'special-button' : '',
+                'data-type': isSpecial ? 'special' : 'normal'
+            }"
+            @mouseenter="showTooltip = true"
+            @mouseleave="showTooltip = false"
+            style="position: relative;">
+            Hover For Custom Tooltip
+        </button>
+        
+        <!-- Custom tooltip that's more visible -->
+        <div 
+            x-show="showTooltip"
+            x-transition
+            style="position: absolute; top: -40px; left: 0; background: #333; color: white; padding: 5px 10px; border-radius: 4px; min-width: 150px; z-index: 10;"
+            x-text="tooltip">
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <button @click="tooltip = tooltip === 'This is a custom tooltip' ? 'Tooltip text changed!' : 'This is a custom tooltip'">
+            Change Tooltip Text
+        </button>
+        <button @click="isSpecial = !isSpecial">
+            Toggle Special Class
+        </button>
+    </div>
+    
+    <p style="margin-top: 10px;">
+        Current tooltip text: <span x-text="tooltip"></span><br>
+        Is special: <span x-text="isSpecial"></span><br>
+        Button has class: <span x-text="isSpecial ? 'special-button' : 'none'"></span><br>
+        Button has data-type: <span x-text="isSpecial ? 'special' : 'normal'"></span>
+    </p>
+</div>
+        <p>Binding styles:</p>
+        <div x-data="{ color: 'blue', fontSize: '16px' }">
+            <p :style="{ color: color, fontSize: fontSize }">This text has dynamic styling</p>
+            <button @click="color = color === 'blue' ? 'red' : 'blue'">Change Color</button>
+            <button @click="fontSize = fontSize === '16px' ? '24px' : '16px'">Change Size</button>
+        </div>
+        
+        <p>Binding classes conditionally:</p>
+        <div x-data="{ isActive: false, hasError: false }">
+            <div :class="{ 'high-count': isActive, 'error': hasError }">
+                Dynamic class element
+            </div>
+            <button @click="isActive = !isActive">Toggle Active</button>
+            <button @click="hasError = !hasError">Toggle Error</button>
+        </div>
+    </div>
+
+    <!-- 3. x-on -->
+    <div class="section">
+        <h2>3. x-on (Event Handling)</h2>
+        <p>Listen for browser events using x-on (or @ shorthand):</p>
+        
+        <div x-data="{ status: 'Waiting for action' }">
+            <p>Status: <span x-text="status"></span></p>
+            
+            <button @click="status = 'Clicked!'; count++">Simple Click</button>
+            <button @click.prevent="status = 'Prevented default!'">Prevent Default</button>
+            <button @click.stop="status = 'Stopped propagation!'">Stop Propagation</button>
+            <button @click.once="status = 'This only works once!'">Click Once</button>
+            
+            <div @mouseenter="status = 'Mouse entered'" @mouseleave="status = 'Mouse left'" 
+                 style="padding: 10px; border: 1px dashed var(--border-color); margin-top: 10px;">
+                Hover over me
+            </div>
+            
+            <form @submit.prevent="status = 'Form submitted!'">
+                <input type="text" placeholder="Type and submit">
+                <button type="submit">Submit Form</button>
+            </form>
+            
+            <input type="text" @keyup.enter="status = 'Enter pressed!'" placeholder="Press enter">
+            <input type="text" @keyup.escape="status = 'Escaped!'" placeholder="Press escape">
+        </div>
+    </div>
+
+    <!-- 4. x-text -->
+    <div class="section">
+        <h2>4. x-text Attribute</h2>
+        <p>Set the text content of an element:</p>
+        
+        <div x-data="{ textDemo: 'This text is set by x-text', counter: 0 }">
+            <p>Basic text: <span x-text="textDemo"></span></p>
+            
+            <p>Dynamic text: <span x-text="'Counter: ' + counter"></span></p>
+            <button @click="counter++">Increment</button>
+            
+            <p>Expression: <span x-text="counter % 2 === 0 ? 'Even' : 'Odd'"></span></p>
+            
+            <p>Current year: <span x-text="new Date().getFullYear()"></span></p>
+        </div>
+    </div>
+
+    <!-- 5. x-html -->
+    <div class="section">
+        <h2>5. x-html Attribute</h2>
+        <p>Set the inner HTML of an element:</p>
+        
+        <div x-data="{ htmlDemo: '<strong>Bold text</strong> and <em>italic text</em>' }">
+            <p>HTML content: <span x-html="htmlContent"></span></p>
+            
+            <div>
+                <p>Edit HTML content:</p>
+                <textarea x-model="htmlContent" rows="3" style="width: 100%"></textarea>
+            </div>
+            
+            <p>Rendered result:</p>
+            <div x-html="htmlContent" style="border: 1px solid var(--border-color); padding: 10px; margin-top: 10px;"></div>
+        </div>
+    </div>
+
+    <!-- 6. x-model -->
+    <div class="section">
+        <h2>6. x-model Attribute</h2>
+        <p>Two-way data binding with form inputs:</p>
+        
+        <div x-data="{ 
+            text: 'Hello', 
+            checked: false, 
+            radio: 'option1', 
+            select: 'apple',
+            number: 5,
+            area: 'Multiline\ntext area'
+        }">
+            <h3>Text Input</h3>
+            <input type="text" x-model="text">
+            <p>Text value: <span x-text="text"></span></p>
+            
+            <h3>Checkbox</h3>
+            <label><input type="checkbox" x-model="checked"> Check me</label>
+            <p>Checked: <span x-text="checked"></span></p>
+            
+            <h3>Radio Buttons</h3>
+            <label><input type="radio" x-model="radio" value="option1"> Option 1</label>
+            <label><input type="radio" x-model="radio" value="option2"> Option 2</label>
+            <p>Selected option: <span x-text="radio"></span></p>
+            
+            <h3>Select Dropdown</h3>
+            <select x-model="select">
+                <option value="apple">Apple</option>
+                <option value="banana">Banana</option>
+                <option value="cherry">Cherry</option>
+            </select>
+            <p>Selected: <span x-text="select"></span></p>
+            
+            <h3>Number Input</h3>
+            <input type="number" x-model.number="number">
+            <p>Number value: <span x-text="number"></span> (Type: <span x-text="typeof number"></span>)</p>
+            
+            <h3>Textarea</h3>
+            <textarea x-model="area" rows="3" style="width: 100%"></textarea>
+            <p>Content: <pre x-text="area" style="background: var(--header-bg); padding: 10px;"></pre></p>
+            
+            <h3>Modifiers</h3>
+            <input type="text" x-model.lazy="text" placeholder="Lazy update (on change)">
+            <input type="text" x-model.debounce.500ms="text" placeholder="Debounced update (500ms)">
+            <input type="text" x-model.trim="text" placeholder="Trimmed input">
+        </div>
+    </div>
+
+    <!-- 7. x-show -->
+    <div class="section">
+        <h2>7. x-show Attribute</h2>
+        <p>Toggle the visibility of elements:</p>
+        
+        <div x-data="{ showContent: true, showSection: false }">
+            <button @click="showContent = !showContent" x-text="showContent ? 'Hide Content' : 'Show Content'"></button>
+            
+            <div x-show="showContent">
+                <p>This content can be toggled with x-show</p>
+                <p>x-show adds/removes the display:none style</p>
+            </div>
+            
+            <h3>With Conditions</h3>
+            <div>
+                <p>Count: <span x-text="count"></span></p>
+                <div x-show="count > 5">This is only visible when count > 5</div>
+                <div x-show="count <= 5">This is only visible when count <= 5</div>
+                <button @click="count++">Increment</button>
+            </div>
+            
+            <h3>Nested Visibility</h3>
+            <button @click="showSection = !showSection">Toggle Section</button>
+            <div x-show="showSection">
+                <p>Parent section is visible</p>
+                <div x-show="count % 2 === 0">This is only visible when count is even</div>
+                <div x-show="count % 2 !== 0">This is only visible when count is odd</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8. x-transition -->
+    <div class="section">
+        <h2>8. x-transition Attribute</h2>
+        <p>Add CSS transitions to elements:</p>
+        
+        <div x-data="{ showTransition: false, showClasses: false }">
+            <h3>Simple Transition</h3>
+            <button @click="showTransition = !showTransition">Toggle Element</button>
+            <div x-show="showTransition" x-transition style="padding: 10px; background: var(--header-bg); margin-top: 10px;">
+                Simple transition (uses opacity transition)
+            </div>
+            
+            <h3>With Duration</h3>
+            <button @click="showTransition = !showTransition">Toggle Element</button>
+            <div x-show="showTransition" x-transition.duration.1000ms style="padding: 10px; background: var(--header-bg); margin-top: 10px;">
+                Slow transition (1 second)
+            </div>
+            
+            <h3>With Custom Classes</h3>
+            <button @click="showClasses = !showClasses">Toggle With Classes</button>
+            <div x-show="showClasses" 
+                 x-transition:enter="slide-enter-active"
+                 x-transition:enter-start="slide-enter-from"
+                 x-transition:enter-end="slide-enter-to"
+                 x-transition:leave="slide-leave-active"
+                 x-transition:leave-start="slide-leave-from"
+                 x-transition:leave-end="slide-leave-to"
+                 style="padding: 10px; background: var(--header-bg); margin-top: 10px;">
+                Custom transition classes
+            </div>
+        </div>
+    </div>
+
+    <!-- 9. x-for -->
+    <div class="section">
+        <h2>9. x-for Attribute</h2>
+        <p>Loop through arrays and objects:</p>
+        
+        <div x-data="{ fruits: items, users: [
+            { id: 1, name: 'Alice', role: 'Admin' },
+            { id: 2, name: 'Bob', role: 'User' },
+            { id: 3, name: 'Charlie', role: 'User' }
+        ]}">
+            <h3>Simple List</h3>
+            <ul>
+                <template x-for="fruit in fruits" :key="fruit">
+                    <li x-text="fruit"></li>
+                </template>
+            </ul>
+            
+            <h3>With Index</h3>
+            <ul>
+                <template x-for="(fruit, index) in fruits" :key="index">
+                    <li>
+                        <span x-text="index + 1 + '. ' + fruit"></span>
+                        <button @click="fruits.splice(index, 1)" class="small">Remove</button>
+                    </li>
+                </template>
+            </ul>
+            <div>
+                <input type="text" x-model="newItem" placeholder="Add new fruit">
+                <button @click="fruits.push(newItem); newItem = ''">Add Fruit</button>
+            </div>
+            
+            <h3>Complex Objects</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">ID</th>
+                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">Name</th>
+                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">Role</th>
+                        <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(user, index) in users" :key="user.id">
+                        <tr class="striped-row">
+                            <td style="padding: 8px;" x-text="user.id"></td>
+                            <td style="padding: 8px;" x-text="user.name"></td>
+                            <td style="padding: 8px;" x-text="user.role"></td>
+                            <td style="padding: 8px;">
+                                <button @click="users.splice(index, 1)" class="small">Delete</button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 10. x-if -->
+    <div class="section">
+        <h2>10. x-if Attribute</h2>
+        <p>Conditionally render elements (completely removed from DOM):</p>
+        
+        <div x-data="{ activeTab: 'tab1', authorized: false }">
+            <h3>Basic Conditional Rendering</h3>
+            <div>
+                <button @click="activeTab = 'tab1'" :class="activeTab === 'tab1' ? 'active' : ''">Tab 1</button>
+                <button @click="activeTab = 'tab2'" :class="activeTab === 'tab2' ? 'active' : ''">Tab 2</button>
+                <button @click="activeTab = 'tab3'" :class="activeTab === 'tab3' ? 'active' : ''">Tab 3</button>
+            </div>
+            
+            <div style="padding: 15px; border: 1px solid var(--border-color); margin-top: 10px;">
+                <template x-if="activeTab === 'tab1'">
+                    <div>
+                        <h4>Tab 1 Content</h4>
+                        <p>This is the content for the first tab.</p>
+                    </div>
+                </template>
+                
+                <template x-if="activeTab === 'tab2'">
+                    <div>
+                        <h4>Tab 2 Content</h4>
+                        <p>This content only exists in the DOM when Tab 2 is active.</p>
+                        <button @click="count += 10">Add 10 to Count</button>
+                    </div>
+                </template>
+                
+                <template x-if="activeTab === 'tab3'">
+                    <div>
+                        <h4>Tab 3 Content</h4>
+                        <p>Tab 3 has completely different content.</p>
+                        <div x-data="{ subTab: 1 }">
+                            <button @click="subTab = 1">Sub 1</button>
+                            <button @click="subTab = 2">Sub 2</button>
+                            
+                            <template x-if="subTab === 1">
+                                <p>Sub tab 1 content</p>
+                            </template>
+                            <template x-if="subTab === 2">
+                                <p>Sub tab 2 content</p>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            
+            <h3>Authentication Example</h3>
+            <div>
+                <button @click="authorized = !authorized" x-text="authorized ? 'Logout' : 'Login'"></button>
+                
+                <template x-if="authorized">
+                    <div style="margin-top: 10px; padding: 10px; border: 1px solid var(--border-color);">
+                        <h4>Welcome, User!</h4>
+                        <p>This content is only visible when logged in.</p>
+                        <ul>
+                            <li>Profile Settings</li>
+                            <li>Account Management</li>
+                            <li>Billing Information</li>
+                        </ul>
+                    </div>
+                </template>
+                
+                <template x-if="!authorized">
+                    <div style="margin-top: 10px; padding: 10px; border: 1px solid var(--border-color);">
+                        <h4>Please Login</h4>
+                        <p>You need to login to access your account information.</p>
+                        <form @submit.prevent="authorized = true">
+                            <div>
+                                <label>Username: <input type="text"></label>
+                            </div>
+                            <div style="margin-top: 5px;">
+                                <label>Password: <input type="password"></label>
+                            </div>
+                            <button type="submit" style="margin-top: 10px;">Login</button>
+                        </form>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- 11. x-init -->
+    <div class="section">
+        <h2>11. x-init Attribute</h2>
+        <p>Run code when an element is initialized:</p>
+        
+        <div x-data="{ initMessage: '', timer: 0 }" 
+             x-init="initMessage = 'Initialized at ' + new Date().toLocaleTimeString(); 
+                     timer = setInterval(() => count++, 5000);
+                     $el.setAttribute('data-initialized', 'true')">
+            <p>Initialization message: <span x-text="initMessage"></span></p>
+            <p>This element sets a timer to increment the count every 5 seconds.</p>
+            <p>Current count: <span x-text="count"></span></p>
+            <button @click="clearInterval(timer); timer = 0">Stop Timer</button>
+            
+            <h3>Access Element with $el</h3>
+            <div x-init="$el.style.padding = '10px'; 
+                          $el.style.border = '2px dashed var(--border-color)'">
+                This div styled itself during initialization using $el.
+            </div>
+            
+            <h3>Fetch Example</h3>
+            <div x-data="{ posts: [] }" 
+                 x-init="fetch('https://jsonplaceholder.typicode.com/posts?_limit=3')
+                            .then(response => response.json())
+                            .then(data => { posts = data; })">
+                <h4>Recent Posts</h4>
+                <template x-if="posts.length === 0">
+                    <p>Loading posts...</p>
+                </template>
+                <ul>
+                    <template x-for="post in posts" :key="post.id">
+                        <li>
+                            <strong x-text="post.title"></strong>
+                            <p x-text="post.body"></p>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 12. x-effect -->
+    <div class="section">
+        <h2>12. x-effect Attribute</h2>
+        <p>Run code when dependencies change:</p>
+        
+        <div x-data="{ effectLog: [], sliderValue: 50 }" 
+             x-effect="effectLog.push(`Count changed to: ${count} at ${new Date().toLocaleTimeString()}`)">
+            <p>Current count: <span x-text="count"></span></p>
+            <button @click="count++">Increment</button>
+            
+            <h3>Effect Log</h3>
+            <ul style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px;">
+                <template x-for="(entry, index) in effectLog" :key="index">
+                    <li x-text="entry"></li>
+                </template>
+            </ul>
+            
+            <h3>Multiple Dependencies</h3>
+            <div x-data="{ name: 'Guest', status: 'Active' }"
+                 x-effect="effectLog.push(`User update: ${name} is ${status} at ${new Date().toLocaleTimeString()}`)">
+                <input type="text" x-model="name" placeholder="Name">
+                <select x-model="status">
+                    <option>Active</option>
+                    <option>Away</option>
+                    <option>Busy</option>
+                </select>
+            </div>
+            
+            <h3>Slider Example</h3>
+            <div>
+                <input type="range" min="0" max="100" x-model.number="sliderValue">
+                <span x-text="sliderValue"></span>
+            </div>
+            <div x-effect="$el.style.width = sliderValue + '%'; 
+                            $el.textContent = sliderValue + '%'"
+                 style="background: var(--header-bg); height: 20px; transition: width 0.3s;">
+            </div>
+        </div>
+    </div>
+
+    <!-- 13. x-ref -->
+    <div class="section">
+        <h2>13. x-ref Attribute</h2>
+        <p>Reference elements directly with $refs:</p>
+        
+        <div x-data="{ message: 'Type something...' }">
+            <h3>Basic Reference</h3>
+            <input type="text" x-ref="inputField" placeholder="Type here">
+            <button @click="$refs.inputField.focus()">Focus Input</button>
+            <button @click="$refs.inputField.value = ''">Clear Input</button>
+            <button @click="message = $refs.inputField.value">Get Value</button>
+            <p>Message: <span x-text="message"></span></p>
+            
+            <h3>Form Example</h3>
+            <form x-ref="myForm" @submit.prevent="$refs.resultBox.textContent = 'Form submitted with: ' + $refs.formInput.value">
+                <input x-ref="formInput" type="text" placeholder="Enter value">
+                <button type="submit">Submit</button>
+            </form>
+            <div x-ref="resultBox" style="margin-top: 10px; padding: 10px; border: 1px solid var(--border-color);"></div>
+            
+            <h3>Copy to Clipboard</h3>
+            <textarea x-ref="copyText" style="width: 100%">This text will be copied to clipboard</textarea>
+            <button @click="navigator.clipboard.writeText($refs.copyText.value)">Copy to Clipboard</button>
+        </div>
+    </div>
+
+    <!-- 14. x-cloak -->
+    <div class="section">
+        <h2>14. x-cloak Attribute</h2>
+        <p>Hide elements until Alpine is initialized:</p>
+        
+        <div x-data="{ loaded: false }">
+            <p>Elements with x-cloak are hidden until Alpine.js initializes to prevent flashing of uninitialized content:</p>
+            
+            <div x-cloak style="padding: 10px; background: var(--header-bg); margin-top: 10px;">
+                This content is hidden until Alpine.js initializes.
+            </div>
+            
+            <div x-cloak x-show="loaded" style="padding: 10px; background: var(--header-bg); margin-top: 10px;">
+                This combines x-cloak with x-show.
+            </div>
+            
+            <button @click="loaded = !loaded" x-text="loaded ? 'Hide Content' : 'Show Content'"></button>
+            
+            <template x-if="loaded">
+                <div x-cloak>
+                    <p>This element is inside a conditional template and also has x-cloak applied.</p>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- 15. x-ignore -->
+    <div class="section">
+        <h2>15. x-ignore Attribute</h2>
+        <p>Prevent Alpine from initializing a section:</p>
+        
+        <div x-ignore>
+            <p>Even though we're inside an x-data scope, these Alpine directives won't be processed:</p>
+            <div x-data="{ test: 'This will not be processed' }">
+                <span x-text="test"></span>
+                <button @click="test = 'Changed'">Won't Work</button>
+            </div>
+        </div>
+        
+        <div>
+            <p>Compare with a normal Alpine section:</p>
+            <div x-data="{ test: 'This will be processed' }">
+                <span x-text="test"></span>
+                <button @click="test = 'Changed'">Will Work</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Magic Properties -->
+    <div class="section">
+        <h2>Magic Properties</h2>
+        
+        <div x-data="{ active: false, name: 'User' }">
+            <!-- $store -->
+            <div class="subsection">
+                <h3>$store</h3>
+                <p>Access global Alpine store data:</p>
+                <p>Current theme: <span x-text="$store.site.theme"></span></p>
+                <button @click="$store.site.toggleTheme()">Toggle Theme from Store</button>
+                <p>Site title: <span x-text="$store.site.title"></span></p>
+            </div>
+            
+            <!-- $el -->
+            <div class="subsection">
+                <h3>$el</h3>
+                <p>Reference the current DOM element:</p>
+                <button @click="$el.style.backgroundColor = 'var(--header-bg)'">Style Self</button>
+                <button @click="$el.textContent = 'Text Changed'">Change Own Text</button>
+                <div @click="$el.classList.toggle('high-count')" style="padding: 10px; cursor: pointer; border: 1px solid var(--border-color); margin-top: 10px;">
+                    Click to toggle my class using $el.classList
+                </div>
+            </div>
+            
+            <!-- $dispatch -->
+            <div class="subsection">
+                <h3>$dispatch</h3>
+                <p>Dispatch custom browser events:</p>
+                <div @custom-event="active = true; name = $event.detail.user" style="padding: 10px;">
+                    <p x-text="active ? `Event received! Hello, ${name}!` : 'Waiting for event...'"></p>
+                    <button @click="$dispatch('custom-event', { user: 'Jane Doe' })">Dispatch Event</button>
+                </div>
+            </div>
+            
+            <!-- $watch -->
+            <div class="subsection">
+                <h3>$watch</h3>
+                <p>Watch for changes in data:</p>
+                <div x-data="{ watchLog: [], value: 0 }" x-init="$watch('value', (newVal, oldVal) => {
+                    watchLog.push(`Value changed from ${oldVal} to ${newVal} at ${new Date().toLocaleTimeString()}`);
+                })">
+                    <input type="number" x-model.number="value">
+                    <button @click="value++">Increment</button>
+                    
+                    <h4>Watch Log:</h4>
+                    <ul style="max-height: 100px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px;">
+                        <template x-for="(entry, index) in watchLog" :key="index">
+                            <li x-text="entry"></li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- $refs -->
+            <div class="subsection">
+                <h3>$refs</h3>
+                <p>Access elements with x-ref from anywhere:</p>
+                <input x-ref="myInput" type="text" placeholder="Type something">
+                <button @click="$refs.myInput.focus()">Focus Input</button>
+                <button @click="$refs.myOutput.textContent = $refs.myInput.value">Update Output</button>
+                <div x-ref="myOutput" style="margin-top: 10px; padding: 10px; border: 1px solid var(--border-color);">
+                    Output will appear here
+                </div>
+            </div>
+            
+            <!-- $nextTick -->
+            <div class="subsection">
+                <h3>$nextTick</h3>
+                <p>Wait until the next browser paint:</p>
+                <div x-data="{ message: 'Original' }">
+                    <p x-text="message"></p>
+                    <button @click="
+                        message = 'Updated';
+                        $nextTick(() => {
+                            $refs.tickOutput.textContent = 'Next tick executed after DOM update to: ' + $el.querySelector('p').textContent;
+                        })
+                    ">Update & Wait</button>
+                    <div x-ref="tickOutput" style="margin-top: 10px; padding: 10px; border: 1px solid var(--border-color);">
+                        Waiting for next tick...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Notification Component Using Multiple Features -->
+    <div x-data="{
+        notifications: [],
+        add(message) {
+            const id = Date.now();
+            this.notifications.push({ id, message });
+            setTimeout(() => this.remove(id), 3000);
+        },
+        remove(id) {
+            this.notifications = this.notifications.filter(notification => notification.id !== id);
+        }
+    }" @notify.window="add($event.detail.message)" class="notification-container">
+        <div style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+            <template x-for="notification in notifications" :key="notification.id">
+                <div class="notification" 
+                     x-transition:enter="fade-enter-active"
+                     x-transition:enter-start="fade-enter-from"
+                     x-transition:leave="fade-leave-active"
+                     x-transition:leave-start="fade-leave-to">
+                    <div x-text="notification.message"></div>
+                    <button @click="remove(notification.id)" style="margin-left: 10px;">&times;</button>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- External props integration demo -->
+    <div class="section">
+        <h2>Bonus: External Props Integration</h2>
+        <p>Demonstrates accessing page props provided from the server in Alpine.js:</p>
+        
+        <div x-init="console.log('Available props:', { name, age, animals })">
+            <p>Name from props: <span x-text="name"></span></p>
+            <p>Age from props: <span x-text="age"></span></p>
+            
+            <h3>Animals List from Props</h3>
+            <ul>
+                <template x-for="(animal, index) in animals" :key="index">
+                    <li x-text="animal"></li>
+                </template>
+            </ul>
+            
+            <h3>Computed from Props</h3>
+            <p>Age in dog years: <span x-text="age * 7"></span></p>
+            <p>Is adult: <span x-text="age >= 18 ? 'Yes' : 'No'"></span></p>
+        </div>
+    </div>
+
+    <footer class="section">
+        <p>This comprehensive demo showcases all 15 Alpine.js attributes, 6 magic properties, and store/data methods.</p>
+        <p>Copyright &copy; <span x-text="currentYear"></span></p>
+    </footer>
+</body>
+</html>

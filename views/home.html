@@ -1,0 +1,114 @@
+---
+import Age from "./views/age.html";
+import Head from "./views/head.html";
+import Todos from "./views/todos.html";
+
+prop name;
+prop age;
+prop animals;
+prop test = "whatever";
+
+let text = "something";
+
+var salutation = "hola";
+//var salutation;
+
+let path = "./views/mycomp.html";
+let comp = "mycomp";
+---
+
+<script>
+	let htmlEl = document.getElementsByTagName("html")[0];
+	let cms_fields_str = htmlEl.getAttribute("x-data");
+	let cms_fields = eval("(" + cms_fields_str + ")");
+
+	function createInputs(obj, container) {
+		for (const key in obj) {
+			if (Object.hasOwnProperty.call(obj, key)) {
+				const input = document.createElement('input');
+				input.type = 'text';
+				let attribute = "x-model";
+				if (typeof obj[key] === 'number') {
+					input.type = 'number';
+					attribute += ".number";
+				}
+				input.id = key;
+				input.name = key;
+				input.placeholder = key;
+				input.setAttribute(attribute, key);
+				const label = document.createElement('label');
+				label.htmlFor = key;
+				label.textContent = key;
+				container.appendChild(label);
+				container.appendChild(input);
+				container.appendChild(document.createElement('br'));
+			}
+		}
+	}
+	const cms = document.getElementById('load_cms');
+	createInputs(cms_fields, cms);
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+	<Head />
+	<body>
+		<main>
+			<div id="load_cms"></div>
+			<h1>{salutation} {name}</h1>
+			<span>{test}</span>
+			{if name === "John"}
+				<div id="praise">{name} is great</div>
+				{if age > 1}
+					<div>Has been born</div>
+				{/if}
+			{else}
+				<div id="praise">Not sure who you are, but you're probably great</div>
+			{/if}
+			{if age > 0}
+				<Age name={"Bill"} {age} />
+				<Todos number={age + 5} />
+
+				<Age name={"Bo"} age={age + 50} />
+				<Todos number={14} />
+
+				<Age name={"Baggins"} age={201} />
+				<Todos number={7 - 2} />
+			{/if}
+
+			<="./views/mycomp.html" {age} />
+			<={path} />
+			<="./views/{comp}.html" age={age + 1} />
+
+			<div class="animals">
+				{for let animal of ["new animal", ...animals]}
+					<div class="type-{animal}">{name} likes: {animal}s</div>
+					<div>Backwards: s{animal.split('').reverse().join('')}</div>
+					<button onclick="{animals.filter(a => a !== animal)}">Remove {animal}</button>
+					<br><br>
+				{/for}
+			</div>
+			<div>
+				<h3>Add new animal:</h3>
+				<input type="text" placeholder="animal name">
+				<button onclick="{animals = ['new', ...animals]}">Submit</button>
+			</div>
+		</main>
+	</body>
+</html>
+
+<style>
+	h1 {
+		color: yellow;
+	}
+	body #praise {
+		font-size: 3rem;
+	}
+	span {
+		color: purple;
+	}
+	.animals {
+		background-color: black;
+		color: white;
+	}
+</style>

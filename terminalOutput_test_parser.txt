@@ -1,0 +1,900 @@
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 0
+13:21:51 expressions.go:46: [TextParser] No text before delimiters, failing
+13:21:51 parser.go:233: [AnyNodeParser] Text parser (#4) failed with error: no text before delimiters
+13:21:51 parser.go:238: [AnyNodeParser] Failed: No choice matched for input starting with '</div>...'
+13:21:51 parser.go:103: [ParseTemplate] Alpine.js document with unparsed content. Forcing successful parse.
+13:21:51 parser.go:159: [ParseTemplate] Filtering out root-level whitespace TextNode
+13:21:51 parser.go:106: [ParseTemplate] Final Root Nodes Count (partial): 5
+✅ Successfully parsed: Alpine.js Attribute
+Template has 5 root nodes
+Node types:
+  - Text: 3
+  - Expression: 2
+--------------------------------------------------
+Testing: HTML with Expression
+13:21:51 parser.go:41: [ParseTemplate] Starting parse of template with length 21
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '<p>Hello, {name}!</p>...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<p>Hello, {name}!</p>...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '<p>Hello, {name}!</p>...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <p>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <p>
+13:21:51 html.go:114: [ElementParser] Found opening tag <p>
+13:21:51 html.go:129: [ElementParser] <p>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: 'Hello, {name}!</p>...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: 'Hello, {name}!</p>...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: 'Hello, {name}!</p>...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 7
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 7 chars: Hello, ...
+13:21:51 html.go:210: [ElementParser] <p>: Added child node: *ast.TextNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '{name}!</p>...'
+13:21:51 expressions.go:75: [ExpressionParser] Parsed expression: name
+13:21:51 html.go:210: [ElementParser] <p>: Added child node: *ast.ExpressionNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '!</p>...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '!</p>...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '!</p>...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: !...
+13:21:51 html.go:206: [ElementParser] <p>: Added text node: !
+13:21:51 html.go:147: [ElementParser] <p>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <p>: Finished parsing with 3 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <p>. Remaining: '...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Element parser (#3). Value: *ast.Element, Remaining: '...'
+13:21:51 parser.go:146: [ParseTemplate] Final Root Nodes Count: 1
+✅ Successfully parsed: HTML with Expression
+Template has 1 root nodes
+Node types:
+  - Element: 1
+  - Text: 2
+  - Expression: 1
+--------------------------------------------------
+Testing: HTML with Comment
+13:21:51 parser.go:41: [ParseTemplate] Starting parse of template with length 37
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '<div><!-- This is a comment --...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<div><!-- This is a comment --...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '<div><!-- This is a comment --...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <div>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <div>
+13:21:51 html.go:114: [ElementParser] Found opening tag <div>
+13:21:51 html.go:129: [ElementParser] <div>: Starting to parse children
+13:21:51 html.go:965: [CommentParser] Parsed comment:  This is a comment ...
+13:21:51 html.go:210: [ElementParser] <div>: Added child node: *ast.CommentNode
+13:21:51 html.go:147: [ElementParser] <div>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <div>: Finished parsing with 1 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <div>. Remaining: '...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Element parser (#3). Value: *ast.Element, Remaining: '...'
+13:21:51 parser.go:146: [ParseTemplate] Final Root Nodes Count: 1
+✅ Successfully parsed: HTML with Comment
+Template has 1 root nodes
+Node types:
+  - Element: 1
+  - Comment: 1
+--------------------------------------------------
+Testing: Complete Simple Document
+13:21:51 parser.go:41: [ParseTemplate] Starting parse of template with length 123
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '
+<html>
+<head>
+  <title>Test</...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+<html>
+<head>
+  <title>Test</...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '
+<html>
+<head>
+  <title>Test</...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:233: [AnyNodeParser] Element parser (#3) failed with error: not an element tag
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+<html>
+<head>
+  <title>Test</...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Text parser (#4). Value: *ast.TextNode, Remaining: '<html>
+<head>
+  <title>Test</t...'
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '<html>
+<head>
+  <title>Test</t...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<html>
+<head>
+  <title>Test</t...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '<html>
+<head>
+  <title>Test</t...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <html>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <html>
+13:21:51 html.go:114: [ElementParser] Found opening tag <html>
+13:21:51 html.go:129: [ElementParser] <html>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+<head>
+  <title>Test</title>
+...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+<head>
+  <title>Test</title>
+...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+<head>
+  <title>Test</title>
+...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 html.go:210: [ElementParser] <html>: Added child node: *ast.TextNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<head>
+  <title>Test</title>
+<...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '<head>
+  <title>Test</title>
+<...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <head>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <head>
+13:21:51 html.go:114: [ElementParser] Found opening tag <head>
+13:21:51 html.go:129: [ElementParser] <head>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+  <title>Test</title>
+</head>...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: '
+  <title>Test</title>
+</head>...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+  <title>Test</title>
+</head>...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 3
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 3 chars: 
+  ...
+13:21:51 html.go:210: [ElementParser] <head>: Added child node: *ast.TextNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<title>Test</title>
+</head>
+<b...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: '<title>Test</title>
+</head>
+<b...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <title>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <title>
+13:21:51 html.go:114: [ElementParser] Found opening tag <title>
+13:21:51 html.go:129: [ElementParser] <title>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: 'Test</title>
+</head>
+<body>
+  ...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 4, starting parse of: 'Test</title>
+</head>
+<body>
+  ...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 3 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: 'Test</title>
+</head>
+<body>
+  ...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 4
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 4 chars: Test...
+13:21:51 html.go:210: [ElementParser] <title>: Added child node: *ast.TextNode
+13:21:51 html.go:147: [ElementParser] <title>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <title>: Finished parsing with 1 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <title>. Remaining: '
+</head>
+<body>
+  <h1>Hello, {...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 html.go:210: [ElementParser] <head>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+</head>
+<body>
+  <h1>Hello, {...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: '
+</head>
+<body>
+  <h1>Hello, {...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+</head>
+<body>
+  <h1>Hello, {...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 html.go:206: [ElementParser] <head>: Added text node: 
+13:21:51 html.go:147: [ElementParser] <head>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <head>: Finished parsing with 3 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <head>. Remaining: '
+<body>
+  <h1>Hello, {name}!</...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 html.go:210: [ElementParser] <html>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+<body>
+  <h1>Hello, {name}!</...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+<body>
+  <h1>Hello, {name}!</...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+<body>
+  <h1>Hello, {name}!</...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 html.go:206: [ElementParser] <html>: Added text node: 
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<body>
+  <h1>Hello, {name}!</h...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '<body>
+  <h1>Hello, {name}!</h...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <body>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <body>
+13:21:51 html.go:114: [ElementParser] Found opening tag <body>
+13:21:51 html.go:129: [ElementParser] <body>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+  <h1>Hello, {name}!</h1>
+  <...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: '
+  <h1>Hello, {name}!</h1>
+  <...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+  <h1>Hello, {name}!</h1>
+  <...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 3
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 3 chars: 
+  ...
+13:21:51 html.go:210: [ElementParser] <body>: Added child node: *ast.TextNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<h1>Hello, {name}!</h1>
+  <p>W...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: '<h1>Hello, {name}!</h1>
+  <p>W...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <h1>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <h1>
+13:21:51 html.go:114: [ElementParser] Found opening tag <h1>
+13:21:51 html.go:129: [ElementParser] <h1>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: 'Hello, {name}!</h1>
+  <p>Welco...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 4, starting parse of: 'Hello, {name}!</h1>
+  <p>Welco...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 3 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: 'Hello, {name}!</h1>
+  <p>Welco...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 7
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 7 chars: Hello, ...
+13:21:51 html.go:210: [ElementParser] <h1>: Added child node: *ast.TextNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '{name}!</h1>
+  <p>Welcome to o...'
+13:21:51 expressions.go:75: [ExpressionParser] Parsed expression: name
+13:21:51 html.go:210: [ElementParser] <h1>: Added child node: *ast.ExpressionNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '!</h1>
+  <p>Welcome to our sit...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 4, starting parse of: '!</h1>
+  <p>Welcome to our sit...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 3 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '!</h1>
+  <p>Welcome to our sit...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: !...
+13:21:51 html.go:206: [ElementParser] <h1>: Added text node: !
+13:21:51 html.go:147: [ElementParser] <h1>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <h1>: Finished parsing with 3 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <h1>. Remaining: '
+  <p>Welcome to our site.</p>...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 html.go:210: [ElementParser] <body>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+  <p>Welcome to our site.</p>...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: '
+  <p>Welcome to our site.</p>...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+  <p>Welcome to our site.</p>...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 3
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 3 chars: 
+  ...
+13:21:51 html.go:206: [ElementParser] <body>: Added text node: 
+  
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<p>Welcome to our site.</p>
+</...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: '<p>Welcome to our site.</p>
+</...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <p>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <p>
+13:21:51 html.go:114: [ElementParser] Found opening tag <p>
+13:21:51 html.go:129: [ElementParser] <p>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: 'Welcome to our site.</p>
+</bod...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 4, starting parse of: 'Welcome to our site.</p>
+</bod...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 3 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: 'Welcome to our site.</p>
+</bod...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 20
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 20 chars: Welcome to our site....
+13:21:51 html.go:210: [ElementParser] <p>: Added child node: *ast.TextNode
+13:21:51 html.go:147: [ElementParser] <p>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <p>: Finished parsing with 1 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <p>. Remaining: '
+</body>
+</html>...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 html.go:210: [ElementParser] <body>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+</body>
+</html>...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: '
+</body>
+</html>...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+</body>
+</html>...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 html.go:206: [ElementParser] <body>: Added text node: 
+13:21:51 html.go:147: [ElementParser] <body>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <body>: Finished parsing with 5 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <body>. Remaining: '
+</html>...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 html.go:210: [ElementParser] <html>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+</html>...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+</html>...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+</html>...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 html.go:206: [ElementParser] <html>: Added text node: 
+13:21:51 html.go:147: [ElementParser] <html>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <html>: Finished parsing with 5 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <html>. Remaining: '...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Element parser (#3). Value: *ast.Element, Remaining: '...'
+13:21:51 parser.go:137: [ParseTemplate] Filtering out root-level whitespace TextNode
+13:21:51 parser.go:146: [ParseTemplate] Final Root Nodes Count: 1
+✅ Successfully parsed: Complete Simple Document
+Template has 1 root nodes
+Node types:
+  - Element: 6
+  - Text: 12
+  - Expression: 1
+--------------------------------------------------
+Testing: Document with Alpine.js
+13:21:51 parser.go:41: [ParseTemplate] Starting parse of template with length 277
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '
+<html lang="en" x-data="{ mes...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+<html lang="en" x-data="{ mes...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '
+<html lang="en" x-data="{ mes...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:233: [AnyNodeParser] Element parser (#3) failed with error: not an element tag
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+<html lang="en" x-data="{ mes...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Text parser (#4). Value: *ast.TextNode, Remaining: '<html lang="en" x-data="{ mess...'
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '<html lang="en" x-data="{ mess...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<html lang="en" x-data="{ mess...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '<html lang="en" x-data="{ mess...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <html>
+13:21:51 html.go:543: [EnhancedAttributeParser] Starting on: 'lang="en" x-data="{ message: '...'
+13:21:51 html.go:554: [EnhancedAttributeParser] Parsed name: lang
+13:21:51 html.go:610: [EnhancedAttributeParser] Parsing regular attribute value
+13:21:51 html.go:786: [parseAttributeValue] Starting on: '"en" x-data="{ message: 'Hello...'
+13:21:51 html.go:824: [parseAttributeValue] Parsed quoted value: en (dynamic=false)
+13:21:51 html.go:620: [EnhancedAttributeParser] Successfully parsed attribute value: en
+13:21:51 html.go:638: [EnhancedAttributeParser] Successfully parsed attribute: lang=en (Alpine=false)
+13:21:51 html.go:82: [ElementParser] Parsed attribute: lang (Value: en)
+13:21:51 html.go:543: [EnhancedAttributeParser] Starting on: 'x-data="{ message: 'Hello Alpi...'
+13:21:51 html.go:554: [EnhancedAttributeParser] Parsed name: x-data
+13:21:51 html.go:568: [EnhancedAttributeParser] Detected Alpine directive: type=data, key=
+13:21:51 html.go:597: [EnhancedAttributeParser] Special handling for x-data attribute
+13:21:51 html.go:645: [parseAlpineDataAttribute] Starting on: '"{ message: 'Hello Alpine!', c...'
+13:21:51 html.go:682: [parseAlpineDataAttribute] Starting to parse quoted value with quote char: "
+13:21:51 html.go:717: [parseAlpineDataAttribute] Found opening brace, count: 1
+13:21:51 html.go:720: [parseAlpineDataAttribute] Found closing brace, count: 0
+13:21:51 html.go:737: [parseAlpineDataAttribute] Warning: Unclosed quote in x-data value, but returning partial content for Alpine.js compatibility
+13:21:51 html.go:607: [EnhancedAttributeParser] Successfully parsed x-data value: { message: 'Hello Alpine!', count: 0 }">
+<head>
+  <meta charset="UTF-8">
+  <title>Alpine Test</title>
+</head>
+<body>
+  <h1 x-text="message"></h1>
+  <button @click="count++">Increment</button>
+  <p>Count: <span x-text="count"></span></p>
+</body>
+</html>
+13:21:51 html.go:638: [EnhancedAttributeParser] Successfully parsed attribute: x-data={ message: 'Hello Alpine!', count: 0 }">
+<head>
+  <meta charset="UTF-8">
+  <title>Alpine Test</title>
+</head>
+<body>
+  <h1 x-text="message"></h1>
+  <button @click="count++">Increment</button>
+  <p>Count: <span x-text="count"></span></p>
+</body>
+</html> (Alpine=true)
+13:21:51 html.go:82: [ElementParser] Parsed attribute: x-data (Value: { message: 'Hello Alpine!', count: 0 }">
+<head>
+  <meta charset="UTF-8">
+  <title>Alpine Test</title>
+</head>
+<body>
+  <h1 x-text="message"></h1>
+  <button @click="count++">Increment</button>
+  <p>Count: <span x-text="count"></span></p>
+</body>
+</html>)
+13:21:51 html.go:96: [ElementParser] Finished parsing 2 attributes for <html>
+13:21:51 html.go:104: [ElementParser] Unexpected end of input after attributes
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:233: [AnyNodeParser] Element parser (#3) failed with error: unexpected end of input after attributes
+13:21:51 expressions.go:14: [TextParser] Starting on: '<html lang="en" x-data="{ mess...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 0
+13:21:51 expressions.go:46: [TextParser] No text before delimiters, failing
+13:21:51 parser.go:233: [AnyNodeParser] Text parser (#4) failed with error: no text before delimiters
+13:21:51 parser.go:238: [AnyNodeParser] Failed: No choice matched for input starting with '<html lang="en" x-data="{ mess...'
+13:21:51 parser.go:242: [AnyNodeParser] Alpine.js document detected. Forcing success with empty text node.
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: 'html lang="en" x-data="{ messa...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: 'html lang="en" x-data="{ messa...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: 'html lang="en" x-data="{ messa...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:233: [AnyNodeParser] Element parser (#3) failed with error: not an element tag
+13:21:51 expressions.go:14: [TextParser] Starting on: 'html lang="en" x-data="{ messa...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 23
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 23 chars: html lang="en" x-data="...
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Text parser (#4). Value: *ast.TextNode, Remaining: '{ message: 'Hello Alpine!', co...'
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '{ message: 'Hello Alpine!', co...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '{ message: 'Hello Alpine!', co...'
+13:21:51 expressions.go:75: [ExpressionParser] Parsed expression:  message: 'Hello Alpine!', count: 0 
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Expression parser (#1). Value: *ast.ExpressionNode, Remaining: '">
+<head>
+  <meta charset="UTF...'
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '">
+<head>
+  <meta charset="UTF...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '">
+<head>
+  <meta charset="UTF...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '">
+<head>
+  <meta charset="UTF...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:233: [AnyNodeParser] Element parser (#3) failed with error: not an element tag
+13:21:51 expressions.go:14: [TextParser] Starting on: '">
+<head>
+  <meta charset="UTF...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 3
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 3 chars: ">
+...
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Text parser (#4). Value: *ast.TextNode, Remaining: '<head>
+  <meta charset="UTF-8"...'
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '<head>
+  <meta charset="UTF-8"...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<head>
+  <meta charset="UTF-8"...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '<head>
+  <meta charset="UTF-8"...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <head>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <head>
+13:21:51 html.go:114: [ElementParser] Found opening tag <head>
+13:21:51 html.go:129: [ElementParser] <head>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+  <meta charset="UTF-8">
+  <t...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+  <meta charset="UTF-8">
+  <t...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+  <meta charset="UTF-8">
+  <t...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 3
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 3 chars: 
+  ...
+13:21:51 html.go:210: [ElementParser] <head>: Added child node: *ast.TextNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<meta charset="UTF-8">
+  <titl...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '<meta charset="UTF-8">
+  <titl...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <meta>
+13:21:51 html.go:543: [EnhancedAttributeParser] Starting on: 'charset="UTF-8">
+  <title>Alpi...'
+13:21:51 html.go:554: [EnhancedAttributeParser] Parsed name: charset
+13:21:51 html.go:610: [EnhancedAttributeParser] Parsing regular attribute value
+13:21:51 html.go:786: [parseAttributeValue] Starting on: '"UTF-8">
+  <title>Alpine Test<...'
+13:21:51 html.go:824: [parseAttributeValue] Parsed quoted value: UTF-8 (dynamic=false)
+13:21:51 html.go:620: [EnhancedAttributeParser] Successfully parsed attribute value: UTF-8
+13:21:51 html.go:638: [EnhancedAttributeParser] Successfully parsed attribute: charset=UTF-8 (Alpine=false)
+13:21:51 html.go:82: [ElementParser] Parsed attribute: charset (Value: UTF-8)
+13:21:51 html.go:96: [ElementParser] Finished parsing 1 attributes for <meta>
+13:21:51 html.go:114: [ElementParser] Found opening tag <meta>
+13:21:51 html.go:123: [ElementParser] <meta> is a void element, treating as self-closing
+13:21:51 html.go:248: [ElementParser] <meta>: Finished parsing with 0 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <meta>. Remaining: '
+  <title>Alpine Test</title>
+...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 html.go:210: [ElementParser] <head>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+  <title>Alpine Test</title>
+...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+  <title>Alpine Test</title>
+...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+  <title>Alpine Test</title>
+...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 3
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 3 chars: 
+  ...
+13:21:51 html.go:206: [ElementParser] <head>: Added text node: 
+  
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<title>Alpine Test</title>
+</h...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '<title>Alpine Test</title>
+</h...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <title>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <title>
+13:21:51 html.go:114: [ElementParser] Found opening tag <title>
+13:21:51 html.go:129: [ElementParser] <title>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: 'Alpine Test</title>
+</head>
+<b...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: 'Alpine Test</title>
+</head>
+<b...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: 'Alpine Test</title>
+</head>
+<b...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 11
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 11 chars: Alpine Test...
+13:21:51 html.go:210: [ElementParser] <title>: Added child node: *ast.TextNode
+13:21:51 html.go:147: [ElementParser] <title>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <title>: Finished parsing with 1 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <title>. Remaining: '
+</head>
+<body>
+  <h1 x-text="...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 html.go:210: [ElementParser] <head>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+</head>
+<body>
+  <h1 x-text="...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+</head>
+<body>
+  <h1 x-text="...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+</head>
+<body>
+  <h1 x-text="...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 html.go:206: [ElementParser] <head>: Added text node: 
+13:21:51 html.go:147: [ElementParser] <head>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <head>: Finished parsing with 5 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <head>. Remaining: '
+<body>
+  <h1 x-text="message"...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Element parser (#3). Value: *ast.Element, Remaining: '
+<body>
+  <h1 x-text="message"...'
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '
+<body>
+  <h1 x-text="message"...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+<body>
+  <h1 x-text="message"...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '
+<body>
+  <h1 x-text="message"...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:233: [AnyNodeParser] Element parser (#3) failed with error: not an element tag
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+<body>
+  <h1 x-text="message"...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Text parser (#4). Value: *ast.TextNode, Remaining: '<body>
+  <h1 x-text="message">...'
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '<body>
+  <h1 x-text="message">...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<body>
+  <h1 x-text="message">...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '<body>
+  <h1 x-text="message">...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <body>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <body>
+13:21:51 html.go:114: [ElementParser] Found opening tag <body>
+13:21:51 html.go:129: [ElementParser] <body>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+  <h1 x-text="message"></h1>
+...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+  <h1 x-text="message"></h1>
+...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+  <h1 x-text="message"></h1>
+...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 3
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 3 chars: 
+  ...
+13:21:51 html.go:210: [ElementParser] <body>: Added child node: *ast.TextNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<h1 x-text="message"></h1>
+  <...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '<h1 x-text="message"></h1>
+  <...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <h1>
+13:21:51 html.go:543: [EnhancedAttributeParser] Starting on: 'x-text="message"></h1>
+  <butt...'
+13:21:51 html.go:554: [EnhancedAttributeParser] Parsed name: x-text
+13:21:51 html.go:568: [EnhancedAttributeParser] Detected Alpine directive: type=text, key=
+13:21:51 html.go:610: [EnhancedAttributeParser] Parsing regular attribute value
+13:21:51 html.go:786: [parseAttributeValue] Starting on: '"message"></h1>
+  <button @cli...'
+13:21:51 html.go:824: [parseAttributeValue] Parsed quoted value: message (dynamic=false)
+13:21:51 html.go:620: [EnhancedAttributeParser] Successfully parsed attribute value: message
+13:21:51 html.go:638: [EnhancedAttributeParser] Successfully parsed attribute: x-text=message (Alpine=true)
+13:21:51 html.go:82: [ElementParser] Parsed attribute: x-text (Value: message)
+13:21:51 html.go:96: [ElementParser] Finished parsing 1 attributes for <h1>
+13:21:51 html.go:114: [ElementParser] Found opening tag <h1>
+13:21:51 html.go:129: [ElementParser] <h1>: Starting to parse children
+13:21:51 html.go:147: [ElementParser] <h1>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <h1>: Finished parsing with 0 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <h1>. Remaining: '
+  <button @click="count++">In...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 html.go:210: [ElementParser] <body>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+  <button @click="count++">In...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+  <button @click="count++">In...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+  <button @click="count++">In...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 3
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 3 chars: 
+  ...
+13:21:51 html.go:206: [ElementParser] <body>: Added text node: 
+  
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<button @click="count++">Incre...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '<button @click="count++">Incre...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <button>
+13:21:51 html.go:543: [EnhancedAttributeParser] Starting on: '@click="count++">Increment</bu...'
+13:21:51 html.go:554: [EnhancedAttributeParser] Parsed name: @click
+13:21:51 html.go:575: [EnhancedAttributeParser] Detected Alpine @ shorthand: @click
+13:21:51 html.go:610: [EnhancedAttributeParser] Parsing regular attribute value
+13:21:51 html.go:786: [parseAttributeValue] Starting on: '"count++">Increment</button>
+ ...'
+13:21:51 html.go:824: [parseAttributeValue] Parsed quoted value: count++ (dynamic=false)
+13:21:51 html.go:620: [EnhancedAttributeParser] Successfully parsed attribute value: count++
+13:21:51 html.go:638: [EnhancedAttributeParser] Successfully parsed attribute: @click=count++ (Alpine=true)
+13:21:51 html.go:82: [ElementParser] Parsed attribute: @click (Value: count++)
+13:21:51 html.go:96: [ElementParser] Finished parsing 1 attributes for <button>
+13:21:51 html.go:114: [ElementParser] Found opening tag <button>
+13:21:51 html.go:129: [ElementParser] <button>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: 'Increment</button>
+  <p>Count:...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: 'Increment</button>
+  <p>Count:...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: 'Increment</button>
+  <p>Count:...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 9
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 9 chars: Increment...
+13:21:51 html.go:210: [ElementParser] <button>: Added child node: *ast.TextNode
+13:21:51 html.go:147: [ElementParser] <button>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <button>: Finished parsing with 1 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <button>. Remaining: '
+  <p>Count: <span x-text="cou...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 html.go:210: [ElementParser] <body>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+  <p>Count: <span x-text="cou...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+  <p>Count: <span x-text="cou...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+  <p>Count: <span x-text="cou...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 3
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 3 chars: 
+  ...
+13:21:51 html.go:206: [ElementParser] <body>: Added text node: 
+  
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<p>Count: <span x-text="count"...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '<p>Count: <span x-text="count"...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <p>
+13:21:51 html.go:96: [ElementParser] Finished parsing 0 attributes for <p>
+13:21:51 html.go:114: [ElementParser] Found opening tag <p>
+13:21:51 html.go:129: [ElementParser] <p>: Starting to parse children
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: 'Count: <span x-text="count"></...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: 'Count: <span x-text="count"></...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: 'Count: <span x-text="count"></...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 7
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 7 chars: Count: ...
+13:21:51 html.go:210: [ElementParser] <p>: Added child node: *ast.TextNode
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '<span x-text="count"></span></...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 3, starting parse of: '<span x-text="count"></span></...'
+13:21:51 html.go:59: [ElementParser] Identified tag: <span>
+13:21:51 html.go:543: [EnhancedAttributeParser] Starting on: 'x-text="count"></span></p>
+</b...'
+13:21:51 html.go:554: [EnhancedAttributeParser] Parsed name: x-text
+13:21:51 html.go:568: [EnhancedAttributeParser] Detected Alpine directive: type=text, key=
+13:21:51 html.go:610: [EnhancedAttributeParser] Parsing regular attribute value
+13:21:51 html.go:786: [parseAttributeValue] Starting on: '"count"></span></p>
+</body>
+</...'
+13:21:51 html.go:824: [parseAttributeValue] Parsed quoted value: count (dynamic=false)
+13:21:51 html.go:620: [EnhancedAttributeParser] Successfully parsed attribute value: count
+13:21:51 html.go:638: [EnhancedAttributeParser] Successfully parsed attribute: x-text=count (Alpine=true)
+13:21:51 html.go:82: [ElementParser] Parsed attribute: x-text (Value: count)
+13:21:51 html.go:96: [ElementParser] Finished parsing 1 attributes for <span>
+13:21:51 html.go:114: [ElementParser] Found opening tag <span>
+13:21:51 html.go:129: [ElementParser] <span>: Starting to parse children
+13:21:51 html.go:147: [ElementParser] <span>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <span>: Finished parsing with 0 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <span>. Remaining: '</p>
+</body>
+</html>...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 2 after parse
+13:21:51 html.go:210: [ElementParser] <p>: Added child node: *ast.Element
+13:21:51 html.go:147: [ElementParser] <p>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <p>: Finished parsing with 2 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <p>. Remaining: '
+</body>
+</html>...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 html.go:210: [ElementParser] <body>: Added child node: *ast.Element
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+</body>
+</html>...'
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 2, starting parse of: '
+</body>
+</html>...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 1 after parse
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+</body>
+</html>...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 html.go:206: [ElementParser] <body>: Added text node: 
+13:21:51 html.go:147: [ElementParser] <body>: Found and consumed closing tag
+13:21:51 html.go:248: [ElementParser] <body>: Finished parsing with 7 children
+13:21:51 html.go:258: [ElementParser] Successfully parsed <body>. Remaining: '
+</html>...'
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Element parser (#3). Value: *ast.Element, Remaining: '
+</html>...'
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '
+</html>...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '
+</html>...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '
+</html>...'
+13:21:51 html.go:36: [ElementParser] Not an element tag (doesn't start with <)
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:233: [AnyNodeParser] Element parser (#3) failed with error: not an element tag
+13:21:51 expressions.go:14: [TextParser] Starting on: '
+</html>...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 1
+13:21:51 expressions.go:41: [TextParser] Parsed text node with 1 chars: 
+...
+13:21:51 parser.go:218: [AnyNodeParser] Succeeded with Text parser (#4). Value: *ast.TextNode, Remaining: '</html>...'
+13:21:51 parser.go:171: [AnyNodeParser] Attempting on: '</html>...'
+13:21:51 parser.go:233: [AnyNodeParser] Comment parser (#0) failed with error: string not matched: <!--
+13:21:51 expressions.go:54: [ExpressionParser] Starting on: '</html>...'
+13:21:51 parser.go:233: [AnyNodeParser] Expression parser (#1) failed with error: not an expression
+13:21:51 parser.go:233: [AnyNodeParser] Component parser (#2) failed with error: not a component tag
+13:21:51 html.go:21: [ElementParser] DEPTH++ = 1, starting parse of: '</html>...'
+13:21:51 html.go:47: [ElementParser] Not a standard element: /html>...
+13:21:51 html.go:26: [ElementParser] DEPTH-- = 0 after parse
+13:21:51 parser.go:233: [AnyNodeParser] Element parser (#3) failed with error: not a standard HTML element opening tag
+13:21:51 expressions.go:14: [TextParser] Starting on: '</html>...'
+13:21:51 expressions.go:29: [TextParser] Found delimiter at position 0
+13:21:51 expressions.go:46: [TextParser] No text before delimiters, failing
+13:21:51 parser.go:233: [AnyNodeParser] Text parser (#4) failed with error: no text before delimiters
+13:21:51 parser.go:238: [AnyNodeParser] Failed: No choice matched for input starting with '</html>...'
+13:21:51 parser.go:103: [ParseTemplate] Alpine.js document with unparsed content. Forcing successful parse.
+13:21:51 parser.go:159: [ParseTemplate] Filtering out root-level whitespace TextNode
+13:21:51 parser.go:159: [ParseTemplate] Filtering out root-level whitespace TextNode
+13:21:51 parser.go:159: [ParseTemplate] Filtering out root-level whitespace TextNode
+13:21:51 parser.go:159: [ParseTemplate] Filtering out root-level whitespace TextNode
+13:21:51 parser.go:106: [ParseTemplate] Final Root Nodes Count (partial): 5
+✅ Successfully parsed: Document with Alpine.js
+Template has 5 root nodes
+Node types:
+  - Text: 12
+  - Expression: 1
+  - Element: 8
+--------------------------------------------------
+ ~/Pr/Al/custom_go_template  master !1 ?10                                  ✔  system  
