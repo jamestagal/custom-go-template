@@ -48,17 +48,33 @@ func TextParser(delimiters ...Parser) Parser {
 	}
 }
 
-// ExpressionParser parses an {expression} and returns an *ast.ExpressionNode
+// ExpressionParser parses an {expression} or {{expression}} and returns an *ast.ExpressionNode
 func ExpressionParser() Parser {
 	return func(input string) Result {
 		log.Printf("[ExpressionParser] Starting on: '%.30s...'", input)
 
-		// Must start with a curly brace
+		// Check for double braces first
+		if strings.HasPrefix(input, "{{") {
+			exprRes := Between(String("{{"), String("}}"), TakeUntil(String("}}")))(input)
+			if exprRes.Successful {
+				expressionContent := strings.TrimSpace(exprRes.Value.(string))
+				log.Printf("[ExpressionParser] Parsed double-brace expression: %s", expressionContent)
+				return Result{
+					&ast.ExpressionNode{Expression: expressionContent},
+					exprRes.Remaining,
+					true,
+					"",
+					false,
+				}
+			}
+		}
+
+		// Then check for single braces
 		if !strings.HasPrefix(input, "{") {
 			return Result{nil, input, false, "not an expression", false}
 		}
 
-		// Check if it's a directive
+		// Check if it's a directive - must be done before attempting to parse as expression
 		if isDirective(input) {
 			log.Printf("[ExpressionParser] Looks like a directive, not a simple expression")
 			return Result{nil, input, false, "looks like a directive, not a simple expression", false}
@@ -71,8 +87,8 @@ func ExpressionParser() Parser {
 			return Result{nil, input, false, fmt.Sprintf("failed to parse expression: %s", exprRes.Error), false}
 		}
 
-		expressionContent := exprRes.Value.(string)
-		log.Printf("[ExpressionParser] Parsed expression: %s", expressionContent)
+		expressionContent := strings.TrimSpace(exprRes.Value.(string))
+		log.Printf("[ExpressionParser] Parsed single-brace expression: %s", expressionContent)
 		return Result{
 			&ast.ExpressionNode{Expression: expressionContent},
 			exprRes.Remaining,
@@ -86,8 +102,9 @@ func ExpressionParser() Parser {
 // isDirective checks if an input string appears to be a directive
 func isDirective(input string) bool {
 	directives := []string{
-		"{if ", "{else if ", "{else}", "{/if}",
-		"{for ", "{/for}", "{await ", "{/await}",
+		"{if", "{else if", "{else}", "{/if}",
+		"{for", "{/for}", "{await", "{/await}",
+		"{#if", "{#each", "{:else}", "{:else if", "{/if}", "{/#if}", "{/each}", "{/#each}",
 		"{#", "{/", "{:", "{@",
 	}
 

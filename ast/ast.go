@@ -143,6 +143,13 @@ type ComponentProp struct {
 
 // --- Simple Directive Nodes ---
 
+// ElseIfNode represents an {else if condition} tag
+type ElseIfNode struct {
+	Condition string
+}
+
+func (n *ElseIfNode) NodeType() string { return "ElseIf" }
+
 // ElseNode represents an {else} tag
 type ElseNode struct{}
 

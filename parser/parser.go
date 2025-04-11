@@ -140,7 +140,7 @@ func ParseTemplate(template string) (*ast.Template, error) {
 			filteredRootNodes = append(filteredRootNodes, node)
 		}
 	}
-
+	
 	// Create the final AST
 	root := &ast.Template{RootNodes: filteredRootNodes}
 	log.Printf("[ParseTemplate] Final Root Nodes Count: %d", len(root.RootNodes))
@@ -165,11 +165,11 @@ func filterWhitespaceRootNodes(nodes []ast.Node) []ast.Node {
 	return filtered
 }
 
-// AnyNodeParser is the main parser for content within elements or at the top level.
+// AnyNodeParser tries all node parsers in sequence
 func AnyNodeParser(stop ...Parser) Parser {
 	return func(input string) Result {
 		log.Printf("[AnyNodeParser] Attempting on: '%.30s...'", input)
-
+		
 		// Check for Alpine.js document patterns
 		hasAlpine := strings.Contains(input, "x-data") ||
 			strings.Contains(input, "@click") ||
@@ -190,47 +190,45 @@ func AnyNodeParser(stop ...Parser) Parser {
 			delimiters = append(delimiters, stop...)
 		}
 
-		// Define available parsers in priority order
-		textP := TextParser(delimiters...)
-		exprP := ExpressionParser()
-		elemP := ElementParser() // This will use the improved ElementParser
-		compP := ComponentParser()
-		commentP := CommentParser()
-
-		// Store parsers with names for better logging
+		// Order matters! Try more specific parsers first
 		parsers := []struct {
 			Name   string
 			Parser Parser
 		}{
-			{"Comment", commentP},
-			{"Expression", exprP},
-			{"Component", compP},
-			{"Element", elemP},
-			{"Text", textP},
+			{"Comment", CommentParser()},
+			{"IfStart", IfStartParser()},
+			{"ElseIf", ElseIfParser()},
+			{"Else", ElseParser()},
+			{"IfEnd", IfEndParser()},
+			{"ForStart", ForStartParser()},
+			{"ForEnd", ForEndParser()},
+			{"Component", ComponentParser()}, // Try component parser before element and expression
+			{"Element", ElementParser()},
+			{"Expression", ExpressionParser()},
+			{"Text", TextParser(delimiters...)}, // Text parser should be last
 		}
-
-		// Try each parser in order
-		for i, pInfo := range parsers {
-			result := pInfo.Parser(input)
+		
+		for i, p := range parsers {
+			result := p.Parser(input)
 			if result.Successful {
 				// Ensure parser made progress or returned a value
 				if result.Remaining != input || result.Value != nil {
-					log.Printf("[AnyNodeParser] Succeeded with %s parser (#%d). Value: %T, Remaining: '%.30s...'",
-						pInfo.Name, i, result.Value, result.Remaining)
+					log.Printf("[AnyNodeParser] Succeeded with %s parser (#%d). Value: %T, Remaining: '%.30s...'", 
+						p.Name, i, result.Value, result.Remaining)
 					return result
 				}
 
 				// Special handling for Alpine.js documents
-				if hasAlpine && pInfo.Name == "Element" {
+				if hasAlpine && p.Name == "Element" {
 					log.Printf("[AnyNodeParser] Alpine.js document detected. Treating element parser as successful despite no progress.")
 					// Create a minimal text node to ensure progress
 					return Result{&ast.TextNode{Content: ""}, input, true, "", false}
 				}
 
-				log.Printf("[AnyNodeParser] %s parser (#%d) succeeded but didn't make progress. Continuing.", pInfo.Name, i)
+				log.Printf("[AnyNodeParser] %s parser (#%d) succeeded but didn't make progress. Continuing.", p.Name, i)
 			} else {
 				// Log failure reason
-				log.Printf("[AnyNodeParser] %s parser (#%d) failed with error: %s", pInfo.Name, i, result.Error)
+				log.Printf("[AnyNodeParser] %s parser (#%d) failed with error: %s", p.Name, i, result.Error)
 			}
 		}
 

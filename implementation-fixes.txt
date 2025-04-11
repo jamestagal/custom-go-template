@@ -1,0 +1,269 @@
+// 1. Fix Alpine data formatting in render.go
+// Change the data formatting to ensure consistent order and format
+
+// In GenerateMarkup function or where the x-data attribute is created:
+func formatAlpineData(data map[string]any) string {
+    // Filter out null values
+    filteredData := make(map[string]any)
+    for k, v := range data {
+        if v != nil {
+            filteredData[k] = v
+        }
+    }
+    
+    // Sort keys to ensure consistent order
+    keys := make([]string, 0, len(filteredData))
+    for k := range filteredData {
+        keys = append(keys, k)
+    }
+    sort.Strings(keys)
+    
+    // Build ordered map
+    orderedData := make(map[string]any)
+    for _, k := range keys {
+        orderedData[k] = filteredData[k]
+    }
+    
+    // Use specific JSON formatting for Alpine compatibility
+    jsonBytes, err := json.Marshal(orderedData)
+    if err != nil {
+        log.Printf("Error marshaling alpine data: %v", err)
+        return "{}"
+    }
+    
+    // Use single quotes for Alpine data to avoid HTML attribute escaping issues
+    return "'" + string(jsonBytes) + "'"
+}
+
+// 2. Fix Loop Transformation in the transformAST.go file:
+// Update the loop transformation logic:
+
+func transformLoop(node *ast.Loop, props map[string]any) ast.Node {
+    // Determine if we're iterating over an array or object
+    isArray := false
+    collection := node.Collection
+    
+    // Check if the collection is an array
+    if collectionValue, ok := props[collection]; ok {
+        _, isArray = collectionValue.([]any)
+        // Also check for typed arrays like []string, []int, etc.
+        if !isArray {
+            rv := reflect.ValueOf(collectionValue)
+            if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
+                isArray = true
+            }
+        }
+    }
+    
+    // Create the proper loop format based on collection type
+    var loopAttr string
+    if isArray {
+        // For arrays, use the "item in array" syntax
+        loopAttr = fmt.Sprintf(`%s in %s`, node.Value, collection)
+    } else {
+        // For objects, use the "key, value of Object.entries(obj)" syntax
+        loopAttr = fmt.Sprintf(`(%s, %s) of Object.entries(%s)`, node.Value, node.Iterator, collection)
+    }
+    
+    // Create the Alpine loop template
+    loopNode := &ast.Element{
+        TagName: "template",
+        Attributes: []ast.Attribute{
+            {Name: "x-for", Value: loopAttr, Dynamic: false},
+        },
+        Children: transformNodes(node.Content, props),
+        SelfClosing: false,
+    }
+    
+    return loopNode
+}
+
+// 3. Fix Conditional Transformation
+// Update the conditional transformation logic:
+
+func transformConditional(node *ast.Conditional, props map[string]any) []ast.Node {
+    var result []ast.Node
+    
+    // Create the "if" branch
+    ifNode := &ast.Element{
+        TagName: "template",
+        Attributes: []ast.Attribute{
+            {Name: "x-if", Value: node.IfCondition, Dynamic: false},
+        },
+        Children: transformNodes(node.IfContent, props),
+        SelfClosing: false,
+    }
+    result = append(result, ifNode)
+    
+    // Process else-if branches if present
+    for i, condition := range node.ElseIfConditions {
+        elseIfNode := &ast.Element{
+            TagName: "template",
+            Attributes: []ast.Attribute{
+                {Name: "x-if", Value: fmt.Sprintf("!(%s) && %s", node.IfCondition, condition), Dynamic: false},
+            },
+            Children: transformNodes(node.ElseIfContent[i], props),
+            SelfClosing: false,
+        }
+        result = append(result, elseIfNode)
+    }
+    
+    // Process else branch if present
+    if len(node.ElseContent) > 0 {
+        // Create a negated condition of all previous conditions
+        var negatedCondition string
+        if len(node.ElseIfConditions) > 0 {
+            conditions := []string{node.IfCondition}
+            conditions = append(conditions, node.ElseIfConditions...)
+            allConditions := strings.Join(conditions, " || ")
+            negatedCondition = fmt.Sprintf("!(%s)", allConditions)
+        } else {
+            negatedCondition = fmt.Sprintf("!(%s)", node.IfCondition)
+        }
+        
+        elseNode := &ast.Element{
+            TagName: "template",
+            Attributes: []ast.Attribute{
+                {Name: "x-if", Value: negatedCondition, Dynamic: false},
+            },
+            Children: transformNodes(node.ElseContent, props),
+            SelfClosing: false,
+        }
+        result = append(result, elseNode)
+    }
+    
+    return result
+}
+
+// 4. Fix Component Duplication
+// Update the component handling logic:
+
+// Add tracking to manage components
+var renderedComponents = make(map[string]bool)
+
+func resetComponentTracking() {
+    renderedComponents = make(map[string]bool)
+}
+
+func transformComponent(node *ast.ComponentNode, props map[string]any) ast.Node {
+    // Generate a unique key for this component based on name and props
+    componentKey := node.Name
+    for _, prop := range node.Props {
+        componentKey += ":" + prop.Name + "=" + prop.Value
+    }
+    
+    // Check if we've rendered this exact component before
+    if isDuplicate := renderedComponents[componentKey]; isDuplicate {
+        log.Printf("Warning: Duplicate component detected: %s", componentKey)
+        // Return empty node or a comment node indicating duplication
+        return &ast.TextNode{Content: "<!-- Duplicate component omitted -->"}
+    }
+    
+    // Mark this component as rendered
+    renderedComponents[componentKey] = true
+    
+    // Generate the component attributes
+    var attributes []ast.Attribute
+    attributes = append(attributes, ast.Attribute{
+        Name:  "x-component", 
+        Value: node.Name,
+        Dynamic: false,
+    })
+    
+    // Add component props as data attributes
+    for _, prop := range node.Props {
+        propAttr := ast.Attribute{
+            Name:  fmt.Sprintf("data-prop-%s", prop.Name),
+            Value: prop.Value,
+            Dynamic: prop.IsDynamic,
+        }
+        attributes = append(attributes, propAttr)
+    }
+    
+    // Create the component element
+    return &ast.Element{
+        TagName:     "div",
+        Attributes:  attributes,
+        Children:    []ast.Node{},
+        SelfClosing: true,
+    }
+}
+
+// 5. Fix Whitespace Handling
+// Update the text node processing:
+
+func transformTextNode(node *ast.TextNode) ast.Node {
+    // Preserve whitespace but trim excessive whitespace
+    content := node.Content
+    
+    // Remove consecutive spaces, but keep line breaks
+    re := regexp.MustCompile(`[ \t]+`)
+    content = re.ReplaceAllString(content, " ")
+    
+    // Trim leading/trailing whitespace
+    content = strings.TrimSpace(content)
+    
+    return &ast.TextNode{
+        Content: content,
+    }
+}
+
+// Finally, update the main transform function to use these improved implementations:
+
+func TransformAST(nodes []ast.Node, props map[string]any) []ast.Node {
+    // Reset component tracking for each transformation
+    resetComponentTracking()
+    
+    log.Printf("TransformAST: Starting node transformation")
+    transformed := transformNodes(nodes, props)
+    log.Printf("TransformAST: Transformation complete, generated %d nodes", len(transformed))
+    
+    return transformed
+}
+
+func transformNodes(nodes []ast.Node, props map[string]any) []ast.Node {
+    var transformed []ast.Node
+    
+    for _, node := range nodes {
+        switch n := node.(type) {
+        case *ast.ExpressionNode:
+            log.Printf("transformNodes: Transforming Expression node")
+            transformed = append(transformed, transformExpression(n, props))
+        
+        case *ast.Conditional:
+            log.Printf("transformNodes: Transforming Conditional node")
+            // Conditional now returns multiple nodes (if/else branches)
+            transformed = append(transformed, transformConditional(n, props)...)
+        
+        case *ast.Loop:
+            log.Printf("transformNodes: Transforming Loop node")
+            transformed = append(transformed, transformLoop(n, props))
+        
+        case *ast.ComponentNode:
+            log.Printf("transformNodes: Transforming Component node")
+            transformed = append(transformed, transformComponent(n, props))
+        
+        case *ast.TextNode:
+            // Only transform text nodes with actual content
+            if strings.TrimSpace(n.Content) != "" {
+                transformed = append(transformed, transformTextNode(n))
+            }
+        
+        case *ast.Element:
+            // Recursively transform element children
+            element := &ast.Element{
+                TagName:     n.TagName,
+                Attributes:  n.Attributes,
+                Children:    transformNodes(n.Children, props),
+                SelfClosing: n.SelfClosing,
+            }
+            transformed = append(transformed, element)
+        
+        default:
+            // Pass through other node types unchanged
+            transformed = append(transformed, n)
+        }
+    }
+    
+    return transformed
+}
