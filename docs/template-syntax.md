@@ -46,7 +46,7 @@ Expressions allow you to output dynamic content using Go template syntax.
 ### Basic Expression
 
 ```html
-<div>{{ variable }}</div>
+<div>{variable }</div>
 ```
 
 This will be transformed to:
@@ -58,7 +58,7 @@ This will be transformed to:
 ### Inline Expressions
 
 ```html
-<div>Hello, {{ name }}!</div>
+<div>Hello, {name}!</div>
 ```
 
 This will be transformed to:
@@ -70,7 +70,7 @@ This will be transformed to:
 ### Attribute Expressions
 
 ```html
-<div class="{{ dynamicClass }}">Content</div>
+<div class="{dynamicClass}">Content</div>
 ```
 
 This will be transformed to:
@@ -86,9 +86,9 @@ Conditionals allow you to render content based on conditions.
 ### If Statement
 
 ```html
-{{ if condition }}
+{if condition }
   <div>Conditional content</div>
-{{ end }}
+{end }
 ```
 
 This will be transformed to:
@@ -102,11 +102,11 @@ This will be transformed to:
 ### If-Else Statement
 
 ```html
-{{ if isActive }}
+{if isActive }
   <div>This is active</div>
-{{ else }}
+{else }
   <div>This is inactive</div>
-{{ end }}
+{end }
 ```
 
 This will be transformed to:
@@ -123,13 +123,13 @@ This will be transformed to:
 ### If-Else If-Else Statement
 
 ```html
-{{ if status === 'active' }}
+{if status === 'active' }
   <div>This is active</div>
-{{ else if status === 'pending' }}
+{else if status === 'pending' }
   <div>This is pending</div>
-{{ else }}
+{else }
   <div>This is inactive</div>
-{{ end }}
+{end }
 ```
 
 This will be transformed to:
@@ -153,9 +153,9 @@ Loops allow you to iterate over arrays and objects.
 ### Array Loop
 
 ```html
-{{ for item in items }}
-  <div>{{ item }}</div>
-{{ end }}
+{for item in items }
+  <div>{item}</div>
+{end}
 ```
 
 This will be transformed to:
@@ -169,9 +169,9 @@ This will be transformed to:
 ### Array Loop with Index
 
 ```html
-{{ for index, item in items }}
-  <div>{{ index }}: {{ item }}</div>
-{{ end }}
+{for index, item in items }
+  <div>{index}: {item}</div>
+{end}
 ```
 
 This will be transformed to:
@@ -185,9 +185,9 @@ This will be transformed to:
 ### Object Loop
 
 ```html
-{{ for key, value of user }}
-  <div>{{ key }}: {{ value }}</div>
-{{ end }}
+{for key, value of user }
+  <div>{key }: {value }</div>
+{end }
 ```
 
 This will be transformed to:
@@ -205,15 +205,15 @@ Components allow you to create reusable template fragments.
 ### Component Definition
 
 ```html
-{{ component Button }}
-  <button class="{{ class }}">{{ label }}</button>
-{{ end }}
+{component Button }
+  <button class="{class }">{label }</button>
+{end }
 ```
 
 ### Component Usage
 
 ```html
-{{ Button label="Click me" class="btn btn-primary" }}
+{Button label="Click me" class="btn btn-primary" }
 ```
 
 This will be transformed to include the component content with the provided props.
@@ -225,7 +225,7 @@ The template engine automatically integrates with Alpine.js by transforming temp
 ### Data Binding
 
 ```html
-<input value="{{ inputValue }}">
+<input value="{inputValue }">
 ```
 
 This will be transformed to:
@@ -237,7 +237,7 @@ This will be transformed to:
 ### Event Handling
 
 ```html
-<button @click="{{ handleClick }}">Click me</button>
+<button @click="{handleClick }">Click me</button>
 ```
 
 This will be transformed to:
@@ -252,8 +252,8 @@ The template engine follows these transformation rules:
 
 ### Expression Transformation
 
-1. Text expressions (`{{ variable }}`) are transformed to `<span x-text="variable"></span>`
-2. Attribute expressions (`attribute="{{ value }}"`) are transformed to `:attribute="value"`
+1. Text expressions (`{variable }`) are transformed to `<span x-text="variable"></span>`
+2. Attribute expressions (`attribute="{value }"`) are transformed to `:attribute="value"`
 
 ### Conditional Transformation
 
@@ -279,47 +279,47 @@ The template engine follows these transformation rules:
 
 ```html
 <div class="user-profile">
-  {{ if user }}
-    <h1>{{ user.name }}</h1>
+  {if user }
+    <h1>{user.name }</h1>
     
     <div class="user-details">
-      {{ for key, value of user.details }}
+      {for key, value of user.details }
         <div class="detail">
-          <strong>{{ key }}:</strong> {{ value }}
+          <strong>{key }:</strong> {value }
         </div>
-      {{ end }}
+      {end }
     </div>
     
-    {{ if user.isAdmin }}
-      {{ AdminPanel }}
-    {{ else }}
-      {{ UserProfile }}
-    {{ end }}
+    {if user.isAdmin }
+      {AdminPanel }
+    {else }
+      {UserProfile }
+    {end }
     
     <div class="user-posts">
       <h2>Recent Posts</h2>
-      {{ if user.posts.length > 0 }}
-        {{ for index, post in user.posts }}
+      {if user.posts.length > 0 }
+        {for index, post in user.posts }
           <div class="post">
-            <h3>{{ post.title }}</h3>
-            <p>{{ post.content }}</p>
-            {{ if post.comments.length > 0 }}
+            <h3>{post.title }</h3>
+            <p>{post.content }</p>
+            {if post.comments.length > 0 }
               <div class="comments">
-                <h4>Comments ({{ post.comments.length }})</h4>
-                {{ for comment in post.comments }}
-                  <div class="comment">{{ comment.text }}</div>
-                {{ end }}
+                <h4>Comments ({post.comments.length })</h4>
+                {for comment in post.comments }
+                  <div class="comment">{comment.text }</div>
+                {end }
               </div>
-            {{ end }}
+            {end }
           </div>
-        {{ end }}
-      {{ else }}
+        {end }
+      {else }
         <p>No posts found.</p>
-      {{ end }}
+      {end }
     </div>
-  {{ else }}
+  {else }
     <p>User not found.</p>
-  {{ end }}
+  {end }
 </div>
 ```
 

@@ -121,7 +121,7 @@ let items = ["apple", "banana", "orange"]
 				},
 			},
 			props: map[string]any{},
-			expected: `<div x-data="{&quot;items&quot;:[&quot;apple&quot;,&quot;banana&quot;,&quot;orange&quot;],&quot;user&quot;:{&quot;age&quot;:30,&quot;name&quot;:&quot;John&quot;}}">
+			expected: `<div x-data="{&quot;items&quot;:[&quot;apple&quot;,&quot;banana&quot;,&quot;orange&quot;],&quot;user&quot;:{&quot;age&quot;:30,&quot;name&quot;:&quot;John&quot;}">
   <h1>User: <span x-text="user.name"></span>, Age: <span x-text="user.age"></span></h1>
   <ul>
     <li>First item: <span x-text="items[0]"></span></li>
@@ -155,7 +155,7 @@ let count = 0
 				},
 			},
 			props: map[string]any{},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;increment&quot;:function() { return count++ }}">
+			expected: `<div x-data="{&quot;count&quot;:0,&quot;increment&quot;:function() { return count++ }">
   <button>Increment</button>
   <p>Count: <span x-text="count"></span></p>
 </div>`,
@@ -225,22 +225,22 @@ let count = 0
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a data scope from the fence content
 			dataScope := extractDataFromFence(tt.fence)
-			
+
 			// Add props to the data scope
 			for k, v := range tt.props {
 				dataScope[k] = v
 			}
-			
+
 			// Transform the nodes with the Alpine.js data wrapper
 			result := transformer.TransformWithAlpineData(tt.nodes, dataScope)
-			
+
 			// Render the transformed nodes to HTML
 			html := testutils.RenderNode(result)
-			
+
 			// Normalize the expected HTML for comparison
 			expected := testutils.NormalizeWhitespace(tt.expected)
 			html = testutils.NormalizeWhitespace(html)
-			
+
 			if html != expected {
 				t.Errorf("Expected:\n%s\n\nGot:\n%s", expected, html)
 			}
@@ -251,7 +251,7 @@ let count = 0
 // extractDataFromFence parses the fence content to extract variable declarations
 func extractDataFromFence(fence string) map[string]any {
 	dataScope := make(map[string]any)
-	
+
 	lines := strings.Split(fence, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -259,11 +259,11 @@ func extractDataFromFence(fence string) map[string]any {
 			// Extract variable name and value
 			declaration := strings.TrimPrefix(line, "let ")
 			eqIndex := strings.Index(declaration, "=")
-			
+
 			if eqIndex > 0 {
 				varName := strings.TrimSpace(declaration[:eqIndex])
 				varValue := strings.TrimSpace(declaration[eqIndex+1:])
-				
+
 				// Handle function expressions
 				if strings.Contains(varValue, "function") {
 					dataScope[varName] = varValue
@@ -292,31 +292,31 @@ func extractDataFromFence(fence string) map[string]any {
 			}
 		}
 	}
-	
+
 	return dataScope
 }
 
 // parseSimpleObject parses a simple JavaScript object into a map
 func parseSimpleObject(objStr string) map[string]any {
 	result := make(map[string]any)
-	
+
 	// Remove the outer braces
-	content := strings.TrimSpace(objStr[1:len(objStr)-1])
-	
+	content := strings.TrimSpace(objStr[1 : len(objStr)-1])
+
 	// Split by commas, but respect nested objects
 	pairs := strings.Split(content, ",")
-	
+
 	for _, pair := range pairs {
 		pair = strings.TrimSpace(pair)
 		colonIndex := strings.Index(pair, ":")
-		
+
 		if colonIndex > 0 {
 			key := strings.TrimSpace(pair[:colonIndex])
 			// Remove quotes from key if present
 			key = strings.Trim(key, "\"'")
-			
+
 			value := strings.TrimSpace(pair[colonIndex+1:])
-			
+
 			// Parse the value based on its type
 			if value == "true" {
 				result[key] = true
@@ -336,27 +336,27 @@ func parseSimpleObject(objStr string) map[string]any {
 			}
 		}
 	}
-	
+
 	return result
 }
 
 // parseSimpleArray parses a simple JavaScript array into a slice
 func parseSimpleArray(arrStr string) []any {
 	var result []any
-	
+
 	// Remove the outer brackets
-	content := strings.TrimSpace(arrStr[1:len(arrStr)-1])
-	
+	content := strings.TrimSpace(arrStr[1 : len(arrStr)-1])
+
 	// Split by commas
 	elements := strings.Split(content, ",")
-	
+
 	for _, elem := range elements {
 		elem = strings.TrimSpace(elem)
-		
+
 		if elem == "" {
 			continue
 		}
-		
+
 		// Parse the element based on its type
 		if elem == "true" {
 			result = append(result, true)
@@ -373,6 +373,6 @@ func parseSimpleArray(arrStr string) []any {
 			result = append(result, elem)
 		}
 	}
-	
+
 	return result
 }

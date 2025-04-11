@@ -1,0 +1,135 @@
+---
+prop name = "Product Name";
+prop price = 0;
+prop inStock = true;
+prop featured = false;
+prop tags = [];
+prop formatPrice = price => `$${price.toFixed(2)}`;
+---
+
+<style>
+  .product-card {
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .product-card.featured {
+    border-color: #ffd43b;
+    background-color: #fff9db;
+  }
+  
+  .product-name {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+  
+  .product-price {
+    font-size: 1.5rem;
+    color: #495057;
+    margin-bottom: 0.5rem;
+  }
+  
+  .product-status {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .in-stock {
+    background-color: #d3f9d8;
+    color: #2b8a3e;
+  }
+  
+  .out-of-stock {
+    background-color: #ffe3e3;
+    color: #c92a2a;
+  }
+  
+  .featured-badge {
+    display: inline-block;
+    background-color: #fff3bf;
+    color: #e67700;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 0.5rem;
+  }
+  
+  .product-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+  }
+  
+  .product-tag {
+    background-color: #e9ecef;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  
+  .add-to-cart {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: #228be6;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    margin-top: 0.5rem;
+    cursor: pointer;
+  }
+  
+  .add-to-cart:hover {
+    background-color: #1c7ed6;
+  }
+  
+  .add-to-cart:disabled {
+    background-color: #adb5bd;
+    cursor: not-allowed;
+  }
+</style>
+
+<div class="product-card {featured ? 'featured' : '' }">
+  <div class="product-name">
+    {name }
+    {#if featured}
+      <span class="featured-badge">Featured</span>
+    {/if}
+  </div>
+  
+  <div class="product-price">{formatPrice(price) }</div>
+  
+  {#if inStock}
+    <div class="product-status in-stock">In Stock</div>
+  {:else}
+    <div class="product-status out-of-stock">Out of Stock</div>
+  {/if}
+  
+  {#if tags && tags.length > 0}
+    <div class="product-tags">
+      {#for tag in tags}
+        <span class="product-tag">{tag }</span>
+      {/for}
+    </div>
+  {/if}
+  
+  <button class="add-to-cart" {!inStock ? 'disabled' : '' }>
+    {#if inStock}
+      Add to Cart
+    {:else}
+      Sold Out
+    {/if}
+  </button>
+</div>

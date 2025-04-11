@@ -1,0 +1,112 @@
+---
+prop title = "Default Page Title";
+prop isLoggedIn = false;
+prop user = { name: "Guest", role: "guest" };
+
+// Compute navigation items based on user role
+const navItems = isLoggedIn ? [
+  { label: "Home", url: "/" },
+  { label: "Products", url: "/products" },
+  { label: "Categories", url: "/categories" },
+  user.role === "admin" ? { label: "Admin Panel", url: "/admin" } : null,
+  { label: "Account", url: "/account" }
+].filter(Boolean) : [
+  { label: "Home", url: "/" },
+  { label: "Products", url: "/products" },
+  { label: "Login", url: "/login" },
+  { label: "Register", url: "/register" }
+];
+---
+
+<style>
+  .header {
+    background-color: #f8f9fa;
+    padding: 1rem 0;
+    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 2rem;
+  }
+  
+  .header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .brand {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333;
+    text-decoration: none;
+  }
+  
+  .nav {
+    display: flex;
+    gap: 1.5rem;
+  }
+  
+  .nav-item {
+    color: #495057;
+    text-decoration: none;
+  }
+  
+  .nav-item:hover {
+    color: #228be6;
+  }
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .user-badge {
+    background-color: #e9ecef;
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  
+  .admin-badge {
+    background-color: #ffe3e3;
+    color: #c92a2a;
+  }
+  
+  .logout-button {
+    background-color: #f1f3f5;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  
+  .logout-button:hover {
+    background-color: #e9ecef;
+  }
+</style>
+
+<header class="header">
+  <div class="header-container">
+    <div>
+      <a href="/" class="brand">{title }</a>
+    </div>
+    
+    <nav class="nav">
+      {#for item in navItems}
+        <a href="{item.url }" class="nav-item">{item.label }</a>
+      {/for}
+    </nav>
+    
+    {#if isLoggedIn}
+      <div class="user-info">
+        <span>Welcome, {user.name }</span>
+        {#if user.role === "admin"}
+          <span class="user-badge admin-badge">Admin</span>
+        {:else}
+          <span class="user-badge">{user.role }</span>
+        {/if}
+        <button class="logout-button">Logout</button>
+      </div>
+    {/if}
+  </div>
+</header>

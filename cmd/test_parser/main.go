@@ -39,7 +39,7 @@ func testHTMLParser() {
 		},
 		{
 			name:     "Alpine.js Attribute",
-			input:    "<div x-data=\"{ message: 'Hello' }\">{{message}}</div>",
+			input:    "<div x-data=\"{ message: 'Hello' }\">{message}</div>",
 			expected: true,
 		},
 		{

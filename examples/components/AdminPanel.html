@@ -1,0 +1,228 @@
+---
+prop user = { name: "Admin", role: "admin" };
+prop stats = {
+  users: 124,
+  products: 56,
+  orders: 890,
+  revenue: 15280.45
+};
+prop recentActions = [
+  { action: "Product created", user: "Jane Smith", timestamp: "2023-04-10T14:32:00Z" },
+  { action: "Order fulfilled", user: "John Doe", timestamp: "2023-04-10T13:45:00Z" },
+  { action: "User account suspended", user: "Admin", timestamp: "2023-04-10T12:30:00Z" },
+  { action: "Inventory updated", user: "Jane Smith", timestamp: "2023-04-10T11:15:00Z" }
+];
+
+// Check if user is actually an admin
+if (user.role !== "admin") {
+  throw new Error("AdminPanel component requires an admin user");
+}
+
+// Format currency
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format(amount);
+}
+
+// Format timestamp
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+---
+
+<style>
+  .admin-panel {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+  
+  .admin-header {
+    background-color: #333;
+    color: white;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .admin-title {
+    font-size: 1.25rem;
+    font-weight: bold;
+  }
+  
+  .admin-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .admin-badge {
+    background-color: #dc3545;
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+  }
+  
+  .admin-content {
+    padding: 1.5rem;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .stat-card {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+  
+  .stat-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+  }
+  
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+  }
+  
+  .action-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .action-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f5;
+  }
+  
+  .action-info {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .action-desc {
+    font-weight: 500;
+  }
+  
+  .action-user {
+    font-size: 0.875rem;
+    color: #6c757d;
+  }
+  
+  .action-time {
+    font-size: 0.875rem;
+    color: #6c757d;
+    text-align: right;
+  }
+  
+  .admin-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+  
+  .admin-button {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  
+  .admin-button:hover {
+    background-color: #0069d9;
+  }
+  
+  .admin-button-secondary {
+    background-color: #6c757d;
+  }
+  
+  .admin-button-secondary:hover {
+    background-color: #5a6268;
+  }
+</style>
+
+<div class="admin-panel">
+  <div class="admin-header">
+    <div class="admin-title">Admin Dashboard</div>
+    <div class="admin-user">
+      <span>{user.name }</span>
+      <span class="admin-badge">{user.role }</span>
+    </div>
+  </div>
+  
+  <div class="admin-content">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">{stats.users }</div>
+        <div class="stat-label">Registered Users</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-value">{stats.products }</div>
+        <div class="stat-label">Products</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-value">{stats.orders }</div>
+        <div class="stat-label">Orders</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-value">{formatCurrency(stats.revenue) }</div>
+        <div class="stat-label">Total Revenue</div>
+      </div>
+    </div>
+    
+    <h3 class="section-title">Recent Activity</h3>
+    <ul class="action-list">
+      {#for action in recentActions}
+        <li class="action-item">
+          <div class="action-info">
+            <span class="action-desc">{action.action }</span>
+            <span class="action-user">by {action.user }</span>
+          </div>
+          <div class="action-time">{formatTimestamp(action.timestamp) }</div>
+        </li>
+      {/for}
+    </ul>
+    
+    <div class="admin-actions">
+      <button class="admin-button">Add New Product</button>
+      <button class="admin-button">Manage Users</button>
+      <button class="admin-button admin-button-secondary">View All Activity</button>
+    </div>
+  </div>
+</div>

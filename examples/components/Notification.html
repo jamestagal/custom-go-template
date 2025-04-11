@@ -1,0 +1,100 @@
+---
+prop type = "info"; // info, success, warning, error
+prop message = "Notification message";
+prop dismissable = true;
+
+// Determine styles based on notification type
+const getTypeStyles = () => {
+  const styles = {
+    info: {
+      bgColor: "bg-blue-50",
+      borderColor: "border-blue-400",
+      textColor: "text-blue-700",
+      icon: "ℹ️"
+    },
+    success: {
+      bgColor: "bg-green-50",
+      borderColor: "border-green-400",
+      textColor: "text-green-700",
+      icon: "✓"
+    },
+    warning: {
+      bgColor: "bg-yellow-50",
+      borderColor: "border-yellow-400",
+      textColor: "text-yellow-700",
+      icon: "⚠️"
+    },
+    error: {
+      bgColor: "bg-red-50",
+      borderColor: "border-red-400",
+      textColor: "text-red-700",
+      icon: "✕"
+    }
+  };
+  
+  return styles[type] || styles.info;
+};
+
+const typeStyles = getTypeStyles();
+---
+
+<style>
+  .notification {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 0.75rem;
+    position: relative;
+  }
+  
+  .notification-info {
+    background-color: #e0f2fe;
+    border-left: 4px solid #38bdf8;
+  }
+  
+  .notification-success {
+    background-color: #dcfce7;
+    border-left: 4px solid #4ade80;
+  }
+  
+  .notification-warning {
+    background-color: #fef3c7;
+    border-left: 4px solid #fbbf24;
+  }
+  
+  .notification-error {
+    background-color: #fee2e2;
+    border-left: 4px solid #f87171;
+  }
+  
+  .notification-icon {
+    margin-right: 0.75rem;
+    font-size: 1rem;
+  }
+  
+  .notification-message {
+    flex: 1;
+  }
+  
+  .notification-dismiss {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.25rem;
+  }
+  
+  .notification-dismiss:hover {
+    color: #374151;
+  }
+</style>
+
+<div class="notification notification-{type }">
+  <div class="notification-icon">{typeStyles.icon }</div>
+  <div class="notification-message">{message }</div>
+  {#if dismissable}
+    <button class="notification-dismiss">×</button>
+  {/if}
+</div>

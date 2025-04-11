@@ -1,0 +1,152 @@
+---
+prop companyName = "Custom Template Co.";
+prop year = new Date().getFullYear();
+prop links = [
+  { label: "Home", url: "/" },
+  { label: "About", url: "/about" },
+  { label: "Products", url: "/products" },
+  { label: "Contact", url: "/contact" },
+  { label: "Terms of Service", url: "/terms" },
+  { label: "Privacy Policy", url: "/privacy" }
+];
+prop socialLinks = [
+  { label: "Twitter", url: "#", icon: "🐦" },
+  { label: "Facebook", url: "#", icon: "📘" },
+  { label: "Instagram", url: "#", icon: "📷" },
+  { label: "GitHub", url: "#", icon: "🐙" }
+];
+---
+
+<style>
+  .footer {
+    background-color: #f8f9fa;
+    padding: 2rem 0;
+    margin-top: 3rem;
+    border-top: 1px solid #e9ecef;
+  }
+  
+  .footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+  
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 2rem;
+  }
+  
+  .footer-brand {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+  }
+  
+  .footer-description {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+  }
+  
+  .footer-heading {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+  }
+  
+  .footer-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .footer-link {
+    margin-bottom: 0.5rem;
+  }
+  
+  .footer-link a {
+    color: #495057;
+    text-decoration: none;
+  }
+  
+  .footer-link a:hover {
+    color: #228be6;
+    text-decoration: underline;
+  }
+  
+  .social-links {
+    display: flex;
+    gap: 0.75rem;
+  }
+  
+  .social-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    background-color: #e9ecef;
+    border-radius: 50%;
+    text-decoration: none;
+    transition: background-color 0.2s;
+  }
+  
+  .social-link:hover {
+    background-color: #dee2e6;
+  }
+  
+  .copyright {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e9ecef;
+    color: #6c757d;
+  }
+</style>
+
+<footer class="footer">
+  <div class="footer-container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">{companyName }</div>
+        <p class="footer-description">
+          Our custom template engine makes building reactive web applications simple and efficient.
+          We focus on developer experience without sacrificing performance.
+        </p>
+        <div class="social-links">
+          {#for social in socialLinks}
+            <a href="{social.url }" class="social-link" title="{social.label }">
+              {social.icon }
+            </a>
+          {/for}
+        </div>
+      </div>
+      
+      <div>
+        <h3 class="footer-heading">Quick Links</h3>
+        <ul class="footer-links">
+          {#for link, index in links.slice(0, 3)}
+            <li class="footer-link">
+              <a href="{link.url }">{link.label }</a>
+            </li>
+          {/for}
+        </ul>
+      </div>
+      
+      <div>
+        <h3 class="footer-heading">Resources</h3>
+        <ul class="footer-links">
+          {#for link, index in links.slice(3)}
+            <li class="footer-link">
+              <a href="{link.url }">{link.label }</a>
+            </li>
+          {/for}
+        </ul>
+      </div>
+    </div>
+    
+    <div class="copyright">
+      &copy; {year } {companyName }. All rights reserved.
+    </div>
+  </div>
+</footer>

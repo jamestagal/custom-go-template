@@ -30,12 +30,12 @@ func testAlpineParser() {
 	}{
 		{
 			name:     "Basic Alpine x-data",
-			input:    `<div x-data="{ message: 'Hello' }">{{ message }}</div>`,
+			input:    `<div x-data="{ message: 'Hello' }">{message }</div>`,
 			expected: true,
 		},
 		{
 			name:     "Alpine with complex data",
-			input:    `<div x-data="{ message: 'Hello Alpine!', count: 0, items: ['apple', 'banana'] }">{{ message }}</div>`,
+			input:    `<div x-data="{ message: 'Hello Alpine!', count: 0, items: ['apple', 'banana'] }">{message }</div>`,
 			expected: true,
 		},
 		{

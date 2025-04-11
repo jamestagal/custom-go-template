@@ -1,0 +1,179 @@
+---
+prop user = { 
+  name: "Guest User", 
+  role: "guest",
+  email: "guest@example.com",
+  avatar: null,
+  joinDate: "2023-01-01" 
+};
+prop showRole = false;
+prop showEmail = true;
+prop showJoinDate = true;
+prop compact = false;
+
+// Format the join date
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+// Get role badge class
+function getRoleBadge(role) {
+  const badges = {
+    'admin': { bg: 'bg-red-100', text: 'text-red-800' },
+    'manager': { bg: 'bg-purple-100', text: 'text-purple-800' },
+    'editor': { bg: 'bg-blue-100', text: 'text-blue-800' },
+    'user': { bg: 'bg-green-100', text: 'text-green-800' },
+    'guest': { bg: 'bg-gray-100', text: 'text-gray-800' }
+  };
+  
+  return badges[role.toLowerCase()] || badges.guest;
+}
+
+const roleBadge = getRoleBadge(user.role);
+const formattedJoinDate = formatDate(user.joinDate);
+---
+
+<style>
+  .profile-card {
+    border-radius: 0.5rem;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+  
+  .profile-compact {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+  }
+  
+  .profile-header {
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .profile-avatar {
+    width: 5rem;
+    height: 5rem;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #495057;
+    margin-bottom: 1rem;
+  }
+  
+  .profile-avatar-small {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    color: #495057;
+    margin-right: 0.75rem;
+  }
+  
+  .profile-name {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+  
+  .profile-name-compact {
+    font-size: 1rem;
+    font-weight: bold;
+  }
+  
+  .profile-role {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: medium;
+  }
+  
+  .profile-details {
+    padding: 1.5rem;
+  }
+  
+  .profile-detail {
+    margin-bottom: 0.75rem;
+  }
+  
+  .profile-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+  }
+  
+  .profile-value {
+    font-size: 1rem;
+  }
+</style>
+
+{#if compact}
+  <div class="profile-card profile-compact">
+    <div class="profile-avatar-small">
+      {#if user.avatar}
+        <img src="{user.avatar }" alt="{user.name }" />
+      {:else}
+        {user.name.charAt(0) }
+      {/if}
+    </div>
+    <div>
+      <div class="profile-name-compact">{user.name }</div>
+      {#if showRole}
+        <span class="profile-role {roleBadge.bg } {roleBadge.text }">
+          {user.role }
+        </span>
+      {/if}
+    </div>
+  </div>
+{:else}
+  <div class="profile-card">
+    <div class="profile-header">
+      <div class="profile-avatar">
+        {#if user.avatar}
+          <img src="{user.avatar }" alt="{user.name }" />
+        {:else}
+          {user.name.charAt(0) }
+        {/if}
+      </div>
+      <h2 class="profile-name">{user.name }</h2>
+      {#if showRole}
+        <span class="profile-role {roleBadge.bg } {roleBadge.text }">
+          {user.role }
+        </span>
+      {/if}
+    </div>
+    <div class="profile-details">
+      {#if showEmail}
+        <div class="profile-detail">
+          <div class="profile-label">Email</div>
+          <div class="profile-value">{user.email }</div>
+        </div>
+      {/if}
+      
+      {#if showJoinDate}
+        <div class="profile-detail">
+          <div class="profile-label">Member since</div>
+          <div class="profile-value">{formattedJoinDate }</div>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}

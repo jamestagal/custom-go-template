@@ -1,0 +1,302 @@
+---
+prop user = { 
+  name: "User", 
+  role: "user",
+  email: "user@example.com",
+  orders: [
+    { id: "ORD-1234", date: "2023-03-15", status: "Delivered", total: 129.99 },
+    { id: "ORD-5678", date: "2023-02-27", status: "Shipped", total: 79.50 },
+    { id: "ORD-9012", date: "2023-01-10", status: "Delivered", total: 49.99 }
+  ],
+  wishlist: [
+    { id: 101, name: "Wireless Headphones", price: 89.99 },
+    { id: 205, name: "Smart Watch", price: 199.99 }
+  ]
+};
+
+// Format currency
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format(amount);
+}
+
+// Format date
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+}
+
+// Get status color
+function getStatusColor(status) {
+  const colors = {
+    'delivered': 'bg-green-100 text-green-800',
+    'shipped': 'bg-blue-100 text-blue-800',
+    'processing': 'bg-yellow-100 text-yellow-800',
+    'cancelled': 'bg-red-100 text-red-800'
+  };
+  
+  return colors[status.toLowerCase()] || 'bg-gray-100 text-gray-800';
+}
+
+// Calculate total orders value
+const totalOrdersValue = user.orders.reduce((sum, order) => sum + order.total, 0);
+---
+
+<style>
+  .dashboard {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+  
+  .dashboard-header {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .welcome-message {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+  
+  .dashboard-content {
+    padding: 1.5rem;
+  }
+  
+  .dashboard-sections {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+  }
+  
+  .dashboard-section {
+    margin-bottom: 2rem;
+  }
+  
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .section-link {
+    font-size: 0.875rem;
+    color: #007bff;
+    text-decoration: none;
+  }
+  
+  .order-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .order-table th {
+    text-align: left;
+    padding: 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+  }
+  
+  .order-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f1f3f5;
+  }
+  
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  
+  .wishlist-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f5;
+  }
+  
+  .wishlist-name {
+    font-weight: 500;
+  }
+  
+  .wishlist-price {
+    color: #495057;
+  }
+  
+  .summary-card {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+  
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+  
+  .summary-label {
+    color: #6c757d;
+  }
+  
+  .summary-total {
+    font-size: 1.125rem;
+    font-weight: bold;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+  }
+  
+  .dashboard-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  
+  .dashboard-button {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  
+  .dashboard-button:hover {
+    background-color: #0069d9;
+  }
+  
+  .dashboard-button-outline {
+    background-color: transparent;
+    color: #007bff;
+    border: 1px solid #007bff;
+  }
+  
+  .dashboard-button-outline:hover {
+    background-color: #f1f8ff;
+  }
+</style>
+
+<div class="dashboard">
+  <div class="dashboard-header">
+    <div class="welcome-message">Welcome back, {user.name }!</div>
+    <div>{user.email }</div>
+  </div>
+  
+  <div class="dashboard-content">
+    <div class="dashboard-sections">
+      <div>
+        <div class="dashboard-section">
+          <div class="section-title">
+            <span>Your Recent Orders</span>
+            <a href="#" class="section-link">View All Orders</a>
+          </div>
+          
+          {#if user.orders && user.orders.length > 0}
+            <table class="order-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#for order in user.orders}
+                  <tr>
+                    <td>{order.id }</td>
+                    <td>{formatDate(order.date) }</td>
+                    <td>
+                      <span class="status-badge {getStatusColor(order.status) }">
+                        {order.status }
+                      </span>
+                    </td>
+                    <td>{formatCurrency(order.total) }</td>
+                  </tr>
+                {/for}
+              </tbody>
+            </table>
+            
+            <div class="summary-card">
+              <div class="summary-row">
+                <span class="summary-label">Total Orders</span>
+                <span>{user.orders.length }</span>
+              </div>
+              <div class="summary-total">
+                <span>Total Spent</span>
+                <span>{formatCurrency(totalOrdersValue) }</span>
+              </div>
+            </div>
+          {:else}
+            <p>You haven't placed any orders yet.</p>
+          {/if}
+        </div>
+        
+        <div class="dashboard-actions">
+          <button class="dashboard-button">View All Orders</button>
+          <button class="dashboard-button dashboard-button-outline">Track an Order</button>
+        </div>
+      </div>
+      
+      <div>
+        <div class="dashboard-section">
+          <div class="section-title">
+            <span>Your Wishlist</span>
+            <a href="#" class="section-link">View All</a>
+          </div>
+          
+          {#if user.wishlist && user.wishlist.length > 0}
+            <div>
+              {#for item in user.wishlist}
+                <div class="wishlist-item">
+                  <div class="wishlist-name">{item.name }</div>
+                  <div class="wishlist-price">{formatCurrency(item.price) }</div>
+                </div>
+              {/for}
+            </div>
+          {:else}
+            <p>Your wishlist is empty.</p>
+          {/if}
+        </div>
+        
+        <div class="dashboard-section">
+          <div class="section-title">Account Settings</div>
+          <div>
+            <button class="dashboard-button dashboard-button-outline" style="width: 100%; margin-bottom: 0.5rem;">
+              Edit Profile
+            </button>
+            <button class="dashboard-button dashboard-button-outline" style="width: 100%; margin-bottom: 0.5rem;">
+              Change Password
+            </button>
+            <button class="dashboard-button dashboard-button-outline" style="width: 100%;">
+              Manage Payment Methods
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

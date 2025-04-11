@@ -349,12 +349,12 @@ func parseChildNode(input string) Result {
 	// Try to parse as text node (any character)
 	if len(input) > 0 {
 		char := string(input[0])
-		
+
 		// Skip < as it might be the start of a tag
 		if char == "<" {
 			return Result{nil, input, false, "not a valid child node", false}
 		}
-		
+
 		textNode := &ast.TextNode{Content: char}
 		return Result{textNode, input[1:], true, "", false}
 	}
@@ -370,7 +370,7 @@ func appendCharToChildren(char string, children *[]ast.Node) {
 			return
 		}
 	}
-	
+
 	// Create a new text node
 	*children = append(*children, &ast.TextNode{Content: char})
 }
@@ -382,7 +382,7 @@ func isVoidElement(tagName string) bool {
 		"hr": true, "img": true, "input": true, "link": true, "meta": true,
 		"param": true, "source": true, "track": true, "wbr": true,
 	}
-	
+
 	return voidElements[tagName]
 }
 
@@ -404,31 +404,31 @@ func EnhancedAttributeParser() Parser {
 		if !nameRes.Successful {
 			return Result{nil, input, false, "invalid attribute name", false}
 		}
-		
+
 		name := nameRes.Value.(string)
 		remaining := nameRes.Remaining
-		
+
 		// Check if this is an Alpine directive
 		alpineInfo := parseAlpineDirective(name)
-		
+
 		// Skip whitespace after name
 		wsRes := Whitespace()(remaining)
 		remaining = wsRes.Remaining
-		
+
 		// Check if there's a value
 		hasValue := false
 		var valueResult Result
 		var value interface{}
 		dynamic := false
-		
+
 		if strings.HasPrefix(remaining, "=") {
 			hasValue = true
 			remaining = remaining[1:] // Skip =
-			
+
 			// Skip whitespace after =
 			wsRes = Whitespace()(remaining)
 			remaining = wsRes.Remaining
-			
+
 			// Special handling for x-data attribute which can contain complex objects
 			if alpineInfo.isAlpine && alpineInfo.directiveType == "data" {
 				dataRes := parseAlpineDataAttribute(remaining)
@@ -446,7 +446,7 @@ func EnhancedAttributeParser() Parser {
 				}
 				value = valueResult.Value
 				remaining = valueResult.Remaining
-				
+
 				// Check if it's a dynamic value (expression)
 				if exprNode, ok := value.(*ast.ExpressionNode); ok {
 					value = exprNode.Expression
@@ -454,7 +454,7 @@ func EnhancedAttributeParser() Parser {
 				}
 			}
 		}
-		
+
 		// Create the attribute
 		attr := ast.Attribute{
 			Name:       name,
@@ -464,7 +464,7 @@ func EnhancedAttributeParser() Parser {
 			AlpineType: alpineInfo.directiveType,
 			AlpineKey:  alpineInfo.key,
 		}
-		
+
 		if hasValue && value != nil {
 			if strValue, ok := value.(string); ok {
 				attr.Value = strValue
@@ -473,7 +473,7 @@ func EnhancedAttributeParser() Parser {
 				attr.Value = fmt.Sprintf("%v", value)
 			}
 		}
-		
+
 		return Result{attr, remaining, true, "", false}
 	}
 }
@@ -484,7 +484,7 @@ func parseAlpineDataAttribute(input string) ValueResult {
 	if len(input) == 0 {
 		return ValueResult{nil, input, false, "empty input", false}
 	}
-	
+
 	quoteChar := input[0]
 	if quoteChar != '"' && quoteChar != '\'' {
 		// Try to parse as an expression
@@ -496,7 +496,7 @@ func parseAlpineDataAttribute(input string) ValueResult {
 		}
 		return ValueResult{nil, input, false, "x-data value must be quoted or an expression", false}
 	}
-	
+
 	// Parse the complex value
 	return parseComplexAlpineValue(input)
 }
@@ -506,15 +506,15 @@ func parseAttributeValue(input string) Result {
 	if len(input) == 0 {
 		return Result{nil, input, false, "empty input", false}
 	}
-	
+
 	// Check for expression
-	if strings.HasPrefix(input, "{") && !strings.HasPrefix(input, "{{") {
+	if strings.HasPrefix(input, "{") && !strings.HasPrefix(input, "{") {
 		exprRes := ExpressionParser()(input)
 		if exprRes.Successful {
 			return exprRes
 		}
 	}
-	
+
 	// Check for quoted string
 	quoteChar := input[0]
 	if quoteChar == '"' {
@@ -522,26 +522,26 @@ func parseAttributeValue(input string) Result {
 	} else if quoteChar == '\'' {
 		return SingleQuotedString()(input)
 	}
-	
+
 	// Unquoted value (up to whitespace or >)
 	var builder strings.Builder
 	i := 0
-	
+
 	for i < len(input) {
 		char := input[i]
-		
+
 		if char == ' ' || char == '\t' || char == '\n' || char == '\r' || char == '>' || char == '/' {
 			break
 		}
-		
+
 		builder.WriteByte(char)
 		i++
 	}
-	
+
 	if builder.Len() == 0 {
 		return Result{nil, input, false, "empty attribute value", false}
 	}
-	
+
 	return Result{builder.String(), input[i:], true, "", false}
 }
 
@@ -550,24 +550,24 @@ func parseComplexAlpineValue(input string) ValueResult {
 	if len(input) == 0 {
 		return ValueResult{nil, input, false, "empty input", false}
 	}
-	
+
 	quoteChar := input[0]
 	if quoteChar != '"' && quoteChar != '\'' {
 		return ValueResult{nil, input, false, "value must start with a quote", false}
 	}
-	
+
 	var valueBuilder strings.Builder
 	remaining := input[1:] // Skip opening quote
-	
+
 	braceCount := 0
 	inSingleQuote := false
 	inDoubleQuote := false
 	escaped := false
 	i := 0
-	
+
 	for i < len(remaining) {
 		char := remaining[i]
-		
+
 		if escaped {
 			valueBuilder.WriteByte(char)
 			escaped = false
@@ -591,14 +591,14 @@ func parseComplexAlpineValue(input string) ValueResult {
 		} else {
 			valueBuilder.WriteByte(char)
 		}
-		
+
 		i++
 	}
-	
+
 	if i >= len(remaining) {
 		return ValueResult{nil, input, false, "unclosed complex Alpine value", false}
 	}
-	
+
 	return ValueResult{valueBuilder.String(), remaining[i+1:], true, "", true}
 }
 
@@ -608,14 +608,14 @@ func DoubleQuotedString() Parser {
 		if !strings.HasPrefix(input, `"`) {
 			return Result{nil, input, false, "not a double-quoted string", false}
 		}
-		
+
 		var builder strings.Builder
 		i := 1 // Skip opening quote
 		escaped := false
-		
+
 		for i < len(input) {
 			char := input[i]
-			
+
 			if escaped {
 				builder.WriteByte(char)
 				escaped = false
@@ -627,10 +627,10 @@ func DoubleQuotedString() Parser {
 			} else {
 				builder.WriteByte(char)
 			}
-			
+
 			i++
 		}
-		
+
 		// If we got here, we never found the closing quote
 		return Result{nil, input, false, "unclosed double-quoted string", false}
 	}
@@ -642,14 +642,14 @@ func SingleQuotedString() Parser {
 		if !strings.HasPrefix(input, `'`) {
 			return Result{nil, input, false, "not a single-quoted string", false}
 		}
-		
+
 		var builder strings.Builder
 		i := 1 // Skip opening quote
 		escaped := false
-		
+
 		for i < len(input) {
 			char := input[i]
-			
+
 			if escaped {
 				builder.WriteByte(char)
 				escaped = false
@@ -661,10 +661,10 @@ func SingleQuotedString() Parser {
 			} else {
 				builder.WriteByte(char)
 			}
-			
+
 			i++
 		}
-		
+
 		// If we got here, we never found the closing quote
 		return Result{nil, input, false, "unclosed single-quoted string", false}
 	}
@@ -712,7 +712,7 @@ func parseAlpineDirective(name string) alpineDirectiveInfo {
 		}
 		return alpineDirectiveInfo{true, "bind", key}
 	}
-	
+
 	return alpineDirectiveInfo{false, "", ""}
 }
 
@@ -731,14 +731,14 @@ func AttributeNameParser() Parser {
 		if len(input) == 0 {
 			return Result{nil, input, false, "empty input", false}
 		}
-		
+
 		// Special case for @ shorthand
 		if input[0] == '@' {
 			// Check if it's just @ or @something
 			if len(input) == 1 {
 				return Result{"@", input[1:], true, "", false}
 			}
-			
+
 			// Parse the rest as an identifier
 			i := 1
 			for i < len(input) {
@@ -748,21 +748,21 @@ func AttributeNameParser() Parser {
 				}
 				i++
 			}
-			
+
 			if i == 1 {
 				return Result{"@", input[1:], true, "", false}
 			}
-			
+
 			return Result{input[:i], input[i:], true, "", false}
 		}
-		
+
 		// Special case for : shorthand
 		if input[0] == ':' {
 			// Check if it's just : or :something
 			if len(input) == 1 {
 				return Result{":", input[1:], true, "", false}
 			}
-			
+
 			// Parse the rest as an identifier
 			i := 1
 			for i < len(input) {
@@ -772,14 +772,14 @@ func AttributeNameParser() Parser {
 				}
 				i++
 			}
-			
+
 			if i == 1 {
 				return Result{":", input[1:], true, "", false}
 			}
-			
+
 			return Result{input[:i], input[i:], true, "", false}
 		}
-		
+
 		// Regular attribute name
 		i := 0
 		for i < len(input) {
@@ -789,11 +789,11 @@ func AttributeNameParser() Parser {
 			}
 			i++
 		}
-		
+
 		if i == 0 {
 			return Result{nil, input, false, "invalid attribute name", false}
 		}
-		
+
 		return Result{input[:i], input[i:], true, "", false}
 	}
 }

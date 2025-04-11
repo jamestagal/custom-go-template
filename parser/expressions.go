@@ -48,14 +48,14 @@ func TextParser(delimiters ...Parser) Parser {
 	}
 }
 
-// ExpressionParser parses an {expression} or {{expression}} and returns an *ast.ExpressionNode
+// ExpressionParser parses an {expression} or {expression} and returns an *ast.ExpressionNode
 func ExpressionParser() Parser {
 	return func(input string) Result {
 		log.Printf("[ExpressionParser] Starting on: '%.30s...'", input)
 
 		// Check for double braces first
-		if strings.HasPrefix(input, "{{") {
-			exprRes := Between(String("{{"), String("}}"), TakeUntil(String("}}")))(input)
+		if strings.HasPrefix(input, "{") {
+			exprRes := Between(String("{"), String("}"), TakeUntil(String("}")))(input)
 			if exprRes.Successful {
 				expressionContent := strings.TrimSpace(exprRes.Value.(string))
 				log.Printf("[ExpressionParser] Parsed double-brace expression: %s", expressionContent)

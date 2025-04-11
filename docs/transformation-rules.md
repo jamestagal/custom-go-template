@@ -28,7 +28,7 @@ Expressions are transformed into Alpine.js `x-text` directives or attribute bind
 ### Text Expressions
 
 ```html
-{{ variable }}
+{variable}
 ```
 
 Transformation rule:
@@ -45,7 +45,7 @@ func transformExpression(node *ast.Expression) string {
 ### Attribute Expressions
 
 ```html
-<div class="{{ dynamicClass }}">
+<div class="{dynamicClass}">
 ```
 
 Transformation rule:
@@ -66,9 +66,9 @@ Conditionals are transformed into Alpine.js `x-if`, `x-else-if`, and `x-else` di
 ### If Condition
 
 ```html
-{{ if condition }}
+{if condition}
   <div>Content</div>
-{{ end }}
+{end}
 ```
 
 Transformation rule:
@@ -89,11 +89,11 @@ func transformConditional(node *ast.Conditional) string {
 ### If-Else Condition
 
 ```html
-{{ if condition }}
+{if condition}
   <div>If content</div>
-{{ else }}
+{else}
   <div>Else content</div>
-{{ end }}
+{end}
 ```
 
 Transformation rule:
@@ -115,13 +115,13 @@ func transformIfElseConditional(ifNode *ast.Conditional, elseNode *ast.Condition
 ### If-Else If-Else Condition
 
 ```html
-{{ if conditionA }}
+{if conditionA}
   <div>If content</div>
-{{ else if conditionB }}
+{else if conditionB}
   <div>Else if content</div>
-{{ else }}
+{else}
   <div>Else content</div>
-{{ end }}
+{end}
 ```
 
 Transformation rule:
@@ -151,9 +151,9 @@ Loops are transformed into Alpine.js `x-for` directives.
 ### Array Loop
 
 ```html
-{{ for item in items }}
-  <div>{{ item }}</div>
-{{ end }}
+{for item in items }
+  <div>{item }</div>
+{end }
 ```
 
 Transformation rule:
@@ -177,9 +177,9 @@ func transformArrayLoop(node *ast.Loop) string {
 ### Array Loop with Index
 
 ```html
-{{ for index, item in items }}
-  <div>{{ index }}: {{ item }}</div>
-{{ end }}
+{for index, item in items }
+  <div>{index }: {item }</div>
+{end }
 ```
 
 Transformation rule:
@@ -203,9 +203,9 @@ func transformArrayLoopWithIndex(node *ast.Loop) string {
 ### Object Loop
 
 ```html
-{{ for key, value of object }}
-  <div>{{ key }}: {{ value }}</div>
-{{ end }}
+{for key, value of object }
+  <div>{key }: {value }</div>
+{end }
 ```
 
 Transformation rule:
@@ -233,9 +233,9 @@ Components are transformed into their content with props passed as variables.
 ### Component Definition
 
 ```html
-{{ component Button }}
-  <button class="{{ class }}">{{ label }}</button>
-{{ end }}
+{component Button }
+  <button class="{class }">{label }</button>
+{end }
 ```
 
 Transformation rule:
@@ -252,7 +252,7 @@ func transformComponent(node *ast.Component) string {
 ### Component Usage
 
 ```html
-{{ Button label="Click me" class="btn btn-primary" }}
+{Button label="Click me" class="btn btn-primary" }
 ```
 
 Transformation rule:

@@ -1,0 +1,389 @@
+---
+// Import necessary components
+import Header from "./components/Header.html";
+import Footer from "./components/Footer.html";
+import ProductCard from "./components/ProductCard.html";
+import UserProfile from "./components/UserProfile.html";
+import Notification from "./components/Notification.html";
+
+// Define props with default values
+prop title = "Custom Template Showcase";
+prop isLoggedIn = true;
+prop user = { name: "John Doe", role: "admin", email: "john@example.com" };
+prop products = [
+  { id: 1, name: "Laptop", price: 999.99, inStock: true, featured: true, tags: ["electronics", "computers"] },
+  { id: 2, name: "Phone", price: 699.99, inStock: true, featured: false, tags: ["electronics", "mobile"] },
+  { id: 3, name: "Headphones", price: 149.99, inStock: false, featured: true, tags: ["electronics", "audio"] },
+  { id: 4, name: "Tablet", price: 499.99, inStock: true, featured: false, tags: ["electronics", "computers"] }
+];
+prop categories = [
+  { name: "Electronics", items: products.filter(p => p.tags.includes("electronics")) },
+  { name: "Computers", items: products.filter(p => p.tags.includes("computers")) },
+  { name: "Audio", items: products.filter(p => p.tags.includes("audio")) },
+  { name: "Mobile", items: products.filter(p => p.tags.includes("mobile")) }
+];
+prop notifications = [
+  { type: "info", message: "Welcome to our store!" },
+  { type: "success", message: "Your order has been processed." },
+  { type: "warning", message: "Some items are out of stock." }
+];
+prop settings = {
+  theme: "light",
+  currency: "USD",
+  showFeatured: true,
+  filters: {
+    minPrice: 0,
+    maxPrice: 1000,
+    inStockOnly: false
+  }
+};
+
+// Computed values
+const filteredProducts = products.filter(p => 
+  p.price >= settings.filters.minPrice && 
+  p.price <= settings.filters.maxPrice &&
+  (!settings.filters.inStockOnly || p.inStock)
+);
+
+// Helper functions
+function formatPrice(price) {
+  return `$${price.toFixed(2)}`;
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function getTagClass(tag) {
+  const tagColors = {
+    "electronics": "bg-blue-100",
+    "computers": "bg-green-100",
+    "audio": "bg-purple-100",
+    "mobile": "bg-yellow-100"
+  };
+  return tagColors[tag] || "bg-gray-100";
+}
+---
+
+<style>
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+  
+  .section {
+    margin-bottom: 2rem;
+    border: 1px solid #eaeaea;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+  }
+  
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    color: #333;
+  }
+  
+  .card {
+    border: 1px solid #ddd;
+    border-radius: 0.25rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+  
+  .tag {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    margin-right: 0.5rem;
+  }
+  
+  .notification {
+    padding: 0.75rem;
+    border-radius: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .notification-info {
+    background-color: #e0f2fe;
+    border-left: 4px solid #38bdf8;
+  }
+  
+  .notification-success {
+    background-color: #dcfce7;
+    border-left: 4px solid #4ade80;
+  }
+  
+  .notification-warning {
+    background-color: #fef3c7;
+    border-left: 4px solid #fbbf24;
+  }
+</style>
+
+<div class="container">
+  <!-- Static Component Usage -->
+  <Header title={title} user={user} isLoggedIn={isLoggedIn} />
+  
+  <!-- 1. Basic Expressions Section -->
+  <div class="section">
+    <h2 class="section-title">1. Basic Expressions</h2>
+    <div class="card">
+      <p>Welcome to {title }!</p>
+      <p>Current user: <strong>{user.name }</strong> ({user.role })</p>
+      <p>{getGreeting() }, {user.name }!</p>
+      <p>Number of products: {products.length }</p>
+      <p>Number of categories: {categories.length }</p>
+      <p>Current theme: {settings.theme }</p>
+      <p>Currency: {settings.currency }</p>
+    </div>
+  </div>
+  
+  <!-- 2. Conditionals Section -->
+  <div class="section">
+    <h2 class="section-title">2. Conditionals</h2>
+    
+    <!-- Simple if condition -->
+    <div class="card">
+      <h3>User Authentication Status</h3>
+      {#if isLoggedIn}
+        <p>You are currently logged in as {user.name }.</p>
+        <p>Email: {user.email }</p>
+      {:else}
+        <p>You are not logged in. Please sign in to access your account.</p>
+      {/if}
+    </div>
+    
+    <!-- if/else if/else condition -->
+    <div class="card">
+      <h3>User Role Check</h3>
+      {#if user.role === "admin"}
+        <p>Welcome, Administrator! You have full access to the system.</p>
+      {:else if user.role === "manager"}
+        <p>Welcome, Manager! You can manage products and users.</p>
+      {:else if user.role === "editor"}
+        <p>Welcome, Editor! You can edit product information.</p>
+      {:else}
+        <p>Welcome, User! You have standard user privileges.</p>
+      {/if}
+    </div>
+    
+    <!-- Nested conditionals -->
+    <div class="card">
+      <h3>Product Availability</h3>
+      {#if filteredProducts.length > 0}
+        <p>We have {filteredProducts.length } products matching your filters:</p>
+        {#if settings.filters.inStockOnly}
+          <p>Showing only in-stock items.</p>
+        {:else}
+          <p>Showing all items (including out of stock).</p>
+        {/if}
+      {:else}
+        <p>No products match your current filters.</p>
+      {/if}
+    </div>
+  </div>
+  
+  <!-- 3. Loops Section -->
+  <div class="section">
+    <h2 class="section-title">3. Loops</h2>
+    
+    <!-- Simple array loop -->
+    <div class="card">
+      <h3>Product List</h3>
+      <ul>
+        {#for product in filteredProducts}
+          <li>{product.name } - {formatPrice(product.price) }
+            {#if !product.inStock}
+              <span style="color: red;"> (Out of Stock)</span>
+            {/if}
+          </li>
+        {/for}
+      </ul>
+    </div>
+    
+    <!-- Loop with index -->
+    <div class="card">
+      <h3>Numbered Product List</h3>
+      <ol>
+        {#for product, index in filteredProducts}
+          <li value="{index + 1 }">
+            {product.name } - {formatPrice(product.price) }
+            {#if product.featured}
+              <span style="color: gold;"> ★ Featured</span>
+            {/if}
+          </li>
+        {/for}
+      </ol>
+    </div>
+    
+    <!-- Object loop -->
+    <div class="card">
+      <h3>Settings Configuration</h3>
+      <dl>
+        {#for key, value of settings}
+          <dt>{key }:</dt>
+          {#if typeof value === 'object'}
+            <dd>
+              <dl>
+                {#for subKey, subValue of value}
+                  <dt>{subKey }:</dt>
+                  <dd>{subValue }</dd>
+                {/for}
+              </dl>
+            </dd>
+          {:else}
+            <dd>{value }</dd>
+          {/if}
+        {/for}
+      </dl>
+    </div>
+    
+    <!-- Nested loops -->
+    <div class="card">
+      <h3>Categories and Products</h3>
+      {#for category in categories}
+        <div style="margin-bottom: 1rem;">
+          <h4>{category.name } ({category.items.length } items)</h4>
+          {#if category.items.length > 0}
+            <ul>
+              {#for item in category.items}
+                <li>
+                  {item.name } - {formatPrice(item.price) }
+                  <div>
+                    Tags: 
+                    {#for tag in item.tags}
+                      <span class="tag {getTagClass(tag) }">{tag }</span>
+                    {/for}
+                  </div>
+                </li>
+              {/for}
+            </ul>
+          {:else}
+            <p>No items in this category.</p>
+          {/if}
+        </div>
+      {/for}
+    </div>
+  </div>
+  
+  <!-- 4. Components Section -->
+  <div class="section">
+    <h2 class="section-title">4. Components</h2>
+    
+    <!-- Static components with props -->
+    <div class="card">
+      <h3>User Profile Component</h3>
+      <UserProfile user={user} showRole={true} />
+    </div>
+    
+    <!-- Component loop -->
+    <div class="card">
+      <h3>Product Cards</h3>
+      <div class="product-grid">
+        {#for product in filteredProducts.filter(p => p.featured)}
+          <ProductCard 
+            name={product.name}
+            price={product.price}
+            inStock={product.inStock}
+            featured={product.featured}
+            formatPrice={formatPrice}
+          />
+        {/for}
+      </div>
+    </div>
+    
+    <!-- Conditional components -->
+    <div class="card">
+      <h3>Notifications</h3>
+      {#for notification in notifications}
+        <Notification 
+          type={notification.type}
+          message={notification.message}
+        />
+      {/for}
+    </div>
+    
+    <!-- Dynamic components -->
+    <div class="card">
+      <h3>Dynamic Component Example</h3>
+      {#if user.role === "admin"}
+        <={`./components/AdminPanel.html`} user={user} />
+      {:else}
+        <={`./components/UserDashboard.html`} user={user} />
+      {/if}
+    </div>
+  </div>
+  
+  <!-- 5. Advanced Features Section -->
+  <div class="section">
+    <h2 class="section-title">5. Advanced Features</h2>
+    
+    <!-- Computed values and functions -->
+    <div class="card">
+      <h3>Filtered Products (Computed)</h3>
+      <p>Products between {settings.filters.minPrice } and {settings.filters.maxPrice }:</p>
+      <ul>
+        {#for product in filteredProducts}
+          <li>{product.name } - {formatPrice(product.price) }</li>
+        {/for}
+      </ul>
+    </div>
+    
+    <!-- Complex expressions -->
+    <div class="card">
+      <h3>Complex Expressions</h3>
+      <p>Average product price: {formatPrice(products.reduce((sum, p) => sum + p.price, 0) / products.length) }</p>
+      <p>Featured products: {products.filter(p => p.featured).length }</p>
+      <p>In-stock products: {products.filter(p => p.inStock).length }</p>
+      <p>Total inventory value: {formatPrice(products.filter(p => p.inStock).reduce((sum, p) => sum + p.price, 0)) }</p>
+    </div>
+    
+    <!-- Combining features -->
+    <div class="card">
+      <h3>Combined Features Example</h3>
+      {#if filteredProducts.length > 0}
+        <div>
+          <p>Top {Math.min(3, filteredProducts.length) } products:</p>
+          <div class="product-grid">
+            {#for product, index in filteredProducts.slice(0, 3)}
+              <div class="card">
+                <h4>{index + 1 }. {product.name }</h4>
+                <p>Price: {formatPrice(product.price) }</p>
+                <div>
+                  {#if product.inStock}
+                    <span style="color: green;">In Stock</span>
+                  {:else}
+                    <span style="color: red;">Out of Stock</span>
+                  {/if}
+                </div>
+                <div>
+                  Tags: 
+                  {#for tag in product.tags}
+                    <span class="tag {getTagClass(tag) }">{tag }</span>
+                  {/for}
+                </div>
+              </div>
+            {/for}
+          </div>
+        </div>
+      {:else}
+        <p>No products available.</p>
+      {/if}
+    </div>
+  </div>
+  
+  <!-- Footer component -->
+  <Footer />
+</div>

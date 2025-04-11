@@ -12,17 +12,17 @@ import (
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
-// transformTextWithExpressions transforms text containing expressions like {name} or {{ name }}
+// transformTextWithExpressions transforms text containing expressions like {name} or {name }
 // into a series of nodes with Alpine.js x-text directives
 func transformTextWithExpressions(text string, dataScope map[string]any) []ast.Node {
 	// Regular expressions to find both single and double curly brace expressions
 	singleBraceRegex := regexp.MustCompile(`\{([^{}]+)\}`)
 	doubleBraceRegex := regexp.MustCompile(`\{\{\s*([^{}]+)\s*\}\}`)
-	
+
 	// Process double braces first (they have precedence)
 	doubleMatches := doubleBraceRegex.FindAllStringSubmatchIndex(text, -1)
 	singleMatches := singleBraceRegex.FindAllStringSubmatchIndex(text, -1)
-	
+
 	// Filter out single brace matches that overlap with double brace matches
 	var filteredSingleMatches [][]int
 	for _, sMatch := range singleMatches {
@@ -30,7 +30,7 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 		for _, dMatch := range doubleMatches {
 			// Check if the single brace match overlaps with any double brace match
 			if (sMatch[0] >= dMatch[0] && sMatch[0] <= dMatch[1]) ||
-			   (sMatch[1] >= dMatch[0] && sMatch[1] <= dMatch[1]) {
+				(sMatch[1] >= dMatch[0] && sMatch[1] <= dMatch[1]) {
 				isOverlapping = true
 				break
 			}
@@ -39,22 +39,22 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 			filteredSingleMatches = append(filteredSingleMatches, sMatch)
 		}
 	}
-	
+
 	// Combine and sort all matches by their start position
 	allMatches := append(doubleMatches, filteredSingleMatches...)
 	sort.Slice(allMatches, func(i, j int) bool {
 		return allMatches[i][0] < allMatches[j][0]
 	})
-	
+
 	// If no expressions found, return the original text node
 	if len(allMatches) == 0 {
-		return []ast.Node{&ast.TextNode{Content: text}}
+		return []ast.Node{&ast.TextNode{Content: text}
 	}
-	
+
 	// Process the text with expressions
 	var result []ast.Node
 	lastIndex := 0
-	
+
 	for _, match := range allMatches {
 		// Add text before the expression
 		if match[0] > lastIndex {
@@ -63,12 +63,12 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 				result = append(result, &ast.TextNode{Content: beforeText})
 			}
 		}
-		
+
 		// Extract the expression without braces
 		var expr string
-		
+
 		// Check if this is a double brace expression
-		if strings.HasPrefix(text[match[0]:match[1]], "{{") {
+		if strings.HasPrefix(text[match[0]:match[1]], "{") {
 			// Double brace expression - extract and trim more aggressively
 			expr = text[match[2]:match[3]]
 			expr = strings.TrimSpace(expr)
@@ -77,10 +77,10 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 			expr = text[match[2]:match[3]]
 			expr = strings.TrimSpace(expr)
 		}
-		
+
 		// Add variables from the expression to the data scope
 		AddExprVarsToScope(expr, dataScope)
-		
+
 		// Create a span with x-text for the expression
 		exprNode := &ast.Element{
 			TagName: "span",
@@ -96,11 +96,11 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 			Children:    []ast.Node{},
 			SelfClosing: false,
 		}
-		
+
 		result = append(result, exprNode)
 		lastIndex = match[1]
 	}
-	
+
 	// Add any remaining text after the last expression
 	if lastIndex < len(text) {
 		afterText := text[lastIndex:]
@@ -108,7 +108,7 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 			result = append(result, &ast.TextNode{Content: afterText})
 		}
 	}
-	
+
 	return result
 }
 
@@ -130,7 +130,7 @@ func isJSKeyword(s string) bool {
 		"new": true, "delete": true, "typeof": true, "instanceof": true,
 		"void": true, "in": true, "of": true,
 	}
-	
+
 	return keywords[s]
 }
 
@@ -139,19 +139,19 @@ func formatDataObject(dataScope map[string]any) string {
 	// For Alpine.js, we need to format the data as a JavaScript object literal
 	// rather than a JSON string, as Alpine expects the x-data attribute to contain
 	// valid JavaScript object syntax
-	
+
 	if len(dataScope) == 0 {
 		return "{}"
 	}
-	
+
 	// For complex object structures that might contain methods, prefer a multiline format
 	// which is more compatible with Alpine.js
 	var builder strings.Builder
 	builder.WriteString("{\n")
-	
+
 	// Track if we need to add a comma
 	needsComma := false
-	
+
 	// Build a JavaScript object literal string
 	for key, value := range dataScope {
 		// Add comma if needed
@@ -159,7 +159,7 @@ func formatDataObject(dataScope map[string]any) string {
 			builder.WriteString(",\n")
 		}
 		needsComma = true
-		
+
 		// Format the key
 		builder.WriteString("  ")
 		// Check if the key needs quotes
@@ -169,7 +169,7 @@ func formatDataObject(dataScope map[string]any) string {
 			builder.WriteString(key)
 		}
 		builder.WriteString(": ")
-		
+
 		// Format the value
 		if strValue, ok := value.(string); ok {
 			// Special handling for string values that might be JavaScript expressions
@@ -193,7 +193,7 @@ func formatDataObject(dataScope map[string]any) string {
 			builder.WriteString(formattedValue)
 		}
 	}
-	
+
 	builder.WriteString("\n}")
 	return builder.String()
 }
@@ -210,7 +210,7 @@ func cleanupMethodDefinition(method string) string {
 	// Remove trailing semicolons
 	method = strings.TrimSpace(method)
 	method = strings.TrimSuffix(method, ";")
-	
+
 	// Check for the arrow function with braces pattern
 	if strings.Contains(method, "=>") && strings.Contains(method, "{") {
 		// Make sure there's proper spacing around the arrow
@@ -219,7 +219,7 @@ func cleanupMethodDefinition(method string) string {
 			method = regexp.MustCompile(`\)=>\{`).ReplaceAllString(method, ") => {")
 		}
 	}
-	
+
 	return method
 }
 
@@ -227,34 +227,34 @@ func cleanupMethodDefinition(method string) string {
 func isMethodDefinition(s string) bool {
 	// Look for patterns like "function(...) {...}" or "(...) => {...}" or "name(...) {...}"
 	s = strings.TrimSpace(s)
-	
+
 	// Check for arrow function: (...) => {...}
 	if strings.Contains(s, "=>") {
 		return true
 	}
-	
+
 	// Check for function keyword: function(...) {...}
 	if strings.HasPrefix(s, "function") {
 		return true
 	}
-	
+
 	// Check for method shorthand: name(...) {...}
 	methodPattern := regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(.*\)\s*\{`)
 	if methodPattern.MatchString(s) {
 		return true
 	}
-	
+
 	// Check for getter/setter syntax: get prop() {...} or set prop(...) {...}
 	getterSetterPattern := regexp.MustCompile(`^(get|set)\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(.*\)\s*\{`)
 	if getterSetterPattern.MatchString(s) {
 		return true
 	}
-	
+
 	// Check for async methods: async function(...) or async name(...)
 	if strings.HasPrefix(s, "async ") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -263,7 +263,7 @@ func formatValue(value any) string {
 	if value == nil {
 		return "null"
 	}
-	
+
 	switch v := value.(type) {
 	case string:
 		// Check if it's a method definition
@@ -271,14 +271,14 @@ func formatValue(value any) string {
 			// Remove any trailing semicolons for method definitions in object literals
 			return cleanupMethodDefinition(v)
 		}
-		
+
 		// Check if it's a JavaScript expression that should be preserved
 		// This includes object literals, array literals, and other JS expressions
 		if isJSExpression(v) {
 			// Remove any trailing semicolons for JS expressions in object literals
 			return strings.TrimSuffix(strings.TrimSpace(v), ";")
 		}
-		
+
 		// Escape quotes and wrap in quotes
 		escaped := escapeJSString(v)
 		return "'" + escaped + "'"
@@ -329,32 +329,32 @@ func formatValue(value any) string {
 // isJSExpression checks if a string appears to be a JavaScript expression that should be preserved without quotes
 func isJSExpression(s string) bool {
 	s = strings.TrimSpace(s)
-	
+
 	// Check for object literals
 	if strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}") {
 		return true
 	}
-	
+
 	// Check for array literals
 	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
 		return true
 	}
-	
+
 	// Check for function expressions (already covered by isMethodDefinition, but for explicitness)
 	if strings.HasPrefix(s, "function(") || strings.Contains(s, "=>") {
 		return true
 	}
-	
+
 	// Check for new operator
 	if strings.HasPrefix(s, "new ") {
 		return true
 	}
-	
+
 	// Check for ternary operators
 	if strings.Contains(s, "?") && strings.Contains(s, ":") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -362,15 +362,15 @@ func isJSExpression(s string) bool {
 func escapeJSString(s string) string {
 	// Replace backslashes first
 	s = strings.ReplaceAll(s, "\\", "\\\\")
-	
+
 	// Replace quotes
 	s = strings.ReplaceAll(s, "'", "\\'")
-	
+
 	// Replace newlines and other special characters
 	s = strings.ReplaceAll(s, "\n", "\\n")
 	s = strings.ReplaceAll(s, "\r", "\\r")
 	s = strings.ReplaceAll(s, "\t", "\\t")
-	
+
 	return s
 }
 

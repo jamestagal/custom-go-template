@@ -121,7 +121,7 @@ func ParseTemplate(template string) (*ast.Template, error) {
 			// For Alpine.js documents, be more lenient with parsing errors
 			if hasAlpine {
 				log.Printf("[ParseTemplate] Alpine.js document with unexpected result type. Forcing empty node list.")
-				return &ast.Template{RootNodes: []ast.Node{}}, nil
+				return &ast.Template{RootNodes: []ast.Node{}, nil
 			}
 			return nil, fmt.Errorf("parser did not return node slice, got %T", result.Value)
 		}

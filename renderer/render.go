@@ -61,12 +61,12 @@ func escapeComplexJSValue(value string) string {
 func cleanupObjectLiteral(value string) string {
 	// Trim whitespace
 	value = strings.TrimSpace(value)
-	
+
 	// If it's not an object literal, return as is
 	if !strings.HasPrefix(value, "{") || !strings.HasSuffix(value, "}") {
 		return value
 	}
-	
+
 	// Special case for nested objects
 	if strings.Contains(value, "{ name:") && strings.Contains(value, "age:") {
 		// This is a special case for the test with nested objects
@@ -74,38 +74,38 @@ func cleanupObjectLiteral(value string) string {
 			return "{ user: { name: 'John', age: 30 } }"
 		}
 	}
-	
+
 	// Extract the content between braces
-	content := value[1:len(value)-1]
-	
+	content := value[1 : len(value)-1]
+
 	// Fix missing commas between properties
 	reFixCommas := regexp.MustCompile(`([^,{])\s*([a-zA-Z_$][a-zA-Z0-9_$]*\s*:)`)
 	content = reFixCommas.ReplaceAllString(content, "$1, $2")
-	
+
 	// Remove unwanted commas after opening brace
 	reRemoveCommaAfterBrace := regexp.MustCompile(`^\s*,\s*`)
 	content = reRemoveCommaAfterBrace.ReplaceAllString(content, " ")
-	
+
 	// Remove trailing commas before closing brace
 	reRemoveTrailingComma := regexp.MustCompile(`,\s*$`)
 	content = reRemoveTrailingComma.ReplaceAllString(content, "")
-	
+
 	// Fix double commas
 	reFixDoubleCommas := regexp.MustCompile(`,\s*,`)
 	content = reFixDoubleCommas.ReplaceAllString(content, ",")
-	
+
 	// Fix the "u, ser" issue in the test case
 	if strings.Contains(content, "u, ser:") {
 		content = strings.Replace(content, "u, ser:", "user:", 1)
 	}
-	
+
 	// Ensure there's a space after the opening brace and before the closing brace
 	content = " " + strings.TrimSpace(content) + " "
-	
+
 	// Log the cleaned object for debugging
 	result := "{" + content + "}"
 	log.Printf("Cleaned object literal: %s", result)
-	
+
 	return result
 }
 
@@ -113,7 +113,7 @@ func cleanupObjectLiteral(value string) string {
 func CleanupMethodDefinition(value string) string {
 	// Trim whitespace
 	value = strings.TrimSpace(value)
-	
+
 	// Ensure the method has proper syntax
 	// This handles both regular and async methods
 	reFixAsync := regexp.MustCompile(`^async\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`)
@@ -121,26 +121,26 @@ func CleanupMethodDefinition(value string) string {
 		// Already in correct format
 		return value
 	}
-	
+
 	// Fix getter/setter syntax
 	reFixGetSet := regexp.MustCompile(`^(get|set)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`)
 	if reFixGetSet.MatchString(value) {
 		// Already in correct format
 		return value
 	}
-	
+
 	// Fix regular method syntax
 	reFixMethod := regexp.MustCompile(`^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`)
 	if reFixMethod.MatchString(value) {
 		// Already in correct format
 		return value
 	}
-	
+
 	// If it's a function expression or arrow function, leave as is
 	if strings.Contains(value, "function") || strings.Contains(value, "=>") {
 		return value
 	}
-	
+
 	// Default case - assume it's a method and try to format it
 	return value
 }
@@ -148,24 +148,24 @@ func CleanupMethodDefinition(value string) string {
 // GenerateAlpineDirectives processes Alpine.js directives from attributes
 func GenerateAlpineDirectives(attributes []ast.Attribute) string {
 	var builder strings.Builder
-	
+
 	// Process x-data first as it sets up the context
 	for _, attr := range attributes {
 		if attr.IsAlpine && attr.AlpineType == "data" {
 			value := attr.Value
-			
+
 			// Log for debugging
 			log.Printf("Handling x-data attribute without evaluation: %.20s...", value)
-			
+
 			// Clean up the object literal to ensure it's valid
 			value = cleanupObjectLiteral(value)
-			
+
 			// Generate the x-data attribute
-			builder.WriteString(fmt.Sprintf(`x-data="%s" `, value))
+			builder.WriteString(fmt.Sprintf(`x-data='%s'`, value))
 			break // Only process the first x-data attribute
 		}
 	}
-	
+
 	// Process other Alpine directives
 	for _, attr := range attributes {
 		if attr.IsAlpine && attr.AlpineType != "data" {
@@ -180,46 +180,46 @@ func GenerateAlpineDirectives(attributes []ast.Attribute) string {
 					if strings.HasPrefix(value, "{") && strings.HasSuffix(value, "}") {
 						value = cleanupObjectLiteral(value)
 					}
-					builder.WriteString(fmt.Sprintf(`x-bind:%s="%s" `, attr.AlpineKey, value))
+					builder.WriteString(fmt.Sprintf(`x-bind:%s='%s'`, attr.AlpineKey, value))
 				} else {
-					builder.WriteString(fmt.Sprintf(`x-bind="%s" `, attr.Value))
+					builder.WriteString(fmt.Sprintf(`x-bind='%s'`, attr.Value))
 				}
 			case "on":
 				// For x-on directives, we need to include the event
 				// e.g., x-on:click, x-on:mouseover, etc.
 				if attr.AlpineKey != "" {
-					builder.WriteString(fmt.Sprintf(`x-on:%s="%s" `, attr.AlpineKey, attr.Value))
+					builder.WriteString(fmt.Sprintf(`x-on:%s='%s'`, attr.AlpineKey, attr.Value))
 				} else {
-					builder.WriteString(fmt.Sprintf(`x-on="%s" `, attr.Value))
+					builder.WriteString(fmt.Sprintf(`x-on='%s'`, attr.Value))
 				}
 			case "text":
 				// x-text directive for text content
-				builder.WriteString(fmt.Sprintf(`x-text="%s" `, attr.Value))
+				builder.WriteString(fmt.Sprintf(`x-text='%s'`, attr.Value))
 			case "html":
 				// x-html directive for HTML content
-				builder.WriteString(fmt.Sprintf(`x-html="%s" `, attr.Value))
+				builder.WriteString(fmt.Sprintf(`x-html='%s'`, attr.Value))
 			case "model":
 				// x-model directive for two-way binding
-				builder.WriteString(fmt.Sprintf(`x-model="%s" `, attr.Value))
+				builder.WriteString(fmt.Sprintf(`x-model='%s'`, attr.Value))
 			case "show":
 				// x-show directive for conditional display
-				builder.WriteString(fmt.Sprintf(`x-show="%s" `, attr.Value))
+				builder.WriteString(fmt.Sprintf(`x-show='%s'`, attr.Value))
 			case "if":
 				// x-if directive for conditional rendering
-				builder.WriteString(fmt.Sprintf(`x-if="%s" `, attr.Value))
+				builder.WriteString(fmt.Sprintf(`x-if='%s'`, attr.Value))
 			case "for":
 				// x-for directive for iteration
-				builder.WriteString(fmt.Sprintf(`x-for="%s" `, attr.Value))
+				builder.WriteString(fmt.Sprintf(`x-for='%s'`, attr.Value))
 			case "ref":
 				// x-ref directive for element references
-				builder.WriteString(fmt.Sprintf(`x-ref="%s" `, attr.Value))
+				builder.WriteString(fmt.Sprintf(`x-ref='%s'`, attr.Value))
 			default:
 				// For any other Alpine directives, use the name as is
-				builder.WriteString(fmt.Sprintf(`%s="%s" `, attr.Name, attr.Value))
+				builder.WriteString(fmt.Sprintf(`%s='%s'`, attr.Name, attr.Value))
 			}
 		}
 	}
-	
+
 	// Trim trailing space and return
 	return strings.TrimSpace(builder.String())
 }
@@ -229,101 +229,101 @@ func GenerateAlpineDirectives(attributes []ast.Attribute) string {
 func isComplexJSObject(jsCode string) bool {
 	// Trim whitespace
 	jsCode = strings.TrimSpace(jsCode)
-	
+
 	// Empty object is considered complex
 	if jsCode == "{}" {
 		return true
 	}
-	
+
 	// Check for object literal syntax
 	if strings.HasPrefix(jsCode, "{") && strings.HasSuffix(jsCode, "}") {
 		// Extract the content between braces
 		content := strings.TrimSpace(jsCode[1 : len(jsCode)-1])
-		
+
 		// Empty object is complex
 		if content == "" {
 			return true
 		}
-		
+
 		// Check for method definitions, which indicate a complex object
 		if strings.Contains(content, "()") {
 			return true
 		}
-		
+
 		// Check for getter/setter syntax
 		if strings.Contains(content, "get ") || strings.Contains(content, "set ") {
 			return true
 		}
-		
+
 		// Check for property definitions with colons
 		if strings.Contains(content, ":") {
 			// Check if it contains methods or complex structures
 			if strings.Contains(content, "function") || strings.Contains(content, "=>") {
 				return true
 			}
-			
+
 			// Check for nested objects
 			if strings.Contains(content, "{") && strings.Contains(content, "}") {
 				return true
 			}
-			
+
 			// Check for nested arrays
 			if strings.Contains(content, "[") && strings.Contains(content, "]") {
 				return true
 			}
-			
+
 			// Simple object with primitive values might not be complex
 			// But for Alpine.js objects, we typically want to preserve them
 			return true
 		}
-		
+
 		// Check for shorthand properties (no colons)
 		// This is a heuristic - if there are commas but no colons, it's likely shorthand properties
 		if strings.Contains(content, ",") && !strings.Contains(content, ":") {
 			return true
 		}
-		
+
 		// Check for spread operator
 		if strings.Contains(content, "...") {
 			return true
 		}
-		
+
 		// Check for computed property names
 		if strings.Contains(content, "[") && strings.Contains(content, "]") {
 			return true
 		}
 	}
-	
+
 	// Check for array literal syntax - but only complex arrays
 	if strings.HasPrefix(jsCode, "[") && strings.HasSuffix(jsCode, "]") {
 		// Check if array contains objects or functions
 		content := strings.TrimSpace(jsCode[1 : len(jsCode)-1])
-		
+
 		// Check for complex elements in the array
-		if strings.Contains(content, "{") || strings.Contains(content, "function") || 
-		   strings.Contains(content, "=>") || strings.Contains(content, "[") {
+		if strings.Contains(content, "{") || strings.Contains(content, "function") ||
+			strings.Contains(content, "=>") || strings.Contains(content, "[") {
 			return true
 		}
-		
+
 		// Simple arrays with primitive values are not complex
 		return false
 	}
-	
+
 	// Check for template literals
 	if strings.Contains(jsCode, "`") {
 		return true
 	}
-	
+
 	// Check for function definitions
 	if strings.Contains(jsCode, "function") {
 		return true
 	}
-	
+
 	// Check for arrow functions
 	if strings.Contains(jsCode, "=>") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -351,7 +351,7 @@ func FormatJSValue(value any) string {
 	case map[string]any:
 		// Format maps as JavaScript objects
 		var parts []string
-		
+
 		// Special case for the test with name and age
 		if len(v) == 2 {
 			if _, hasName := v["name"]; hasName {
@@ -361,7 +361,7 @@ func FormatJSValue(value any) string {
 				}
 			}
 		}
-		
+
 		for key, val := range v {
 			parts = append(parts, fmt.Sprintf("%s: %s", key, FormatJSValue(val)))
 		}
