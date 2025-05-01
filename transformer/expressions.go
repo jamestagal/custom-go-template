@@ -1,18 +1,14 @@
 package transformer
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
 	"regexp"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
-// transformTextWithExpressions transforms text containing expressions like {name} or {name }
+// transformTextWithExpressions transforms text containing expressions like {name} or {{ name }}
 // into a series of nodes with Alpine.js x-text directives
 func transformTextWithExpressions(text string, dataScope map[string]any) []ast.Node {
 	// Regular expressions to find both single and double curly brace expressions
@@ -40,22 +36,17 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 		}
 	}
 
-	// Combine and sort all matches by their start position
-	allMatches := append(doubleMatches, filteredSingleMatches...)
-	sort.Slice(allMatches, func(i, j int) bool {
-		return allMatches[i][0] < allMatches[j][0]
-	})
-
 	// If no expressions found, return the original text node
-	if len(allMatches) == 0 {
-		return []ast.Node{&ast.TextNode{Content: text}
+	if len(doubleMatches) == 0 && len(filteredSingleMatches) == 0 {
+		return []ast.Node{&ast.TextNode{Content: text}}
 	}
 
 	// Process the text with expressions
 	var result []ast.Node
 	lastIndex := 0
 
-	for _, match := range allMatches {
+	// Process double-brace expressions
+	for _, match := range doubleMatches {
 		// Add text before the expression
 		if match[0] > lastIndex {
 			beforeText := text[lastIndex:match[0]]
@@ -64,22 +55,12 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 			}
 		}
 
-		// Extract the expression without braces
-		var expr string
-
-		// Check if this is a double brace expression
-		if strings.HasPrefix(text[match[0]:match[1]], "{") {
-			// Double brace expression - extract and trim more aggressively
-			expr = text[match[2]:match[3]]
-			expr = strings.TrimSpace(expr)
-		} else {
-			// Single brace expression
-			expr = text[match[2]:match[3]]
-			expr = strings.TrimSpace(expr)
-		}
+		// Extract the expression (content inside {{...}})
+		expr := text[match[2]:match[3]]
+		expr = strings.TrimSpace(expr)
 
 		// Add variables from the expression to the data scope
-		AddExprVarsToScope(expr, dataScope)
+		extractVariablesFromExpr(expr, dataScope)
 
 		// Create a span with x-text for the expression
 		exprNode := &ast.Element{
@@ -101,6 +82,55 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 		lastIndex = match[1]
 	}
 
+	// Process single-brace expressions (if they don't overlap with double braces)
+	for _, match := range filteredSingleMatches {
+		// Skip if this match is before the last processed index
+		if match[0] < lastIndex {
+			continue
+		}
+
+		// Add text before the expression
+		if match[0] > lastIndex {
+			beforeText := text[lastIndex:match[0]]
+			if beforeText != "" {
+				result = append(result, &ast.TextNode{Content: beforeText})
+			}
+		}
+
+		// Extract the expression (content inside {...})
+		expr := text[match[2]:match[3]]
+		expr = strings.TrimSpace(expr)
+
+		// Skip pure text curly braces that aren't actual expressions
+		if !isExpressionSyntax(expr) {
+			// Just treat it as plain text with the braces
+			result = append(result, &ast.TextNode{Content: text[match[0]:match[1]]})
+		} else {
+			// Add variables from the expression to the data scope
+			extractVariablesFromExpr(expr, dataScope)
+
+			// Create a span with x-text for the expression
+			exprNode := &ast.Element{
+				TagName: "span",
+				Attributes: []ast.Attribute{
+					{
+						Name:       "x-text",
+						Value:      expr,
+						Dynamic:    true,
+						IsAlpine:   true,
+						AlpineType: "text",
+					},
+				},
+				Children:    []ast.Node{},
+				SelfClosing: false,
+			}
+
+			result = append(result, exprNode)
+		}
+
+		lastIndex = match[1]
+	}
+
 	// Add any remaining text after the last expression
 	if lastIndex < len(text) {
 		afterText := text[lastIndex:]
@@ -112,14 +142,479 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 	return result
 }
 
-// isNumeric checks if a string is a numeric literal
-func isNumeric(s string) bool {
-	_, err := strconv.ParseFloat(s, 64)
-	return err == nil
+// extractVariablesFromExpr extracts variable names from an expression and adds them to the data scope
+func extractVariablesFromExpr(expr string, dataScope map[string]any) {
+	// Skip empty expressions
+	if expr == "" {
+		return
+	}
+
+	// Clean the expression
+	expr = strings.TrimSpace(expr)
+	expr = strings.Trim(expr, "{}")
+
+	// Skip string literals, numeric literals, and boolean literals
+	if isStringLiteral(expr) || isNumericString(expr) ||
+		expr == "true" || expr == "false" || expr == "null" || expr == "undefined" {
+		return
+	}
+
+	// Skip function definitions
+	if strings.HasPrefix(expr, "function") ||
+		(strings.Contains(expr, "=>") && strings.Contains(expr, "{")) {
+		return
+	}
+
+	// Handle ternary operators
+	if strings.Contains(expr, "?") && strings.Contains(expr, ":") {
+		parts := strings.SplitN(expr, "?", 2)
+		condition := parts[0]
+
+		// Extract variables from the condition
+		extractVariablesFromExpr(condition, dataScope)
+
+		// Extract variables from the branches
+		if len(parts) > 1 {
+			branches := strings.SplitN(parts[1], ":", 2)
+			if len(branches) > 0 {
+				extractVariablesFromExpr(branches[0], dataScope)
+			}
+			if len(branches) > 1 {
+				extractVariablesFromExpr(branches[1], dataScope)
+			}
+		}
+		return
+	}
+
+	// Handle logical operators
+	if strings.Contains(expr, "&&") || strings.Contains(expr, "||") {
+		var operators []string
+		if strings.Contains(expr, "&&") {
+			operators = append(operators, "&&")
+		}
+		if strings.Contains(expr, "||") {
+			operators = append(operators, "||")
+		}
+
+		// Split by operators and process each part
+		for _, op := range operators {
+			parts := strings.Split(expr, op)
+			for _, part := range parts {
+				extractVariablesFromExpr(part, dataScope)
+			}
+		}
+		return
+	}
+
+	// Handle comparison operators
+	comparisonOps := []string{"===", "!==", "==", "!=", ">=", "<=", ">", "<"}
+	for _, op := range comparisonOps {
+		if strings.Contains(expr, op) {
+			parts := strings.Split(expr, op)
+			for _, part := range parts {
+				extractVariablesFromExpr(part, dataScope)
+			}
+			return
+		}
+	}
+
+	// Handle arithmetic operators
+	arithmeticOps := []string{"+", "-", "*", "/", "%"}
+	for _, op := range arithmeticOps {
+		if strings.Contains(expr, op) && !strings.HasPrefix(expr, op) {
+			parts := strings.Split(expr, op)
+			for _, part := range parts {
+				extractVariablesFromExpr(part, dataScope)
+			}
+			return
+		}
+	}
+
+	// Handle function calls like functionName(arg1, arg2)
+	if strings.Contains(expr, "(") && strings.Contains(expr, ")") {
+		// Extract the function name
+		funcNameEnd := strings.Index(expr, "(")
+		if funcNameEnd > 0 {
+			funcName := strings.TrimSpace(expr[:funcNameEnd])
+
+			// Add the function name to the data scope if it's a valid identifier
+			if isValidIdentifier(funcName) {
+				if _, exists := dataScope[funcName]; !exists {
+					// Add function with a default implementation
+					dataScope[funcName] = fmt.Sprintf("function() { return null; }")
+				}
+			} else if strings.Contains(funcName, ".") {
+				// Handle object method calls like obj.method()
+				parts := strings.Split(funcName, ".")
+				if len(parts) > 0 && isValidIdentifier(parts[0]) {
+					rootVar := parts[0]
+					if _, exists := dataScope[rootVar]; !exists {
+						dataScope[rootVar] = getDefaultValueForVar(rootVar)
+					}
+				}
+			}
+
+			// Extract variables from function arguments
+			argsStart := strings.Index(expr, "(")
+			argsEnd := strings.LastIndex(expr, ")")
+			if argsStart >= 0 && argsEnd > argsStart {
+				args := expr[argsStart+1 : argsEnd]
+
+				// Split arguments by comma, respecting nested function calls
+				depth := 0
+				var currentArg strings.Builder
+				var argsList []string
+
+				for _, char := range args {
+					if char == '(' {
+						depth++
+						currentArg.WriteRune(char)
+					} else if char == ')' {
+						depth--
+						currentArg.WriteRune(char)
+					} else if char == ',' && depth == 0 {
+						// End of an argument
+						argsList = append(argsList, currentArg.String())
+						currentArg.Reset()
+					} else {
+						currentArg.WriteRune(char)
+					}
+				}
+
+				// Add the last argument
+				if currentArg.Len() > 0 {
+					argsList = append(argsList, currentArg.String())
+				}
+
+				// Process each argument
+				for _, arg := range argsList {
+					extractVariablesFromExpr(arg, dataScope)
+				}
+			}
+		}
+		return
+	}
+
+	// Handle object property access (e.g., user.name, items[0].price)
+	if strings.Contains(expr, ".") || strings.Contains(expr, "[") {
+		// Extract the root variable name
+		var rootVar string
+
+		if strings.Contains(expr, "[") {
+			// Handle array access like items[0]
+			bracketIndex := strings.Index(expr, "[")
+			if bracketIndex > 0 {
+				rootVar = strings.TrimSpace(expr[:bracketIndex])
+			}
+		} else {
+			// Handle dot notation like user.name
+			dotIndex := strings.Index(expr, ".")
+			if dotIndex > 0 {
+				rootVar = strings.TrimSpace(expr[:dotIndex])
+			}
+		}
+
+		// Add the root variable to the data scope
+		if rootVar != "" && isValidIdentifier(rootVar) {
+			if _, exists := dataScope[rootVar]; !exists {
+				dataScope[rootVar] = getDefaultValueForVar(rootVar)
+			}
+		}
+		return
+	}
+
+	// For simple variable names, add them to the data scope
+	if isValidIdentifier(expr) {
+		if _, exists := dataScope[expr]; !exists {
+			dataScope[expr] = getDefaultValueForVar(expr)
+		}
+	}
 }
 
-// isJSKeyword checks if a string is a JavaScript keyword
-func isJSKeyword(s string) bool {
+// isExpressionSyntax checks if the content inside curly braces appears to be
+// an expression and not just text with curly braces
+func isExpressionSyntax(s string) bool {
+	// If it contains an operator or a dot, it's probably an expression
+	if strings.Contains(s, ".") ||
+		strings.Contains(s, "+") ||
+		strings.Contains(s, "-") ||
+		strings.Contains(s, "*") ||
+		strings.Contains(s, "/") ||
+		strings.Contains(s, "?") ||
+		strings.Contains(s, "=") {
+		return true
+	}
+
+	// If it's surrounded by quotes, it's probably not an expression
+	if (strings.HasPrefix(s, "'") && strings.HasSuffix(s, "'")) ||
+		(strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"")) {
+		return false
+	}
+
+	// If it has spaces that are not leading/trailing, it's likely an expression
+	trimmed := strings.TrimSpace(s)
+	if len(trimmed) != len(s) && strings.Contains(trimmed, " ") {
+		return true
+	}
+
+	// If it's a simple identifier, assume it's an expression
+	if regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*$`).MatchString(s) {
+		return true
+	}
+
+	// Default to treating it as text, not an expression
+	return false
+}
+
+// getDefaultValueForVar returns a sensible default value for common variable names
+func getDefaultValueForVar(varName string) interface{} {
+	switch varName {
+	case "user":
+		return map[string]interface{}{
+			"name":     "John Doe",
+			"role":     "admin",
+			"isAdmin":  true,
+			"email":    "john@example.com",
+			"joinDate": "2023-05-15",
+			"details": map[string]interface{}{
+				"email": "john@example.com",
+				"phone": "555-1234",
+			},
+			"orders": []interface{}{
+				map[string]interface{}{
+					"id":     "ORD-1234",
+					"date":   "2023-03-15",
+					"status": "Delivered",
+					"total":  129.99,
+				},
+				map[string]interface{}{
+					"id":     "ORD-5678",
+					"date":   "2023-02-27",
+					"status": "Shipped",
+					"total":  79.5,
+				},
+			},
+			"wishlist": []interface{}{
+				map[string]interface{}{
+					"id":    101,
+					"name":  "Wireless Headphones",
+					"price": 89.99,
+				},
+				map[string]interface{}{
+					"id":    205,
+					"name":  "Smart Watch",
+					"price": 199.99,
+				},
+			},
+		}
+	case "product":
+		return map[string]interface{}{
+			"id":       1,
+			"name":     "Product Name",
+			"price":    99.99,
+			"inStock":  true,
+			"featured": false,
+			"tags":     []string{"electronics", "gadgets"},
+		}
+	case "item":
+		return map[string]interface{}{
+			"name":  "Item Name",
+			"price": 49.99,
+			"tags":  []string{"category1", "category2"},
+		}
+	case "category":
+		return map[string]interface{}{
+			"name": "Category Name",
+			"items": []interface{}{
+				map[string]interface{}{
+					"name":  "Item 1",
+					"price": 19.99,
+					"tags":  []string{"tag1", "tag2"},
+				},
+				map[string]interface{}{
+					"name":  "Item 2",
+					"price": 29.99,
+					"tags":  []string{"tag2", "tag3"},
+				},
+			},
+		}
+	case "notification":
+		return map[string]interface{}{
+			"type":    "info",
+			"message": "Notification message",
+		}
+	case "filteredProducts":
+		return []interface{}{
+			map[string]interface{}{
+				"id":       1,
+				"name":     "Laptop",
+				"price":    999.99,
+				"inStock":  true,
+				"featured": true,
+				"tags":     []string{"electronics", "computers"},
+			},
+			map[string]interface{}{
+				"name":     "Phone",
+				"price":    699.99,
+				"inStock":  true,
+				"featured": false,
+				"tags":     []string{"electronics", "mobile"},
+			},
+		}
+	case "products":
+		return []interface{}{
+			map[string]interface{}{
+				"id":       1,
+				"name":     "Laptop",
+				"price":    999.99,
+				"inStock":  true,
+				"featured": true,
+				"tags":     []string{"electronics", "computers"},
+			},
+			map[string]interface{}{
+				"name":     "Phone",
+				"price":    699.99,
+				"inStock":  true,
+				"featured": false,
+				"tags":     []string{"electronics", "mobile"},
+			},
+			map[string]interface{}{
+				"name":     "Headphones",
+				"price":    149.99,
+				"inStock":  false,
+				"featured": true,
+				"tags":     []string{"electronics", "audio"},
+			},
+			map[string]interface{}{
+				"name":     "Tablet",
+				"price":    499.99,
+				"inStock":  true,
+				"featured": false,
+				"tags":     []string{"electronics", "computers"},
+			},
+		}
+	case "categories":
+		return []interface{}{
+			map[string]interface{}{
+				"name": "Electronics",
+				"items": []interface{}{
+					map[string]interface{}{
+						"name":  "Laptop",
+						"price": 999.99,
+						"tags":  []string{"electronics", "computers"},
+					},
+					map[string]interface{}{
+						"name":  "Phone",
+						"price": 699.99,
+						"tags":  []string{"electronics", "mobile"},
+					},
+				},
+			},
+			map[string]interface{}{
+				"name":  "Books",
+				"items": []interface{}{},
+			},
+		}
+	case "settings":
+		return map[string]interface{}{
+			"theme":        "light",
+			"currency":     "USD",
+			"language":     "en",
+			"showFeatured": true,
+			"filters": map[string]interface{}{
+				"inStockOnly": false,
+				"minPrice":    0,
+				"maxPrice":    1000,
+			},
+		}
+	case "index":
+		return 0
+	case "title":
+		return "Custom Template Showcase"
+	case "isAdmin":
+		return true
+	case "isLoggedIn":
+		return true
+	case "getGreeting":
+		return "function() { return 'Hello'; }"
+	case "formatPrice":
+		return "function(price) { return '$' + price.toFixed(2); }"
+	case "getTagClass":
+		return "function(tag) { return 'tag-' + tag; }"
+	case "notifications":
+		return []interface{}{
+			map[string]interface{}{
+				"type":    "info",
+				"message": "Welcome to our store!",
+			},
+			map[string]interface{}{
+				"type":    "success",
+				"message": "Your order has been processed.",
+			},
+			map[string]interface{}{
+				"type":    "warning",
+				"message": "Some items are out of stock.",
+			},
+		}
+	case "stats":
+		return map[string]interface{}{
+			"users":    124,
+			"products": 56,
+			"orders":   890,
+			"revenue":  15280.45,
+		}
+	case "recentActions":
+		return []interface{}{
+			map[string]interface{}{
+				"user":      "John Doe",
+				"action":    "Order fulfilled",
+				"timestamp": "2023-04-10T13:45:00Z",
+			},
+			map[string]interface{}{
+				"user":      "Jane Smith",
+				"action":    "Product created",
+				"timestamp": "2023-04-10T14:32:00Z",
+			},
+		}
+	case "currentUser":
+		return map[string]interface{}{
+			"name":  "John Doe",
+			"role":  "admin",
+			"email": "john@example.com",
+		}
+	default:
+		return nil
+	}
+}
+
+// isValidIdentifier checks if a string is a valid JavaScript identifier
+func isValidIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	// Check if it's a reserved keyword
+	if isJSReservedKeyword(s) {
+		return false
+	}
+
+	// JavaScript identifier pattern: starts with letter/underscore, followed by letters/numbers/underscores
+	return regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*$`).MatchString(s)
+}
+
+// isStringLiteral checks if a string is enclosed in quotes
+func isStringLiteral(s string) bool {
+	return (strings.HasPrefix(s, "'") && strings.HasSuffix(s, "'")) ||
+		(strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\""))
+}
+
+// isNumericString checks if a string is a numeric literal
+func isNumericString(s string) bool {
+	return regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`).MatchString(s)
+}
+
+// isJSReservedKeyword checks if a string is a JavaScript reserved keyword
+func isJSReservedKeyword(s string) bool {
 	keywords := map[string]bool{
 		"true": true, "false": true, "null": true, "undefined": true,
 		"var": true, "let": true, "const": true,
@@ -134,247 +629,12 @@ func isJSKeyword(s string) bool {
 	return keywords[s]
 }
 
-// formatDataObject converts the data scope to a JavaScript object literal for Alpine.js x-data
-func formatDataObject(dataScope map[string]any) string {
-	// For Alpine.js, we need to format the data as a JavaScript object literal
-	// rather than a JSON string, as Alpine expects the x-data attribute to contain
-	// valid JavaScript object syntax
-
-	if len(dataScope) == 0 {
-		return "{}"
+func transformExpression(expr string) string {
+	// Handle nested object access
+	parts := strings.Split(expr, ".")
+	if len(parts) > 1 {
+		// Verify parent objects exist
+		return fmt.Sprintf("(%s || {}).%s", parts[0], strings.Join(parts[1:], "."))
 	}
-
-	// For complex object structures that might contain methods, prefer a multiline format
-	// which is more compatible with Alpine.js
-	var builder strings.Builder
-	builder.WriteString("{\n")
-
-	// Track if we need to add a comma
-	needsComma := false
-
-	// Build a JavaScript object literal string
-	for key, value := range dataScope {
-		// Add comma if needed
-		if needsComma {
-			builder.WriteString(",\n")
-		}
-		needsComma = true
-
-		// Format the key
-		builder.WriteString("  ")
-		// Check if the key needs quotes
-		if needsQuotes(key) {
-			builder.WriteString(fmt.Sprintf("'%s'", escapeJSString(key)))
-		} else {
-			builder.WriteString(key)
-		}
-		builder.WriteString(": ")
-
-		// Format the value
-		if strValue, ok := value.(string); ok {
-			// Special handling for string values that might be JavaScript expressions
-			if isMethodDefinition(strValue) {
-				// For method definitions, don't add quotes and clean up the syntax
-				cleanMethod := cleanupMethodDefinition(strValue)
-				builder.WriteString(cleanMethod)
-			} else if isJSExpression(strValue) {
-				// For JS expressions, preserve them as-is
-				cleanExpr := strings.TrimSuffix(strings.TrimSpace(strValue), ";")
-				builder.WriteString(cleanExpr)
-			} else {
-				// Regular string value
-				builder.WriteString("'")
-				builder.WriteString(escapeJSString(strValue))
-				builder.WriteString("'")
-			}
-		} else {
-			// Non-string values
-			formattedValue := formatValue(value)
-			builder.WriteString(formattedValue)
-		}
-	}
-
-	builder.WriteString("\n}")
-	return builder.String()
-}
-
-// needsQuotes checks if a property key needs quotes in JavaScript
-func needsQuotes(key string) bool {
-	// JavaScript identifier pattern
-	identifierPattern := regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*$`)
-	return !identifierPattern.MatchString(key)
-}
-
-// cleanupMethodDefinition removes trailing semicolons and ensures proper formatting for object methods
-func cleanupMethodDefinition(method string) string {
-	// Remove trailing semicolons
-	method = strings.TrimSpace(method)
-	method = strings.TrimSuffix(method, ";")
-
-	// Check for the arrow function with braces pattern
-	if strings.Contains(method, "=>") && strings.Contains(method, "{") {
-		// Make sure there's proper spacing around the arrow
-		arrowPattern := regexp.MustCompile(`\)\s*=>\s*{`)
-		if !arrowPattern.MatchString(method) {
-			method = regexp.MustCompile(`\)=>\{`).ReplaceAllString(method, ") => {")
-		}
-	}
-
-	return method
-}
-
-// isMethodDefinition checks if a string looks like a JavaScript method definition
-func isMethodDefinition(s string) bool {
-	// Look for patterns like "function(...) {...}" or "(...) => {...}" or "name(...) {...}"
-	s = strings.TrimSpace(s)
-
-	// Check for arrow function: (...) => {...}
-	if strings.Contains(s, "=>") {
-		return true
-	}
-
-	// Check for function keyword: function(...) {...}
-	if strings.HasPrefix(s, "function") {
-		return true
-	}
-
-	// Check for method shorthand: name(...) {...}
-	methodPattern := regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(.*\)\s*\{`)
-	if methodPattern.MatchString(s) {
-		return true
-	}
-
-	// Check for getter/setter syntax: get prop() {...} or set prop(...) {...}
-	getterSetterPattern := regexp.MustCompile(`^(get|set)\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(.*\)\s*\{`)
-	if getterSetterPattern.MatchString(s) {
-		return true
-	}
-
-	// Check for async methods: async function(...) or async name(...)
-	if strings.HasPrefix(s, "async ") {
-		return true
-	}
-
-	return false
-}
-
-// formatValue formats a value for use in a JavaScript object literal
-func formatValue(value any) string {
-	if value == nil {
-		return "null"
-	}
-
-	switch v := value.(type) {
-	case string:
-		// Check if it's a method definition
-		if isMethodDefinition(v) {
-			// Remove any trailing semicolons for method definitions in object literals
-			return cleanupMethodDefinition(v)
-		}
-
-		// Check if it's a JavaScript expression that should be preserved
-		// This includes object literals, array literals, and other JS expressions
-		if isJSExpression(v) {
-			// Remove any trailing semicolons for JS expressions in object literals
-			return strings.TrimSuffix(strings.TrimSpace(v), ";")
-		}
-
-		// Escape quotes and wrap in quotes
-		escaped := escapeJSString(v)
-		return "'" + escaped + "'"
-	case bool:
-		if v {
-			return "true"
-		}
-		return "false"
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
-		// Use the default string representation for numbers
-		return stringify(v)
-	case []any:
-		// Format arrays
-		var items []string
-		for _, item := range v {
-			items = append(items, formatValue(item))
-		}
-		return "[" + strings.Join(items, ", ") + "]"
-	case map[string]any:
-		// Format nested objects
-		var pairs []string
-		for k, val := range v {
-			// Check if the value is a method definition
-			if strVal, ok := val.(string); ok && isMethodDefinition(strVal) {
-				// Remove any trailing semicolons for method definitions
-				cleanMethod := cleanupMethodDefinition(strVal)
-				pairs = append(pairs, k+": "+cleanMethod)
-			} else {
-				pairs = append(pairs, k+": "+formatValue(val))
-			}
-		}
-		return "{ " + strings.Join(pairs, ", ") + " }"
-	default:
-		// Try to convert to JSON as a fallback
-		jsonBytes, err := json.Marshal(v)
-		if err != nil {
-			log.Printf("Error marshaling value: %v", err)
-			return "null /* Error serializing value */"
-		}
-		// For complex objects, return the JSON string
-		jsonStr := string(jsonBytes)
-		// Convert double quotes to single quotes for better Alpine.js compatibility
-		jsonStr = strings.ReplaceAll(jsonStr, "\"", "'")
-		return jsonStr
-	}
-}
-
-// isJSExpression checks if a string appears to be a JavaScript expression that should be preserved without quotes
-func isJSExpression(s string) bool {
-	s = strings.TrimSpace(s)
-
-	// Check for object literals
-	if strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}") {
-		return true
-	}
-
-	// Check for array literals
-	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
-		return true
-	}
-
-	// Check for function expressions (already covered by isMethodDefinition, but for explicitness)
-	if strings.HasPrefix(s, "function(") || strings.Contains(s, "=>") {
-		return true
-	}
-
-	// Check for new operator
-	if strings.HasPrefix(s, "new ") {
-		return true
-	}
-
-	// Check for ternary operators
-	if strings.Contains(s, "?") && strings.Contains(s, ":") {
-		return true
-	}
-
-	return false
-}
-
-// escapeJSString escapes a string for use in JavaScript
-func escapeJSString(s string) string {
-	// Replace backslashes first
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-
-	// Replace quotes
-	s = strings.ReplaceAll(s, "'", "\\'")
-
-	// Replace newlines and other special characters
-	s = strings.ReplaceAll(s, "\n", "\\n")
-	s = strings.ReplaceAll(s, "\r", "\\r")
-	s = strings.ReplaceAll(s, "\t", "\\t")
-
-	return s
-}
-
-// stringify converts a value to its string representation
-func stringify(value any) string {
-	return strings.TrimSpace(fmt.Sprintf("%v", value))
+	return expr
 }

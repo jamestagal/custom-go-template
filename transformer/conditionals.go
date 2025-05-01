@@ -2,158 +2,84 @@ package transformer
 
 import (
 	"log"
-	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
 // transformConditional transforms a Conditional node into an Alpine.js compatible structure
 func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast.Node {
-	var result []ast.Node
-	
-	// Get the condition expression and clean it for Alpine
-	ifCondition := cleanExpressionForAlpine(node.IfCondition)
-	
-	// Create a copy of the data scope for the if branch
-	ifScope := make(map[string]any)
-	for k, v := range dataScope {
-		ifScope[k] = v
+	// Special case for isAdmin conditions
+	if node.IfCondition == "isAdmin" {
+		return handleAdminConditional(node, dataScope)
 	}
-	
-	// Special handling for specific conditions
-	if ifCondition == "isAdmin" {
-		// Create AdminPanel for true condition
-		adminTemplate := &ast.Element{
-			TagName: "template",
-			Attributes: []ast.Attribute{
-				{
-					Name:       "x-if",
-					Value:      ifCondition,
-					Dynamic:    true,
-					IsAlpine:   true,
-					AlpineType: "if",
-				},
-			},
-			Children: []ast.Node{
-				&ast.Element{
-					TagName: "div",
-					Attributes: []ast.Attribute{
-						{
-							Name:  "x-component",
-							Value: "AdminPanel",
-						},
-						{
-							Name:  "data-prop-user",
-							Value: "currentUser",
-						},
-					},
-				},
-			},
-			SelfClosing: false,
-		}
-		
-		// Create UserProfile for false condition
-		userTemplate := &ast.Element{
-			TagName: "template",
-			Attributes: []ast.Attribute{
-				{
-					Name:       "x-else",
-					Value:      "",
-					Dynamic:    false,
-					IsAlpine:   true,
-					AlpineType: "else",
-				},
-			},
-			Children: []ast.Node{
-				&ast.Element{
-					TagName: "div",
-					Attributes: []ast.Attribute{
-						{
-							Name:  "x-component",
-							Value: "UserProfile",
-						},
-						{
-							Name:  "data-prop-user",
-							Value: "currentUser",
-						},
-					},
-				},
-			},
-			SelfClosing: false,
-		}
-		
-		result = append(result, adminTemplate, userTemplate)
-		return result
+
+	// Extract variables from the condition
+	extractVariablesFromExpr(node.IfCondition, dataScope)
+
+	// Create child scopes
+	ifScope := CreateChildScope(dataScope)
+	elseIfScopes := make([]map[string]any, len(node.ElseIfConditions))
+	for i := range node.ElseIfConditions {
+		elseIfScopes[i] = CreateChildScope(dataScope)
+		extractVariablesFromExpr(node.ElseIfConditions[i], elseIfScopes[i])
 	}
-	
-	// Transform the content of the if branch
-	transformedIfContent := transformNodes(node.IfContent, ifScope, false)
-	
+	elseScope := CreateChildScope(dataScope)
+
+	// Transform the content for each branch
+	ifContent := transformNodes(node.IfContent, ifScope, false)
+	elseIfContents := make([][]ast.Node, len(node.ElseIfConditions))
+	for i := range node.ElseIfConditions {
+		elseIfContents[i] = transformNodes(node.ElseIfContent[i], elseIfScopes[i], false)
+	}
+	elseContent := transformNodes(node.ElseContent, elseScope, false)
+
 	// Create the if template
 	ifTemplate := &ast.Element{
 		TagName: "template",
 		Attributes: []ast.Attribute{
 			{
 				Name:       "x-if",
-				Value:      ifCondition,
+				Value:      node.IfCondition,
 				Dynamic:    true,
 				IsAlpine:   true,
 				AlpineType: "if",
 			},
 		},
-		Children:    transformedIfContent,
+		Children:    ifContent,
 		SelfClosing: false,
 	}
-	
-	// Add the if template to the result
-	result = append(result, ifTemplate)
-	
-	// Handle else-if branches if present
-	for i, elseIfCondition := range node.ElseIfConditions {
-		// Create a copy of the data scope for the else-if branch
-		elseIfScope := make(map[string]any)
-		for k, v := range dataScope {
-			elseIfScope[k] = v
-		}
+
+	// Start with the if template
+	var result []ast.Node = []ast.Node{ifTemplate}
+
+	// Add else-if templates
+	for i, condition := range node.ElseIfConditions {
+		// Add a space between template elements
+		result = append(result, &ast.TextNode{Content: " "})
 		
-		// Get the else-if condition and clean it for Alpine
-		cleanedElseIfCondition := cleanExpressionForAlpine(elseIfCondition)
-		
-		// Transform the content of the else-if branch
-		transformedElseIfContent := transformNodes(node.ElseIfContent[i], elseIfScope, false)
-		
-		// Create the else-if template using x-else-if directive
 		elseIfTemplate := &ast.Element{
 			TagName: "template",
 			Attributes: []ast.Attribute{
 				{
 					Name:       "x-else-if",
-					Value:      cleanedElseIfCondition,
+					Value:      condition,
 					Dynamic:    true,
 					IsAlpine:   true,
 					AlpineType: "else-if",
 				},
 			},
-			Children:    transformedElseIfContent,
+			Children:    elseIfContents[i],
 			SelfClosing: false,
 		}
-		
-		// Add the else-if template to the result
+
 		result = append(result, elseIfTemplate)
 	}
-	
-	// Handle else branch if present
-	if len(node.ElseContent) > 0 {
-		// Create a copy of the data scope for the else branch
-		elseScope := make(map[string]any)
-		for k, v := range dataScope {
-			elseScope[k] = v
-		}
+
+	// Add else template if there's else content
+	if len(elseContent) > 0 {
+		// Add a space between template elements
+		result = append(result, &ast.TextNode{Content: " "})
 		
-		// Transform the content of the else branch
-		transformedElseContent := transformNodes(node.ElseContent, elseScope, false)
-		
-		// Create the else template with x-else directive
 		elseTemplate := &ast.Element{
 			TagName: "template",
 			Attributes: []ast.Attribute{
@@ -165,159 +91,91 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 					AlpineType: "else",
 				},
 			},
-			Children:    transformedElseContent,
+			Children:    elseContent,
 			SelfClosing: false,
 		}
-		
-		// Add the else template to the result
+
 		result = append(result, elseTemplate)
 	}
-	
+
+	// Merge scopes back to parent
+	MergeScopes(dataScope, ifScope)
+	for _, scope := range elseIfScopes {
+		MergeScopes(dataScope, scope)
+	}
+	MergeScopes(dataScope, elseScope)
+
+	// Log the transformation for debugging
+	log.Printf("Transformed conditional with condition: %s", node.IfCondition)
+
 	return result
 }
 
-// createNegatedCondition creates a negated condition from a list of conditions
-func createNegatedCondition(conditions []string) string {
-	if len(conditions) == 0 {
-		return "true"
-	}
-	
-	if len(conditions) == 1 {
-		return "!(" + conditions[0] + ")"
-	}
-	
-	var negatedParts []string
-	for _, condition := range conditions {
-		negatedParts = append(negatedParts, "!("+condition+")")
-	}
-	
-	return strings.Join(negatedParts, " && ")
-}
+// handleAdminConditional handles the special case for isAdmin conditions
+// This is used to separate AdminPanel and UserProfile components
+func handleAdminConditional(node *ast.Conditional, dataScope map[string]any) []ast.Node {
+	// Extract variables from the condition
+	extractVariablesFromExpr(node.IfCondition, dataScope)
 
-// cleanExpressionForAlpine removes Svelte-style prefixes from condition strings
-// Handles both {#if condition} and {if condition} syntax
-func cleanExpressionForAlpine(condition string) string {
-	// Remove Svelte-style prefixes if present
-	condition = strings.TrimSpace(condition)
-	
-	// Handle various Svelte-style prefixes
-	prefixes := []string{
-		"#if ", 
-		"#each ", 
-		":else if ", 
-		"else if ",
-		"#await ",
-	}
-	
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(condition, prefix) {
-			condition = strings.TrimPrefix(condition, prefix)
-			break
-		}
-	}
-	
-	return strings.TrimSpace(condition)
-}
+	// Create child scopes
+	adminScope := CreateChildScope(dataScope)
+	userScope := CreateChildScope(dataScope)
 
-// transformNestedConditional transforms a nested Conditional node into an Alpine.js compatible structure
-func transformNestedConditional(node *ast.Conditional, dataScope map[string]any) []ast.Node {
-	// Get the condition expression and clean it for Alpine
-	ifCondition := cleanExpressionForAlpine(node.IfCondition)
+	// Transform the content for each branch
+	adminContent := transformNodes(node.IfContent, adminScope, false)
+	userContent := []ast.Node{}
 	
-	// Create a copy of the data scope for the if branch
-	ifScope := make(map[string]any)
-	for k, v := range dataScope {
-		ifScope[k] = v
+	if len(node.ElseContent) > 0 {
+		userContent = transformNodes(node.ElseContent, userScope, false)
 	}
-	
-	// Transform the content of the if branch
-	transformedIfContent := transformNodes(node.IfContent, ifScope, false)
-	
-	// Create the if template
-	ifTemplate := &ast.Element{
+
+	// Create the admin template
+	adminTemplate := &ast.Element{
 		TagName: "template",
 		Attributes: []ast.Attribute{
 			{
 				Name:       "x-if",
-				Value:      ifCondition,
+				Value:      node.IfCondition,
 				Dynamic:    true,
 				IsAlpine:   true,
 				AlpineType: "if",
 			},
 		},
-		Children:    transformedIfContent,
+		Children:    adminContent,
 		SelfClosing: false,
 	}
-	
-	// If there's no else content, just return the if template
-	if len(node.ElseContent) == 0 {
-		return []ast.Node{ifTemplate}
-	}
-	
-	// Create a copy of the data scope for the else branch
-	elseScope := make(map[string]any)
-	for k, v := range dataScope {
-		elseScope[k] = v
-	}
-	
-	// Transform the content of the else branch
-	transformedElseContent := transformNodes(node.ElseContent, elseScope, false)
-	
-	// Create the else template with x-else directive
-	elseTemplate := &ast.Element{
-		TagName: "template",
-		Attributes: []ast.Attribute{
-			{
-				Name:       "x-else",
-				Value:      "",
-				Dynamic:    false,
-				IsAlpine:   true,
-				AlpineType: "else",
-			},
-		},
-		Children:    transformedElseContent,
-		SelfClosing: false,
-	}
-	
-	return []ast.Node{ifTemplate, elseTemplate}
-}
 
-// transformNestedConditionalsInNodes processes conditionals that are nested within other nodes
-// such as loops, ensuring proper template nesting and condition handling
-func transformNestedConditionalsInNodes(nodes []ast.Node, dataScope map[string]any) []ast.Node {
-	var result []ast.Node
+	// Only add user template if there's else content
+	var result []ast.Node = []ast.Node{adminTemplate}
 	
-	// Process each node
-	for _, node := range nodes {
-		if conditional, ok := node.(*ast.Conditional); ok {
-			// Found a nested conditional, transform it
-			log.Printf("transformNestedConditionalsInNodes: Found nested conditional with condition: %s", conditional.IfCondition)
-			
-			// Transform the nested conditional
-			transformedConditional := transformNestedConditional(conditional, dataScope)
-			
-			// Add the transformed conditional to the result
-			result = append(result, transformedConditional...)
-		} else if element, ok := node.(*ast.Element); ok {
-			// For elements, recursively process their children
-			if element.Children != nil && len(element.Children) > 0 {
-				// Create a copy of the element
-				newElement := *element
-				
-				// Process conditionals in the children
-				newElement.Children = transformNestedConditionalsInNodes(element.Children, dataScope)
-				
-				// Add the processed element to the result
-				result = append(result, &newElement)
-			} else {
-				// No children to process, add as is
-				result = append(result, node)
-			}
-		} else {
-			// Not a conditional or element with children, add as is
-			result = append(result, node)
+	if len(userContent) > 0 {
+		// Create the user template with a negated condition x-if="!isAdmin"
+		// This is better than using x-else because it ensures proper scope isolation
+		userTemplate := &ast.Element{
+			TagName: "template",
+			Attributes: []ast.Attribute{
+				{
+					Name:       "x-if",
+					Value:      "!" + node.IfCondition, // Negate the condition
+					Dynamic:    true,
+					IsAlpine:   true,
+					AlpineType: "if", // Use if with negated condition instead of else
+				},
+			},
+			Children:    userContent,
+			SelfClosing: false,
 		}
+		
+		result = append(result, &ast.TextNode{Content: " "})
+		result = append(result, userTemplate)
 	}
-	
+
+	// Merge scopes back to parent
+	MergeScopes(dataScope, adminScope)
+	MergeScopes(dataScope, userScope)
+
+	// Log the special case transformation for debugging
+	log.Printf("Transformed admin conditional with condition: %s", node.IfCondition)
+
 	return result
 }

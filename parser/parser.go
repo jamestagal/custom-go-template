@@ -121,7 +121,7 @@ func ParseTemplate(template string) (*ast.Template, error) {
 			// For Alpine.js documents, be more lenient with parsing errors
 			if hasAlpine {
 				log.Printf("[ParseTemplate] Alpine.js document with unexpected result type. Forcing empty node list.")
-				return &ast.Template{RootNodes: []ast.Node{}, nil
+				return &ast.Template{RootNodes: []ast.Node{}}, nil
 			}
 			return nil, fmt.Errorf("parser did not return node slice, got %T", result.Value)
 		}
@@ -140,7 +140,7 @@ func ParseTemplate(template string) (*ast.Template, error) {
 			filteredRootNodes = append(filteredRootNodes, node)
 		}
 	}
-	
+
 	// Create the final AST
 	root := &ast.Template{RootNodes: filteredRootNodes}
 	log.Printf("[ParseTemplate] Final Root Nodes Count: %d", len(root.RootNodes))
@@ -169,7 +169,7 @@ func filterWhitespaceRootNodes(nodes []ast.Node) []ast.Node {
 func AnyNodeParser(stop ...Parser) Parser {
 	return func(input string) Result {
 		log.Printf("[AnyNodeParser] Attempting on: '%.30s...'", input)
-		
+
 		// Check for Alpine.js document patterns
 		hasAlpine := strings.Contains(input, "x-data") ||
 			strings.Contains(input, "@click") ||
@@ -207,13 +207,13 @@ func AnyNodeParser(stop ...Parser) Parser {
 			{"Expression", ExpressionParser()},
 			{"Text", TextParser(delimiters...)}, // Text parser should be last
 		}
-		
+
 		for i, p := range parsers {
 			result := p.Parser(input)
 			if result.Successful {
 				// Ensure parser made progress or returned a value
 				if result.Remaining != input || result.Value != nil {
-					log.Printf("[AnyNodeParser] Succeeded with %s parser (#%d). Value: %T, Remaining: '%.30s...'", 
+					log.Printf("[AnyNodeParser] Succeeded with %s parser (#%d). Value: %T, Remaining: '%.30s...'",
 						p.Name, i, result.Value, result.Remaining)
 					return result
 				}

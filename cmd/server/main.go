@@ -19,7 +19,7 @@ func main() {
 	}
 
 	// Define initial props
-	props := map[string]any{"name": "John", "age": 2, "animals": []string{"cat", "dog", "pig"}
+	props := map[string]any{"name": "John", "age": 2, "animals": []string{"cat", "dog", "pig"}}
 
 	// Render the main template using the renderer package
 	// Assuming views are relative to the execution directory (where go run ./cmd/server is executed)

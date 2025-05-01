@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"log"
 	"strings"
 
@@ -49,27 +48,12 @@ func TextParser(delimiters ...Parser) Parser {
 }
 
 // ExpressionParser parses an {expression} or {expression} and returns an *ast.ExpressionNode
+// This version is more flexible with whitespace inside the braces
 func ExpressionParser() Parser {
 	return func(input string) Result {
 		log.Printf("[ExpressionParser] Starting on: '%.30s...'", input)
 
-		// Check for double braces first
-		if strings.HasPrefix(input, "{") {
-			exprRes := Between(String("{"), String("}"), TakeUntil(String("}")))(input)
-			if exprRes.Successful {
-				expressionContent := strings.TrimSpace(exprRes.Value.(string))
-				log.Printf("[ExpressionParser] Parsed double-brace expression: %s", expressionContent)
-				return Result{
-					&ast.ExpressionNode{Expression: expressionContent},
-					exprRes.Remaining,
-					true,
-					"",
-					false,
-				}
-			}
-		}
-
-		// Then check for single braces
+		// Check if it starts with a brace
 		if !strings.HasPrefix(input, "{") {
 			return Result{nil, input, false, "not an expression", false}
 		}
@@ -80,37 +64,74 @@ func ExpressionParser() Parser {
 			return Result{nil, input, false, "looks like a directive, not a simple expression", false}
 		}
 
-		// Parse the expression content
-		exprRes := Between(String("{"), String("}"), TakeUntil(String("}")))(input)
-		if !exprRes.Successful {
-			log.Printf("[ExpressionParser] Failed to parse expression: %s", exprRes.Error)
-			return Result{nil, input, false, fmt.Sprintf("failed to parse expression: %s", exprRes.Error), false}
+		// Manual parsing with whitespace handling
+		i := 1 // Skip the opening brace
+		
+		// Track the expression content
+		start := i
+		
+		// Find the closing brace, handling nested braces
+		braceDepth := 1
+		for i < len(input) && braceDepth > 0 {
+			if input[i] == '{' {
+				braceDepth++
+			} else if input[i] == '}' {
+				braceDepth--
+			}
+			
+			if braceDepth > 0 {
+				i++
+			}
 		}
-
-		expressionContent := strings.TrimSpace(exprRes.Value.(string))
-		log.Printf("[ExpressionParser] Parsed single-brace expression: %s", expressionContent)
-		return Result{
-			&ast.ExpressionNode{Expression: expressionContent},
-			exprRes.Remaining,
-			true,
-			"",
-			false,
+		
+		// If we found a closing brace
+		if i < len(input) && input[i] == '}' {
+			expressionContent := strings.TrimSpace(input[start:i])
+			log.Printf("[ExpressionParser] Parsed expression with whitespace handling: %s", expressionContent)
+			
+			return Result{
+				&ast.ExpressionNode{Expression: expressionContent},
+				input[i+1:],
+				true,
+				"",
+				false,
+			}
 		}
+		
+		log.Printf("[ExpressionParser] Failed to find closing brace for expression")
+		return Result{nil, input, false, "unclosed expression", false}
 	}
 }
 
-// isDirective checks if an input string appears to be a directive
+// isDirective checks if an input string appears to be a directive, handling whitespace
 func isDirective(input string) bool {
-	directives := []string{
-		"{if", "{else if", "{else}", "{/if}",
-		"{for", "{/for}", "{await", "{/await}",
-		"{#if", "{#each", "{:else}", "{:else if", "{/if}", "{/#if}", "{/each}", "{/#each}",
-		"{#", "{/", "{:", "{@",
+	// Trim whitespace at the start for consistent checking
+	trimmed := strings.TrimLeft(input, " \t\n\r")
+	
+	// First character must be {
+	if !strings.HasPrefix(trimmed, "{") {
+		return false
 	}
-
-	for _, prefix := range directives {
-		if strings.HasPrefix(input, prefix) {
-			return true
+	
+	// Check for directive prefixes after the opening brace and potential whitespace
+	i := 1
+	// Skip whitespace after the opening brace
+	for i < len(trimmed) && (trimmed[i] == ' ' || trimmed[i] == '\t') {
+		i++
+	}
+	
+	// Now check for directive keywords
+	if i < len(trimmed) {
+		prefixes := []string{
+			"if ", "#if ", "else", "/if", "end",
+			"for ", "#each ", "/for", "#for", "/each", "/#each",
+			"await ", "/await", "#await", "/await",
+		}
+		
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(trimmed[i:], prefix) {
+				return true
+			}
 		}
 	}
 

@@ -122,7 +122,7 @@ func ElseParser() Parser {
 	}
 }
 
-// IfEndParser parses {/if} or {/#if} directives with various whitespace patterns
+// IfEndParser parses {/if}, {/#if}, or {end} directives with various whitespace patterns
 func IfEndParser() Parser {
 	return func(input string) Result {
 		// Trim leading whitespace for better matching
@@ -143,6 +143,40 @@ func IfEndParser() Parser {
 					Remaining:  input[consumed:],
 					Successful: true,
 					Error:      "",
+				}
+			}
+		}
+		
+		// Check specifically for {end} with flexible whitespace
+		if strings.HasPrefix(trimmedInput, "{") {
+			i := 1
+			// Skip whitespace after opening bracket
+			for i < len(trimmedInput) && (trimmedInput[i] == ' ' || trimmedInput[i] == '\t') {
+				i++
+			}
+			
+			// Check for "end" keyword
+			if i+3 <= len(trimmedInput) && trimmedInput[i:i+3] == "end" {
+				i += 3
+				
+				// Skip whitespace before closing bracket
+				for i < len(trimmedInput) && (trimmedInput[i] == ' ' || trimmedInput[i] == '\t') {
+					i++
+				}
+				
+				// Check for closing bracket
+				if i < len(trimmedInput) && trimmedInput[i] == '}' {
+					node := &ast.IfEndNode{}
+					
+					// Calculate how much of the original input to consume
+					consumed := len(input) - len(trimmedInput) + i + 1
+					
+					return Result{
+						Value:      node,
+						Remaining:  input[consumed:],
+						Successful: true,
+						Error:      "",
+					}
 				}
 			}
 		}
@@ -285,7 +319,7 @@ func ForStartParser() Parser {
 	}
 }
 
-// ForEndParser parses {/for} or {/each} directive with various whitespace patterns
+// ForEndParser parses {/for}, {/each}, or {end} directive with various whitespace patterns
 func ForEndParser() Parser {
 	return func(input string) Result {
 		// Trim leading whitespace for better matching
@@ -309,6 +343,40 @@ func ForEndParser() Parser {
 					Remaining:  input[consumed:],
 					Successful: true,
 					Error:      "",
+				}
+			}
+		}
+		
+		// Check specifically for {end} with flexible whitespace
+		if strings.HasPrefix(trimmedInput, "{") {
+			i := 1
+			// Skip whitespace after opening bracket
+			for i < len(trimmedInput) && (trimmedInput[i] == ' ' || trimmedInput[i] == '\t') {
+				i++
+			}
+			
+			// Check for "end" keyword
+			if i+3 <= len(trimmedInput) && trimmedInput[i:i+3] == "end" {
+				i += 3
+				
+				// Skip whitespace before closing bracket
+				for i < len(trimmedInput) && (trimmedInput[i] == ' ' || trimmedInput[i] == '\t') {
+					i++
+				}
+				
+				// Check for closing bracket
+				if i < len(trimmedInput) && trimmedInput[i] == '}' {
+					node := &ast.ForEndNode{}
+					
+					// Calculate how much of the original input to consume
+					consumed := len(input) - len(trimmedInput) + i + 1
+					
+					return Result{
+						Value:      node,
+						Remaining:  input[consumed:],
+						Successful: true,
+						Error:      "",
+					}
 				}
 			}
 		}

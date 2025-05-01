@@ -85,7 +85,7 @@ func CollectFenceData(fence *ast.FenceSection, dataScope map[string]any) {
 	}
 	
 	// Extract variables from raw content in the fence
-	AddExprVarsToScope(fence.RawContent, dataScope)
+	extractVariablesFromExpr(fence.RawContent, dataScope)
 }
 
 // CreateChildScope creates a new scope that inherits from the parent scope
@@ -108,38 +108,6 @@ func MergeScopes(parentScope, childScope map[string]any) {
 	for key, value := range childScope {
 		if _, exists := parentScope[key]; !exists {
 			parentScope[key] = value
-		}
-	}
-}
-
-// AddExprVarsToScope extracts variable references from expressions and adds to scope
-func AddExprVarsToScope(expr string, dataScope map[string]any) {
-	// Simple regex to find potential variable names
-	// This is a simplified approach and won't catch all cases
-	varRegex := regexp.MustCompile(`[a-zA-Z_$][a-zA-Z0-9_$]*`)
-	matches := varRegex.FindAllString(expr, -1)
-	
-	// JavaScript keywords and internal helpers to skip
-	keywords := map[string]bool{
-		"let": true, "var": true, "const": true, "if": true, "else": true, 
-		"for": true, "while": true, "function": true, "return": true,
-		"true": true, "false": true, "null": true, "undefined": true,
-		"new": true, "this": true, "typeof": true, "instanceof": true,
-		"in": true, "of": true, "class": true, "import": true, "export": true,
-		// Alpine and internal helpers to skip
-		"Object": true, "entries": true, "keys": true, "values": true,
-		"Array": true, "Math": true, "Date": true, "JSON": true,
-		"length": true, "toString": true, "valueOf": true,
-	}
-	
-	for _, varName := range matches {
-		// Skip JavaScript keywords, Alpine helpers, component names, and variables already in scope with values
-		if !keywords[varName] && !(len(varName) > 0 && varName[0] >= 'A' && varName[0] <= 'Z') {
-			// Only add if not already in scope with a real value
-			if existing, exists := dataScope[varName]; !exists || existing == nil {
-				// Don't overwrite existing values
-				dataScope[varName] = nil
-			}
 		}
 	}
 }

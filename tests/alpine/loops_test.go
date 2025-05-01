@@ -205,6 +205,7 @@ func TestLoopTransformation(t *testing.T) {
 					{"title": "Task 1", "completed": true},
 					{"title": "Task 2", "completed": false},
 				},
+				"title": "Custom Template Showcase",
 			},
 			contains: []string{
 				`<div class="task-list">`,
@@ -214,12 +215,15 @@ func TestLoopTransformation(t *testing.T) {
 				`<template x-if="task.completed">`,
 				`<span class="completed"><span x-text="task.title"></span></span>`,
 				`</template>`,
-				`<template x-if="!(task.completed)">`,
+				`<template x-else>`,
 				`<span x-text="task.title"></span>`,
 				`</template>`,
 				`</div>`,
 				`</template>`,
 				`</div>`,
+			},
+			notContains: []string{
+				`<template x-if="!(task.completed)">`,
 			},
 		},
 		{

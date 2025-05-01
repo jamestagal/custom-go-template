@@ -1,0 +1,220 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+
+	// Import your renderer package (adjust the path to match your project)
+	"github.com/jimafisk/custom_go_template/renderer"
+)
+
+func main() {
+	// Get the absolute path to your project root
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get working directory: %v", err)
+	}
+
+	// Ensure we're at the project root, not in cmd/example
+	if filepath.Base(projectRoot) == "example" {
+		projectRoot = filepath.Dir(filepath.Dir(projectRoot))
+	}
+
+	// Paths to example files
+	examplesDir := filepath.Join(projectRoot, "examples")
+	componentsDir := filepath.Join(examplesDir, "components")
+	pagesDir := filepath.Join(examplesDir, "pages")
+
+	// Log the directories we're using
+	log.Printf("Pages directory: %s", pagesDir)
+	log.Printf("Components directory: %s", componentsDir)
+
+	// Create output directory for rendered HTML
+	outputDir := filepath.Join(projectRoot, "public")
+	os.MkdirAll(outputDir, 0755)
+
+	// Set up file server for static files
+	fs := http.FileServer(http.Dir(outputDir))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	// Comprehensive data for the template
+	data := map[string]any{
+		"title":      "Custom Template Showcase",
+		"isLoggedIn": true,
+		"currentUser": map[string]any{
+			"name":  "John Doe",
+			"role":  "admin",
+			"email": "john@example.com",
+		},
+		"user": map[string]any{
+			"name":     "John Doe",
+			"role":     "admin",
+			"email":    "john@example.com",
+			"joinDate": "2023-05-15",
+			"orders": []map[string]any{
+				{"id": "ORD-1234", "date": "2023-03-15", "status": "Delivered", "total": 129.99},
+				{"id": "ORD-5678", "date": "2023-02-27", "status": "Shipped", "total": 79.50},
+			},
+			"wishlist": []map[string]any{
+				{"id": 101, "name": "Wireless Headphones", "price": 89.99},
+				{"id": 205, "name": "Smart Watch", "price": 199.99},
+			},
+		},
+		"isAdmin": true,
+		"products": []map[string]any{
+			{"id": 1, "name": "Laptop", "price": 999.99, "inStock": true, "featured": true, "tags": []string{"electronics", "computers"}},
+			{"id": 2, "name": "Phone", "price": 699.99, "inStock": true, "featured": false, "tags": []string{"electronics", "mobile"}},
+			{"id": 3, "name": "Headphones", "price": 149.99, "inStock": false, "featured": true, "tags": []string{"electronics", "audio"}},
+			{"id": 4, "name": "Tablet", "price": 499.99, "inStock": true, "featured": false, "tags": []string{"electronics", "computers"}},
+		},
+		"filteredProducts": []map[string]any{
+			{"id": 1, "name": "Laptop", "price": 999.99, "inStock": true, "featured": true, "tags": []string{"electronics", "computers"}},
+			{"id": 2, "name": "Phone", "price": 699.99, "inStock": true, "featured": false, "tags": []string{"electronics", "mobile"}},
+		},
+		"categories": []map[string]any{
+			{
+				"name": "Electronics",
+				"items": []map[string]any{
+					{"name": "Laptop", "price": 999.99, "tags": []string{"electronics", "computers"}},
+					{"name": "Phone", "price": 699.99, "tags": []string{"electronics", "mobile"}},
+				},
+			},
+			{
+				"name":  "Books",
+				"items": []map[string]any{},
+			},
+		},
+		"notifications": []map[string]any{
+			{"type": "info", "message": "Welcome to our store!"},
+			{"type": "success", "message": "Your order has been processed."},
+			{"type": "warning", "message": "Some items are out of stock."},
+		},
+		"settings": map[string]any{
+			"theme":        "light",
+			"currency":     "USD",
+			"showFeatured": true,
+			"filters": map[string]any{
+				"minPrice":    0,
+				"maxPrice":    1000,
+				"inStockOnly": false,
+			},
+		},
+		"componentType": "Button",
+		"componentPath": "./components/UserProfile",
+		"stats": map[string]any{
+			"users":    124,
+			"products": 56,
+			"orders":   890,
+			"revenue":  15280.45,
+		},
+		"recentActions": []map[string]any{
+			{"action": "Product created", "user": "Jane Smith", "timestamp": "2023-04-10T14:32:00Z"},
+			{"action": "Order fulfilled", "user": "John Doe", "timestamp": "2023-04-10T13:45:00Z"},
+		},
+	}
+
+	// Handle the example page
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// If requesting root, serve the comprehensive example
+		if r.URL.Path == "/" {
+			templatePath := filepath.Join(pagesDir, "comprehensive.html")
+			html, script, style := renderer.Render(templatePath, data)
+
+			// Debug output - write the generated HTML to a file for inspection
+			debugOutput := filepath.Join(projectRoot, "debug-output.html")
+
+			// Create Alpine.js wrapper
+			fullHtml := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>%s</title>
+	<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js"></script>
+	<style>%s</style>
+</head>
+<body>
+	%s
+	<script>%s</script>
+</body>
+</html>`, data["title"], style, html, script)
+
+			// Write debug output
+			err = os.WriteFile(debugOutput, []byte(fullHtml), 0644)
+			if err != nil {
+				log.Printf("Warning: Failed to write debug file: %v", err)
+			} else {
+				log.Printf("Debug output written to: %s", debugOutput)
+			}
+
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte(fullHtml))
+			return
+		}
+
+		// Handle 404
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("Page not found"))
+	})
+
+	// Add a simple example route
+	http.HandleFunc("/simple", func(w http.ResponseWriter, r *http.Request) {
+		// Create a simple template on the fly
+		simple := `---
+prop title = "Simple Test"
+prop name = "John"
+prop age = 2
+---
+
+<div>
+  <h1>{title}</h1>
+  <p>Hello, {name}! Your age is {age}.</p>
+</div>`
+
+		// Write the simple template to a temporary file
+		tempFile := filepath.Join(projectRoot, "examples", "pages", "simple.html")
+		err := os.WriteFile(tempFile, []byte(simple), 0644)
+		if err != nil {
+			log.Printf("Warning: Failed to write simple template: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		// Render the simple template
+		simpleData := map[string]any{
+			"title": "Simple Test",
+			"name":  "John",
+			"age":   2,
+		}
+
+		html, script, _ := renderer.Render(tempFile, simpleData)
+
+		// Create Alpine.js wrapper
+		fullHtml := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>%s</title>
+	<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js"></script>
+</head>
+<body>
+	%s
+	<script>%s</script>
+</body>
+</html>`, simpleData["title"], html, script)
+
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(fullHtml))
+	})
+
+	// Start the server
+	port := ":8081"
+	fmt.Printf("Server starting at http://localhost%s\n", port)
+	log.Fatal(http.ListenAndServe(port, nil))
+}

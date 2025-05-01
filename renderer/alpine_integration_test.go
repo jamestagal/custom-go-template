@@ -112,8 +112,10 @@ func TestAlpineJSDirectiveGeneration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := GenerateAlpineDirectives(tt.attributes)
-			if !strings.Contains(got, tt.want) {
-				t.Errorf("GenerateAlpineDirectives() = %v, want %v", got, tt.want)
+			// Join the directives into a single string for the test
+			gotStr := strings.Join(got, " ")
+			if !strings.Contains(gotStr, tt.want) {
+				t.Errorf("GenerateAlpineDirectives() = %v, want %v", gotStr, tt.want)
 			}
 		})
 	}

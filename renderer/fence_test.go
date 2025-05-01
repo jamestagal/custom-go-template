@@ -23,7 +23,7 @@ func TestEvalJS_SimpleExpressions(t *testing.T) {
 			name:      "simple number",
 			jsCode:    "42",
 			propsDecl: "",
-			want:      int64(42),
+			want:      float64(42),
 		},
 		{
 			name:      "simple boolean",
@@ -35,19 +35,19 @@ func TestEvalJS_SimpleExpressions(t *testing.T) {
 			name:      "simple array",
 			jsCode:    "[1, 2, 3]",
 			propsDecl: "",
-			want:      []interface{}{int64(1), int64(2), int64(3)},
+			want:      []interface{}{float64(1), float64(2), float64(3)},
 		},
 		{
 			name:      "simple object",
 			jsCode:    "({a: 1, b: 2})",
 			propsDecl: "",
-			want:      map[string]interface{}{"a": int64(1), "b": int64(2)},
+			want:      map[string]interface{}{"a": float64(1), "b": float64(2)},
 		},
 		{
 			name:      "variable from props",
 			jsCode:    "x + y",
 			propsDecl: "let x = 10; let y = 20;",
-			want:      int64(30),
+			want:      float64(30),
 		},
 	}
 
@@ -55,7 +55,7 @@ func TestEvalJS_SimpleExpressions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := EvalJS(tt.jsCode, tt.propsDecl)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("EvalJS() = %v, want %v", got, tt.want)
+				t.Errorf("EvalJS() = %v (type %T), want %v (type %T)", got, got, tt.want, tt.want)
 			}
 		})
 	}
@@ -163,7 +163,7 @@ func TestEvalJS_EvaluationStrategies(t *testing.T) {
 	// Test each evaluation strategy separately
 	t.Run("DirectEvaluation", func(t *testing.T) {
 		result := EvalJS("1 + 2", "")
-		if result != int64(3) {
+		if result != float64(3) {
 			t.Errorf("Direct evaluation failed, got %v, want 3", result)
 		}
 	})
