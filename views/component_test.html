@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Component Test</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        :root {
+            --bg-color: white;
+            --text-color: #333;
+            --border-color: #ddd;
+            --header-bg: #f5f5f5;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        h1, h2, h3 {
+            margin-top: 0;
+            background: var(--header-bg);
+            padding: 10px;
+            border-radius: 3px;
+        }
+        
+        button {
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background: var(--header-bg);
+            cursor: pointer;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: var(--bg-color);
+        }
+        
+        .counter {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .profile {
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--header-bg);
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="section">
+        <h1>Component Test</h1>
+        <p>This page demonstrates how components are transformed into Alpine.js compatible HTML.</p>
+    </div>
+
+    <!-- Static Component Test -->
+    <div class="section">
+        <h2>Static Component Test</h2>
+        <p>Testing a component with static props:</p>
+        
+        <Card title="Welcome to Components" description="This is a static card component" />
+    </div>
+
+    <!-- Dynamic Component Test -->
+    <div class="section">
+        <h2>Dynamic Component Test</h2>
+        <p>Testing a component with dynamic props:</p>
+        
+        {#fence}
+            let cardTitle = "Dynamic Card Title";
+            let cardDescription = "This description is passed dynamically";
+        {/fence}
+        
+        <Card title={cardTitle} description={cardDescription} />
+    </div>
+
+    <!-- Counter Component Test -->
+    <div class="section">
+        <h2>Counter Component Test</h2>
+        <p>Testing a component with state and events:</p>
+        
+        {#fence}
+            let parentCount = 0;
+            
+            function incrementParent() {
+                parentCount++;
+            }
+        {/fence}
+        
+        <p>Parent count: {parentCount}</p>
+        <button @click="incrementParent()">Increment Parent</button>
+        
+        <Counter count={parentCount} onIncrement="incrementParent()" />
+    </div>
+
+    <!-- Nested Components Test -->
+    <div class="section">
+        <h2>Nested Components Test</h2>
+        <p>Testing nested components:</p>
+        
+        {#fence}
+            let user = {
+                name: "John Doe",
+                email: "john@example.com",
+                role: "Admin"
+            };
+        {/fence}
+        
+        <UserProfile user={user}>
+            <Card title="User Statistics" description="Member since 2023" />
+        </UserProfile>
+    </div>
+
+    <!-- Conditional Component Rendering -->
+    <div class="section">
+        <h2>Conditional Component Rendering</h2>
+        <p>Testing conditional rendering of components:</p>
+        
+        {#fence}
+            let isAdmin = true;
+            let currentUser = {
+                name: "Admin User",
+                permissions: ["read", "write", "delete"]
+            };
+        {/fence}
+        
+        {#if isAdmin}
+            <AdminPanel user={currentUser} />
+        {:else}
+            <UserProfile user={currentUser} />
+        {/if}
+        
+        <button @click="isAdmin = !isAdmin">Toggle Admin</button>
+    </div>
+
+    <!-- Component in Loop -->
+    <div class="section">
+        <h2>Component in Loop</h2>
+        <p>Testing components rendered in a loop:</p>
+        
+        {#fence}
+            let items = [
+                { id: 1, title: "Item One", description: "First item description" },
+                { id: 2, title: "Item Two", description: "Second item description" },
+                { id: 3, title: "Item Three", description: "Third item description" }
+            ];
+        {/fence}
+        
+        {#each items as item}
+            <Card title={item.title} description={item.description} />
+        {/each}
+    </div>
+</body>
+</html>

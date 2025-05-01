@@ -89,34 +89,12 @@ func RenderNodeToBuilder(sb *strings.Builder, node ast.Node) {
 		sb.WriteString("</template>")
 		
 	case *ast.Conditional:
-		// Check if we need to handle the special case for Alpine.js directives
-		if hasAlpineDirectives(n) {
-			renderAlpineConditional(sb, n)
-		} else {
-			// Legacy rendering for tests that expect x-if with negated conditions
-			renderLegacyConditional(sb, n)
-		}
+		// Always use modern Alpine.js directives for conditionals
+		renderAlpineConditional(sb, n)
 		
 	default:
 		// Skip other node types like FenceSection
 	}
-}
-
-// hasAlpineDirectives checks if the conditional uses native Alpine.js directives
-func hasAlpineDirectives(cond *ast.Conditional) bool {
-	// This is a heuristic - we check if any of the nodes in the conditional
-	// are elements with x-else or x-else-if attributes
-	for _, node := range cond.IfContent {
-		if elem, ok := node.(*ast.Element); ok {
-			for _, attr := range elem.Attributes {
-				if attr.Name == "x-else" || attr.Name == "x-else-if" {
-					return true
-				}
-			}
-		}
-	}
-	
-	return false
 }
 
 // renderAlpineConditional renders a conditional using native Alpine.js directives
@@ -150,51 +128,6 @@ func renderAlpineConditional(sb *strings.Builder, cond *ast.Conditional) {
 	// Render else branch
 	if len(cond.ElseContent) > 0 {
 		sb.WriteString("<template x-else>")
-		
-		for _, child := range cond.ElseContent {
-			RenderNodeToBuilder(sb, child)
-		}
-		
-		sb.WriteString("</template>")
-	}
-}
-
-// renderLegacyConditional renders a conditional using x-if with negated conditions
-// This is kept for backward compatibility with existing tests
-func renderLegacyConditional(sb *strings.Builder, cond *ast.Conditional) {
-	// Render if branch
-	sb.WriteString("<template x-if=\"")
-	sb.WriteString(cond.IfCondition)
-	sb.WriteString("\">")
-	
-	for _, child := range cond.IfContent {
-		RenderNodeToBuilder(sb, child)
-	}
-	
-	sb.WriteString("</template>")
-	
-	// Render else-if branches
-	for i, condition := range cond.ElseIfConditions {
-		sb.WriteString("<template x-if=\"!(")
-		sb.WriteString(cond.IfCondition)
-		sb.WriteString(") && ")
-		sb.WriteString(condition)
-		sb.WriteString("\">")
-		
-		if i < len(cond.ElseIfContent) {
-			for _, child := range cond.ElseIfContent[i] {
-				RenderNodeToBuilder(sb, child)
-			}
-		}
-		
-		sb.WriteString("</template>")
-	}
-	
-	// Render else branch
-	if len(cond.ElseContent) > 0 {
-		sb.WriteString("<template x-if=\"!(")
-		sb.WriteString(cond.IfCondition)
-		sb.WriteString(")\">")
 		
 		for _, child := range cond.ElseContent {
 			RenderNodeToBuilder(sb, child)

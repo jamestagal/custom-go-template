@@ -200,7 +200,7 @@ let count = 0
 			props: map[string]any{
 				"showReset": true,
 			},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;showReset&quot;:true}"> <template x-if="count > 0"><p>Count is positive: <span x-text="count"></span></p></template><template x-if="!(count > 0)"><p>Count is zero: <span x-text="count"></span></p><template x-if="showReset"><button>Reset</button></template></template> </div>`,
+			expected: `<div x-data="{&quot;count&quot;:0,&quot;showReset&quot;:true}"> <template x-if="count > 0"><p>Count is positive: <span x-text="count"></span></p></template><template x-else><p>Count is zero: <span x-text="count"></span></p><template x-if="showReset"><button>Reset</button></template></template> </div>`,
 		},
 	}
 

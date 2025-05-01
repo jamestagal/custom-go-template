@@ -11,7 +11,10 @@ import (
 func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 	// Reset component tracking for each transformation
 	resetComponentTracking()
-
+	
+	// Reset the component template registry
+	resetComponentTemplateRegistry()
+	
 	// Initialize the data scope with the provided props
 	dataScope := InitDataScope(props)
 	

@@ -44,10 +44,12 @@ func TestConditionalTransformation(t *testing.T) {
 				"isActive": true,
 			},
 			contains: []string{
+				`<div x-data=`,
 				`<div class="container">`,
 				`<template x-if="isActive">`,
 				`Active state`,
 				`</template>`,
+				`</div>`,
 				`</div>`,
 			},
 		},
@@ -103,6 +105,7 @@ func TestConditionalTransformation(t *testing.T) {
 				"status": "inactive",
 			},
 			contains: []string{
+				`<div x-data=`,
 				`<div class="status-indicator">`,
 				`<template x-if="status === 'active'">`,
 				`<span class="active">Active</span>`,
@@ -110,6 +113,7 @@ func TestConditionalTransformation(t *testing.T) {
 				`<template x-else>`,
 				`<span class="inactive">Inactive</span>`,
 				`</template>`,
+				`</div>`,
 				`</div>`,
 			},
 			notContains: []string{
@@ -120,11 +124,6 @@ func TestConditionalTransformation(t *testing.T) {
 			name: "if-else-if-else condition",
 			template: &ast.Template{
 				RootNodes: []ast.Node{
-					&ast.FenceSection{
-						RawContent: `
-							let status = 'pending';
-						`,
-					},
 					&ast.Element{
 						TagName: "div",
 						Attributes: []ast.Attribute{
@@ -186,8 +185,11 @@ func TestConditionalTransformation(t *testing.T) {
 					},
 				},
 			},
-			props: map[string]any{},
+			props: map[string]any{
+				"status": "pending",
+			},
 			contains: []string{
+				`<div x-data=`,
 				`<div class="status-display">`,
 				`<template x-if="status === 'active'">`,
 				`<div class="active-status">Status: Active</div>`,
@@ -198,6 +200,7 @@ func TestConditionalTransformation(t *testing.T) {
 				`<template x-else>`,
 				`<div class="inactive-status">Status: Inactive</div>`,
 				`</template>`,
+				`</div>`,
 				`</div>`,
 			},
 			notContains: []string{
@@ -246,6 +249,7 @@ func TestConditionalTransformation(t *testing.T) {
 				"username": "JohnDoe",
 			},
 			contains: []string{
+				`<div x-data=`,
 				`<div class="user-profile">`,
 				`<template x-if="isLoggedIn">`,
 				`Welcome, <span x-text="username"></span>!`,
@@ -259,6 +263,7 @@ func TestConditionalTransformation(t *testing.T) {
 				`<template x-else>`,
 				`Please log in.`,
 				`</template>`,
+				`</div>`,
 				`</div>`,
 			},
 			notContains: []string{
@@ -298,6 +303,7 @@ func TestConditionalTransformation(t *testing.T) {
 				"total": 42.99,
 			},
 			contains: []string{
+				`<div x-data=`,
 				`<div class="cart">`,
 				`<template x-if="items.length > 0">`,
 				`You have <span x-text="items.length"></span> items in your cart.`,
@@ -306,6 +312,7 @@ func TestConditionalTransformation(t *testing.T) {
 				`<template x-else>`,
 				`Your cart is empty.`,
 				`</template>`,
+				`</div>`,
 				`</div>`,
 			},
 			notContains: []string{
@@ -325,17 +332,22 @@ func TestConditionalTransformation(t *testing.T) {
 				result += testutils.RenderNode(node)
 			}
 			
+			// Normalize and compare
+			resultNormalized := testutils.NormalizeWhitespace(result)
+			
 			// Check that output contains expected strings
 			for _, s := range tt.contains {
-				if !strings.Contains(result, s) {
-					t.Errorf("Expected output to contain %q, but it doesn't.\nOutput: %s", s, result)
+				normalizedSubstr := testutils.NormalizeWhitespace(s)
+				if !strings.Contains(resultNormalized, normalizedSubstr) {
+					t.Errorf("Expected output to contain (normalized):\n%s\n\nBut it doesn't. Full output (normalized):\n%s", normalizedSubstr, resultNormalized)
 				}
 			}
 			
 			// Check that output doesn't contain unwanted strings
 			for _, s := range tt.notContains {
-				if strings.Contains(result, s) {
-					t.Errorf("Expected output not to contain %q, but it does.\nOutput: %s", s, result)
+				normalizedSubstr := testutils.NormalizeWhitespace(s)
+				if strings.Contains(resultNormalized, normalizedSubstr) {
+					t.Errorf("Expected output NOT to contain (normalized):\n%s\n\nBut it does. Full output (normalized):\n%s", normalizedSubstr, resultNormalized)
 				}
 			}
 		})
