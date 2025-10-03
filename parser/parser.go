@@ -20,22 +20,6 @@ type Result struct {
 // Parser is a function that takes a string and returns a Result
 type Parser func(string) Result
 
-// Helper function to get line and column information for error reporting
-func getLineAndColumn(input string, position int) (int, int) {
-	line := 1
-	lastNewline := -1
-
-	for i := 0; i < position; i++ {
-		if input[i] == '\n' {
-			line++
-			lastNewline = i
-		}
-	}
-
-	column := position - lastNewline
-	return line, column
-}
-
 // ParseTemplate is the main entry point, parsing the full template string into an AST.
 func ParseTemplate(template string) (*ast.Template, error) {
 	log.Printf("[ParseTemplate] Starting parse of template with length %d", len(template))
@@ -73,13 +57,12 @@ func ParseTemplate(template string) (*ast.Template, error) {
 	// Improved error handling for remaining content
 	if len(result.Remaining) > 0 {
 		position := len(template) - len(result.Remaining)
-		line, col := getLineAndColumn(template, position)
 
 		// Look for potential HTML start tag in remaining content (sign of recursion)
 		if strings.Contains(result.Remaining, "<html") ||
 			strings.Contains(result.Remaining, "<body") ||
 			strings.Contains(result.Remaining, "<head") {
-			log.Printf("[ParseTemplate] Detected potential recursion with HTML restart in remaining content at line %d, col %d", line, col)
+			log.Printf("[ParseTemplate] Detected potential recursion with HTML restart in remaining content at position %d", position)
 			// Capture a longer context to see what we're failing on
 			remainingStart := min(50, len(result.Remaining))
 			log.Printf("[ParseTemplate] Remaining content starts with: '%s'", result.Remaining[:remainingStart])
@@ -94,8 +77,13 @@ func ParseTemplate(template string) (*ast.Template, error) {
 				return &ast.Template{RootNodes: filteredRootNodes}, nil // Return partial success
 			}
 
-			// Otherwise, report specific recursion error
-			return nil, fmt.Errorf("parsing error: possibly infinite recursion detected. HTML document restarted at line %d, column %d", line, col)
+			// Otherwise, report specific recursion error with context
+			return nil, NewParseErrorWithSuggestion(
+				"possibly infinite recursion detected - HTML document restarted",
+				"Check for unclosed tags or incorrect nesting that may cause recursive parsing",
+				template,
+				position,
+			)
 		}
 
 		// For Alpine.js documents, be more lenient with parsing errors
@@ -107,9 +95,14 @@ func ParseTemplate(template string) (*ast.Template, error) {
 			return &ast.Template{RootNodes: filteredRootNodes}, nil
 		}
 
-		// Standard error for unparsed content
-		return nil, fmt.Errorf("unparsed content remaining at line %d, column %d, starting near: '%s'",
-			line, col, result.Remaining[:min(50, len(result.Remaining))])
+		// Standard error for unparsed content with context
+		snippet := result.Remaining[:min(50, len(result.Remaining))]
+		return nil, NewParseErrorWithSuggestion(
+			fmt.Sprintf("unparsed content remaining starting with: '%s'", snippet),
+			"This may indicate a syntax error or unsupported template syntax",
+			template,
+			position,
+		)
 	}
 
 	// Extract and validate root nodes
@@ -165,6 +158,237 @@ func filterWhitespaceRootNodes(nodes []ast.Node) []ast.Node {
 	return filtered
 }
 
+// BlockConditionalParser parses a complete if/else-if/else block structure.
+// This follows Jim's control tree pattern - it builds ONE Conditional node with proper nesting.
+func BlockConditionalParser() Parser {
+	return func(input string) Result {
+		log.Printf("[BlockConditionalParser] Attempting to parse conditional block")
+		originalInput := input
+
+		// First, check if we start with an if directive
+		ifStartRes := IfStartParser()(input)
+		if !ifStartRes.Successful {
+			return Result{nil, input, false, "not a conditional block", false}
+		}
+
+		// Get the initial conditional node
+		conditional, ok := ifStartRes.Value.(*ast.Conditional)
+		if !ok {
+			return Result{nil, input, false, "IfStartParser did not return *ast.Conditional", false}
+		}
+
+		remaining := ifStartRes.Remaining
+		log.Printf("[BlockConditionalParser] Parsed if condition: %s", conditional.IfCondition)
+
+		// Current branch we're collecting content for
+		type branch int
+		const (
+			ifBranch branch = iota
+			elseIfBranch
+			elseBranch
+		)
+
+		currentBranch := ifBranch
+		currentElseIfIndex := -1
+
+		// Parse content until we hit else-if, else, or /if
+		iterationCount := 0
+		maxIterations := 10000
+
+		for {
+			iterationCount++
+			if iterationCount > maxIterations {
+				offset := len(originalInput) - len(remaining)
+				return Result{
+					nil,
+					input,
+					false,
+					ErrMaxDepthExceeded(maxIterations, originalInput, offset).Error(),
+					false,
+				}
+			}
+
+			// Check for block terminators
+			elseIfRes := ElseIfParser()(remaining)
+			elseRes := ElseParser()(remaining)
+			ifEndRes := IfEndParser()(remaining)
+
+			// Check if we hit the end of the if block
+			if ifEndRes.Successful {
+				log.Printf("[BlockConditionalParser] Found {/if}, completing conditional block")
+				return Result{
+					Value:      conditional,
+					Remaining:  ifEndRes.Remaining,
+					Successful: true,
+					Error:      "",
+				}
+			}
+
+			// Check if we hit an else-if
+			if elseIfRes.Successful {
+				elseIfNode, ok := elseIfRes.Value.(*ast.ElseIfNode)
+				if !ok {
+					return Result{nil, input, false, "ElseIfParser did not return *ast.ElseIfNode", false}
+				}
+
+				log.Printf("[BlockConditionalParser] Found {else if %s}", elseIfNode.Condition)
+
+				// Add the else-if condition
+				conditional.ElseIfConditions = append(conditional.ElseIfConditions, elseIfNode.Condition)
+				conditional.ElseIfContent = append(conditional.ElseIfContent, []ast.Node{})
+
+				// Switch to else-if branch
+				currentBranch = elseIfBranch
+				currentElseIfIndex = len(conditional.ElseIfConditions) - 1
+
+				remaining = elseIfRes.Remaining
+				continue
+			}
+
+			// Check if we hit an else
+			if elseRes.Successful {
+				log.Printf("[BlockConditionalParser] Found {else}")
+
+				// Switch to else branch
+				currentBranch = elseBranch
+
+				remaining = elseRes.Remaining
+				continue
+			}
+
+			// Parse one node of content for the current branch
+			// Use AnyNodeParser with stop conditions to avoid parsing nested if/else directives incorrectly
+			stopParsers := []Parser{
+				ElseIfParser(),
+				ElseParser(),
+				IfEndParser(),
+			}
+
+			nodeRes := AnyNodeParser(stopParsers...)(remaining)
+			if !nodeRes.Successful {
+				// If we can't parse any more content, this is an error - missing closing directive
+				offset := len(originalInput) - len(remaining)
+				return Result{
+					nil,
+					input,
+					false,
+					ErrMissingClosingDirective("if", originalInput, offset).Error(),
+					false,
+				}
+			}
+
+			// Add the parsed node to the appropriate branch
+			if node, ok := nodeRes.Value.(ast.Node); ok && node != nil {
+				switch currentBranch {
+				case ifBranch:
+					conditional.IfContent = append(conditional.IfContent, node)
+					log.Printf("[BlockConditionalParser] Added node %T to IfContent", node)
+				case elseIfBranch:
+					conditional.ElseIfContent[currentElseIfIndex] = append(
+						conditional.ElseIfContent[currentElseIfIndex], node)
+					log.Printf("[BlockConditionalParser] Added node %T to ElseIfContent[%d]", node, currentElseIfIndex)
+				case elseBranch:
+					conditional.ElseContent = append(conditional.ElseContent, node)
+					log.Printf("[BlockConditionalParser] Added node %T to ElseContent", node)
+				}
+			}
+
+			remaining = nodeRes.Remaining
+
+			// Safety check - ensure we're making progress
+			if remaining == ifStartRes.Remaining {
+				return Result{nil, input, false, "BlockConditionalParser: no progress made", false}
+			}
+		}
+	}
+}
+
+// BlockLoopParser parses a complete for/each loop block structure.
+// This follows Jim's control tree pattern - it builds ONE Loop node with proper nesting.
+func BlockLoopParser() Parser {
+	return func(input string) Result {
+		log.Printf("[BlockLoopParser] Attempting to parse loop block")
+		originalInput := input
+
+		// First, check if we start with a for directive
+		forStartRes := ForStartParser()(input)
+		if !forStartRes.Successful {
+			return Result{nil, input, false, "not a loop block", false}
+		}
+
+		// Get the initial loop node
+		loop, ok := forStartRes.Value.(*ast.Loop)
+		if !ok {
+			return Result{nil, input, false, "ForStartParser did not return *ast.Loop", false}
+		}
+
+		remaining := forStartRes.Remaining
+		log.Printf("[BlockLoopParser] Parsed loop: %s in %s", loop.Value, loop.Collection)
+
+		// Parse content until we hit /for or /each
+		iterationCount := 0
+		maxIterations := 10000
+
+		for {
+			iterationCount++
+			if iterationCount > maxIterations {
+				offset := len(originalInput) - len(remaining)
+				return Result{
+					nil,
+					input,
+					false,
+					ErrMaxDepthExceeded(maxIterations, originalInput, offset).Error(),
+					false,
+				}
+			}
+
+			// Check for block terminator
+			forEndRes := ForEndParser()(remaining)
+
+			// Check if we hit the end of the loop block
+			if forEndRes.Successful {
+				log.Printf("[BlockLoopParser] Found {/for}, completing loop block")
+				return Result{
+					Value:      loop,
+					Remaining:  forEndRes.Remaining,
+					Successful: true,
+					Error:      "",
+				}
+			}
+
+			// Parse one node of content
+			// Use AnyNodeParser with stop condition to avoid parsing /for incorrectly
+			stopParsers := []Parser{ForEndParser()}
+
+			nodeRes := AnyNodeParser(stopParsers...)(remaining)
+			if !nodeRes.Successful {
+				// If we can't parse any more content, this is an error - missing closing directive
+				offset := len(originalInput) - len(remaining)
+				return Result{
+					nil,
+					input,
+					false,
+					ErrMissingClosingDirective("for", originalInput, offset).Error(),
+					false,
+				}
+			}
+
+			// Add the parsed node to loop content
+			if node, ok := nodeRes.Value.(ast.Node); ok && node != nil {
+				loop.Content = append(loop.Content, node)
+				log.Printf("[BlockLoopParser] Added node %T to loop content", node)
+			}
+
+			remaining = nodeRes.Remaining
+
+			// Safety check - ensure we're making progress
+			if remaining == forStartRes.Remaining {
+				return Result{nil, input, false, "BlockLoopParser: no progress made", false}
+			}
+		}
+	}
+}
+
 // AnyNodeParser tries all node parsers in sequence
 func AnyNodeParser(stop ...Parser) Parser {
 	return func(input string) Result {
@@ -191,18 +415,16 @@ func AnyNodeParser(stop ...Parser) Parser {
 		}
 
 		// Order matters! Try more specific parsers first
+		// NOTE: Use block-aware parsers instead of individual directive parsers
 		parsers := []struct {
 			Name   string
 			Parser Parser
 		}{
 			{"Comment", CommentParser()},
-			{"IfStart", IfStartParser()},
-			{"ElseIf", ElseIfParser()},
-			{"Else", ElseParser()},
-			{"IfEnd", IfEndParser()},
-			{"ForStart", ForStartParser()},
-			{"ForEnd", ForEndParser()},
-			{"Component", ComponentParser()}, // Try component parser before element and expression
+			{"BlockConditional", BlockConditionalParser()}, // Block-aware conditional parser
+			{"BlockLoop", BlockLoopParser()},               // Block-aware loop parser
+			{"DynamicComponent", DynamicComponentParser()}, // Try dynamic component (<= syntax) first
+			{"Component", ComponentParser()},               // Try component parser before element and expression
 			{"Element", ElementParser()},
 			{"Expression", ExpressionParser()},
 			{"Text", TextParser(delimiters...)}, // Text parser should be last

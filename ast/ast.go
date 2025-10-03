@@ -79,6 +79,7 @@ type Attribute struct {
 	IsAlpine   bool   // true if this is an Alpine.js directive
 	AlpineType string // "data", "bind", "on", etc.
 	AlpineKey  string // For x-bind:class, this would be "class"
+	QuoteStyle string // Quote style to use for the attribute value: ' or "
 }
 
 // TextNode represents a text node
@@ -132,6 +133,22 @@ type ComponentNode struct {
 }
 
 func (c *ComponentNode) NodeType() string { return "Component" }
+
+// DynamicComponentNode represents a component with a dynamic path
+// Syntax: <='./views/{comp}.html' prop={value} />
+// This is Jim's innovative feature for runtime component selection based on variables
+type DynamicComponentNode struct {
+	PathExpression string          // The path with possible {variables}, e.g., "./views/{comp}.html"
+	Props          []ComponentProp // Props to pass to component
+	SelfClosing    bool            // True if ends with />
+}
+
+func (d *DynamicComponentNode) NodeType() string { return "DynamicComponent" }
+
+// String provides a debug representation of DynamicComponentNode
+func (d *DynamicComponentNode) String() string {
+	return "DynamicComponent{Path: " + d.PathExpression + ", Props: " + string(rune(len(d.Props))) + "}"
+}
 
 // ComponentProp represents a prop passed to a component
 type ComponentProp struct {

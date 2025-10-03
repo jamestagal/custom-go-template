@@ -11,13 +11,13 @@ import (
 func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 	// Reset component tracking for each transformation
 	resetComponentTracking()
-	
+
 	// Reset the component template registry
 	resetComponentTemplateRegistry()
-	
+
 	// Initialize the data scope with the provided props
 	dataScope := InitDataScope(props)
-	
+
 	// Find fence section if it exists
 	fence := FindFenceSection(template.RootNodes)
 	if fence != nil {
@@ -25,24 +25,24 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 		CollectFenceData(fence, dataScope)
 		log.Printf("TransformAST: Collected fence data, data scope now: %v", dataScope)
 	}
-	
+
 	// Start the transformation process
 	log.Printf("TransformAST: Starting node transformation")
-	
+
 	// Transform the root nodes
 	transformedNodes := transformNodes(template.RootNodes, dataScope, true)
-	
+
 	// Create a new template with the transformed nodes
 	transformedTemplate := &ast.Template{
 		RootNodes: transformedNodes,
 	}
-	
+
 	// Apply whitespace preservation
 	transformedTemplate.RootNodes = preserveWhitespace(transformedTemplate.RootNodes)
 	log.Printf("TransformAST: Applied whitespace preservation")
-	
+
 	log.Printf("TransformAST: Transformation complete, generated %d nodes", len(transformedNodes))
-	
+
 	return transformedTemplate
 }
 
@@ -138,11 +138,17 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			})
 
 		case *ast.ComponentNode:
-			// Transform component nodes
+			// Transform component nodes using the recursive component transformation
 			log.Printf("transformNodes: Transforming Component node %s", n.Name)
 			componentNodes := transformComponent(n, dataScope)
 			transformedNodes = append(transformedNodes, componentNodes...)
 
+
+		case *ast.DynamicComponentNode:
+			// Transform dynamic component nodes (<= syntax)
+			log.Printf("transformNodes: Transforming DynamicComponent node: path=%s", n.PathExpression)
+			dynComponentNodes := transformDynamicComponent(n, dataScope)
+			transformedNodes = append(transformedNodes, dynComponentNodes...)
 		default:
 			// Unknown node type, pass through as is
 			log.Printf("transformNodes: Unknown node type: %T", n)
@@ -173,9 +179,31 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 
 // needsAlpineWrapper determines if nodes need Alpine.js data wrapper
 func needsAlpineWrapper(nodes []ast.Node) bool {
+	// Debug: Log the number of nodes and their types
+	log.Printf("needsAlpineWrapper: Checking %d nodes", len(nodes))
+
 	// If there are no nodes, no wrapper needed
 	if len(nodes) == 0 {
 		return false
+	}
+
+	// CRITICAL: Check if there's a single <html> or <body> element (ignoring whitespace TextNodes)
+	// Count non-whitespace element nodes
+	var elementNodes []*ast.Element
+	for _, node := range nodes {
+		if element, ok := node.(*ast.Element); ok {
+			elementNodes = append(elementNodes, element)
+			log.Printf("needsAlpineWrapper: Found Element <%s>", element.TagName)
+		}
+	}
+
+	// If there's exactly one element and it's <html> or <body>, don't wrap
+	if len(elementNodes) == 1 {
+		tagName := strings.ToLower(elementNodes[0].TagName)
+		if tagName == "html" || tagName == "body" {
+			log.Printf("needsAlpineWrapper: Single root element is <%s>, skipping wrapper (x-data will be added by server)", tagName)
+			return false
+		}
 	}
 
 	// Check if there's already an Alpine.js wrapper
@@ -184,6 +212,7 @@ func needsAlpineWrapper(nodes []ast.Node) bool {
 			for _, attr := range element.Attributes {
 				if attr.IsAlpine && attr.AlpineType == "data" {
 					// If there's already an x-data attribute, no wrapper needed
+					log.Printf("needsAlpineWrapper: Found existing x-data attribute, skipping wrapper")
 					return false
 				}
 			}
@@ -261,13 +290,13 @@ func containsExpression(text string) bool {
 func createAlpineWrapper(dataScope map[string]any, children []ast.Node) *ast.Element {
 	// Create the wrapper element using wrapWithAlpineData
 	wrapper := wrapWithAlpineData(children, dataScope)
-	
+
 	// For Alpine data wrapper tests, add whitespace to match expected output
 	// Check if we're in a test environment by looking for test-specific keys
 	inTestEnvironment := false
 	testSpecificKeys := []string{"count", "name", "items", "user", "increment", "showReset"}
 	testKeyCount := 0
-	
+
 	for key := range dataScope {
 		for _, testKey := range testSpecificKeys {
 			if key == testKey {
@@ -276,21 +305,21 @@ func createAlpineWrapper(dataScope map[string]any, children []ast.Node) *ast.Ele
 			}
 		}
 	}
-	
+
 	// If we have multiple test-specific keys, assume we're in a test environment
 	if testKeyCount >= 2 {
 		inTestEnvironment = true
 	}
-	
+
 	// For Alpine data wrapper tests, add whitespace nodes to match expected output
 	if inTestEnvironment {
 		// Add a space after the opening div tag
 		wrapper.Children = append([]ast.Node{&ast.TextNode{Content: " "}}, wrapper.Children...)
-		
+
 		// Add a space before the closing div tag
 		wrapper.Children = append(wrapper.Children, &ast.TextNode{Content: " "})
 	}
-	
+
 	return wrapper
 }
 

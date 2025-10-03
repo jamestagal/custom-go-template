@@ -275,8 +275,11 @@ func parseChildren(input string, parentTag string) Result {
 				continue
 			}
 
-			// Found the matching closing tag
-			break
+			// Found the matching closing tag - process directives before returning
+			log.Printf("[parseChildren] Processing %d children nodes for directives", len(children))
+			processedChildren := processDirectiveNodes(children)
+			log.Printf("[parseChildren] After directive processing: %d nodes", len(processedChildren))
+			return Result{processedChildren, remaining, true, "", false}
 		}
 
 		// Parse a child node
@@ -299,7 +302,12 @@ func parseChildren(input string, parentTag string) Result {
 		}
 	}
 
-	return Result{children, remaining, true, "", false}
+	// Handle case where we exit loop without finding closing tag
+	// Still process directives before returning
+	log.Printf("[parseChildren] Processing %d children nodes for directives (no closing tag found)", len(children))
+	processedChildren := processDirectiveNodes(children)
+	log.Printf("[parseChildren] After directive processing: %d nodes", len(processedChildren))
+	return Result{processedChildren, remaining, true, "", false}
 }
 
 // parseChildNode attempts to parse a single child node

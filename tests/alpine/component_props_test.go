@@ -9,6 +9,9 @@ import (
 )
 
 func TestComponentPropsTransformation(t *testing.T) {
+	// Register component templates for testing
+	registerTestPropComponents()
+	
 	tests := []struct {
 		name     string
 		input    ast.Node
@@ -38,7 +41,7 @@ func TestComponentPropsTransformation(t *testing.T) {
 			props: map[string]any{
 				"items": []any{"item1", "item2", "item3"},
 			},
-			expected: `<div x-component="DataCard" data-prop-title="getTitle()" data-prop-count="items.length"></div>`,
+			expected: `<div x-data="{ &quot;count&quot;: &quot;items.length&quot;, &quot;title&quot;: &quot;getTitle()&quot; }">DataCard Component</div>`,
 		},
 		{
 			name: "component_with_mixed_props",
@@ -72,7 +75,7 @@ func TestComponentPropsTransformation(t *testing.T) {
 					"id":   "123",
 				},
 			},
-			expected: `<div x-component="UserProfile" data-prop-username="currentUser.name" data-prop-isAdmin="true" data-prop-avatar="'/images/default.png'"></div>`,
+			expected: `<div x-data="{ &quot;avatar&quot;: &quot;/images/default.png&quot;, &quot;isAdmin&quot;: true, &quot;username&quot;: &quot;currentUser.name&quot; }">UserProfile Component</div>`,
 		},
 		{
 			name: "component_with_complex_expression_props",
@@ -99,7 +102,7 @@ func TestComponentPropsTransformation(t *testing.T) {
 					"price": 149.99,
 				},
 			},
-			expected: `<div x-component="ProductCard" data-prop-price="formatCurrency(product.price)" data-prop-discount="product.price > 100 ? '10%' : '5%'"></div>`,
+			expected: `<div x-data="{ &quot;discount&quot;: &quot;product.price > 100 ? '10%' : '5%'&quot;, &quot;price&quot;: &quot;formatCurrency(product.price)&quot; }">ProductCard Component</div>`,
 		},
 		{
 			name: "component_with_shorthand_and_spread_props",
@@ -130,7 +133,7 @@ func TestComponentPropsTransformation(t *testing.T) {
 					"name": "Name is required",
 				},
 			},
-			expected: `<div x-component="Form" data-prop-formData="formData" data-prop-errors="validationErrors"></div>`,
+			expected: `<div x-data="{ &quot;errors&quot;: &quot;validationErrors&quot;, &quot;formData&quot;: {&quot;email&quot;: &quot;&quot;, &quot;name&quot;: &quot;&quot;} }">Form Component</div>`,
 		},
 	}
 
@@ -149,33 +152,12 @@ func TestComponentPropsTransformation(t *testing.T) {
 				t.Fatalf("Expected at least one node in the result, but got none")
 			}
 			
-			// Get the component node, which might be wrapped in an x-data div
-			var componentNode ast.Node
+			// Get the root node
 			rootNode := result.RootNodes[0]
 			
-			// Check if the root node is an element with x-data (wrapper)
-			if element, ok := rootNode.(*ast.Element); ok {
-				hasXData := false
-				for _, attr := range element.Attributes {
-					if attr.Name == "x-data" {
-						hasXData = true
-						break
-					}
-				}
-				
-				// If it's an x-data wrapper, get the component from its children
-				if hasXData && len(element.Children) > 0 {
-					componentNode = element.Children[0]
-				} else {
-					componentNode = rootNode
-				}
-			} else {
-				componentNode = rootNode
-			}
-			
-			// Convert the component node to a string for comparison
+			// Convert the root node to a string for comparison
 			var sb strings.Builder
-			renderComponentPropsNode(&sb, componentNode)
+			renderComponentPropsNode(&sb, rootNode)
 			output := sb.String()
 
 			if output != tt.expected {
@@ -227,4 +209,39 @@ func renderComponentPropsNode(sb *strings.Builder, node ast.Node) {
 		sb.WriteString(n.Expression)
 		sb.WriteString("\"></span>")
 	}
+}
+
+// registerTestPropComponents registers test component templates for prop tests
+func registerTestPropComponents() {
+	// DataCard component
+	dataCardTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.TextNode{Content: "DataCard Component"},
+		},
+	}
+	transformer.RegisterComponent("DataCard", dataCardTemplate, []string{"title", "count"})
+	
+	// UserProfile component
+	userProfileTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.TextNode{Content: "UserProfile Component"},
+		},
+	}
+	transformer.RegisterComponent("UserProfile", userProfileTemplate, []string{"username", "isAdmin", "avatar"})
+	
+	// ProductCard component
+	productCardTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.TextNode{Content: "ProductCard Component"},
+		},
+	}
+	transformer.RegisterComponent("ProductCard", productCardTemplate, []string{"price", "discount"})
+	
+	// Form component
+	formTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.TextNode{Content: "Form Component"},
+		},
+	}
+	transformer.RegisterComponent("Form", formTemplate, []string{"formData", "errors"})
 }

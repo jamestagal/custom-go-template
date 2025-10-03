@@ -1,0 +1,76 @@
+---
+prop name = "Guest";
+prop age = 0;
+---
+
+<div class="age-container">
+  <div class="age-info">{name}'s age is: {age}</div>
+
+  {if age > 300}
+    <div class="age-badge dust">Dust (300+)</div>
+  {else if age > 200}
+    <div class="age-badge dead">Dead (200+)</div>
+  {else if age > 90}
+    <div class="age-badge old">Wow (90+)</div>
+  {else if age > 80}
+    <div class="age-badge old">Well done (80+)</div>
+  {else if age > 40}
+    <div class="age-badge mid">Over the hill (40+)</div>
+  {else if age >= 21}
+    <div class="age-badge young">Can drink (21+)</div>
+  {else}
+    <div class="age-badge new">Just a baby (Under 21)</div>
+  {/if}
+</div>
+
+<style>
+  .age-container {
+    background-color: #e5e7eb;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 0.5rem;
+  }
+
+  .age-info {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .age-badge {
+    font-size: 1.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    display: inline-block;
+  }
+
+  .dust {
+    background-color: #6b7280;
+    color: white;
+  }
+
+  .dead {
+    background-color: #ef4444;
+    color: white;
+    font-weight: bold;
+  }
+
+  .old {
+    background-color: #10b981;
+    color: white;
+  }
+
+  .mid {
+    background-color: #f97316;
+    color: white;
+  }
+
+  .young {
+    background-color: #3b82f6;
+    color: white;
+  }
+
+  .new {
+    background-color: #ec4899;
+    color: white;
+  }
+</style>

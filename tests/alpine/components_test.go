@@ -9,6 +9,9 @@ import (
 )
 
 func TestStaticComponentTransformation(t *testing.T) {
+	// Register component templates for testing
+	registerTestComponents()
+	
 	tests := []struct {
 		name     string
 		input    ast.Node
@@ -23,7 +26,7 @@ func TestStaticComponentTransformation(t *testing.T) {
 				Dynamic: false,
 			},
 			props:    map[string]any{},
-			expected: `<div x-component="Button"></div>`,
+			expected: `<div x-data="{}">Button Component</div>`,
 		},
 		{
 			name: "component_with_static_props",
@@ -46,7 +49,7 @@ func TestStaticComponentTransformation(t *testing.T) {
 				Dynamic: false,
 			},
 			props:    map[string]any{},
-			expected: `<div x-component="Card" data-prop-title="Welcome" data-prop-subtitle="Hello World"></div>`,
+			expected: `<div x-data="{ &quot;subtitle&quot;: &quot;Hello World&quot;, &quot;title&quot;: &quot;Welcome&quot; }">Card Component</div>`,
 		},
 		{
 			name: "component_with_dynamic_props",
@@ -75,7 +78,7 @@ func TestStaticComponentTransformation(t *testing.T) {
 				},
 				"isAdmin": true,
 			},
-			expected: `<div x-component="UserProfile" data-prop-user="currentUser" data-prop-showDetails="isAdmin"></div>`,
+			expected: `<div x-data="{ &quot;showDetails&quot;: true, &quot;user&quot;: {&quot;name&quot;: &quot;John Doe&quot;, &quot;role&quot;: &quot;Admin&quot;} }">UserProfile Component</div>`,
 		},
 		{
 			name: "component_with_shorthand_props",
@@ -105,7 +108,7 @@ func TestStaticComponentTransformation(t *testing.T) {
 				},
 				"inStock": true,
 			},
-			expected: `<div x-component="ProductCard" data-prop-product="product" data-prop-inStock="inStock"></div>`,
+			expected: `<div x-data="{ &quot;inStock&quot;: true, &quot;product&quot;: {&quot;id&quot;: &quot;123&quot;, &quot;name&quot;: &quot;Laptop&quot;, &quot;price&quot;: 999.99} }">ProductCard Component</div>`,
 		},
 	}
 
@@ -124,33 +127,12 @@ func TestStaticComponentTransformation(t *testing.T) {
 				t.Fatalf("Expected at least one node in the result, but got none")
 			}
 			
-			// Get the component node, which might be wrapped in an x-data div
-			var componentNode ast.Node
+			// Get the root node
 			rootNode := result.RootNodes[0]
 			
-			// Check if the root node is an element with x-data (wrapper)
-			if element, ok := rootNode.(*ast.Element); ok {
-				hasXData := false
-				for _, attr := range element.Attributes {
-					if attr.Name == "x-data" {
-						hasXData = true
-						break
-					}
-				}
-				
-				// If it's an x-data wrapper, get the component from its children
-				if hasXData && len(element.Children) > 0 {
-					componentNode = element.Children[0]
-				} else {
-					componentNode = rootNode
-				}
-			} else {
-				componentNode = rootNode
-			}
-			
-			// Convert the component node to a string for comparison
+			// Convert the root node to a string for comparison
 			var sb strings.Builder
-			renderComponentNode(&sb, componentNode)
+			renderComponentNode(&sb, rootNode)
 			output := sb.String()
 
 			if output != tt.expected {
@@ -202,4 +184,39 @@ func renderComponentNode(sb *strings.Builder, node ast.Node) {
 		sb.WriteString(n.Expression)
 		sb.WriteString("\"></span>")
 	}
+}
+
+// registerTestComponents registers test component templates
+func registerTestComponents() {
+	// Button component
+	buttonTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.TextNode{Content: "Button Component"},
+		},
+	}
+	transformer.RegisterComponent("Button", buttonTemplate, []string{})
+	
+	// Card component
+	cardTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.TextNode{Content: "Card Component"},
+		},
+	}
+	transformer.RegisterComponent("Card", cardTemplate, []string{"title", "subtitle"})
+	
+	// UserProfile component
+	userProfileTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.TextNode{Content: "UserProfile Component"},
+		},
+	}
+	transformer.RegisterComponent("UserProfile", userProfileTemplate, []string{"user", "showDetails"})
+	
+	// ProductCard component
+	productCardTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.TextNode{Content: "ProductCard Component"},
+		},
+	}
+	transformer.RegisterComponent("ProductCard", productCardTemplate, []string{"product", "inStock"})
 }

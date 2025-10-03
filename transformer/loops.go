@@ -3,157 +3,106 @@ package transformer
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
+// getMapKeys returns sorted keys from a map for logging
+func getMapKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 // transformLoop transforms a Loop node into an Alpine.js compatible structure
 func transformLoop(node *ast.Loop, dataScope map[string]any) []ast.Node {
-	// Add loop variables to the data scope
-	dataScope[node.Iterator] = nil
-	if node.Value != "" {
-		dataScope[node.Value] = nil
+	log.Printf("transformLoop: iterator=%s, value=%s, collection=%s, isOf=%v",
+		node.Iterator, node.Value, node.Collection, node.IsOf)
+
+	// Extract variables from the collection expression (add collection to parent scope)
+	// This makes the collection accessible in the loop expression
+	extractVariablesFromExpr(node.Collection, dataScope)
+
+	// Create child scope for loop body
+	// The iterator variable should be in the loop body scope, NOT the parent scope
+	loopBodyScope := CreateChildScope(dataScope)
+
+	log.Printf("transformLoop: parent scope keys before: %v", getMapKeys(dataScope))
+	log.Printf("transformLoop: loop body scope keys before: %v", getMapKeys(loopBodyScope))
+
+	// IMPORTANT: Parser uses different field assignments for {#each} vs {for} syntax
+	// {#each items as item} → Iterator="", Value="item", IsOf=true
+	// {for item in items} → Iterator="item", Value="", IsOf=false
+	// We need to normalize this
+
+	var itemVar, indexVar string
+
+	if node.IsOf {
+		// This is {#each} syntax: Value=item, Iterator=index (or empty)
+		itemVar = node.Value
+		indexVar = node.Iterator
+	} else {
+		// This is {for} syntax: Iterator=item, Value=index (or empty)
+		itemVar = node.Iterator
+		indexVar = node.Value
 	}
 
-	// Extract variables from the collection expression
-	extractVariablesFromExpr(node.Collection, dataScope)
+	// Add variables to loop body scope (makes them available for expressions inside loop)
+	if itemVar != "" {
+		loopBodyScope[itemVar] = nil
+	}
+	if indexVar != "" {
+		loopBodyScope[indexVar] = nil
+	}
+
+	log.Printf("transformLoop: loop body scope keys after adding iterator: %v", getMapKeys(loopBodyScope))
+	log.Printf("transformLoop: parent scope keys after: %v", getMapKeys(dataScope))
 
 	// Clean up the collection expression
 	cleanedCollection := cleanLoopCollection(node.Collection)
 
-	// Determine the appropriate loop expression based on the loop type and variables
+	// Build the x-for expression - always use Alpine.js "in" syntax for arrays
 	var loopExpr string
 
-	// Handle specific test cases first
-	if node.Collection == "categories" && node.Iterator == "category" && node.Value == "" {
-		// Special case for category loop in nested_conditionals_and_loops test
-		return createLoopTemplate("category in categories", node.Content, dataScope)
-	}
-
-	if node.Collection == "category.items" && node.Iterator == "item" && node.Value == "" {
-		// Special case for item loop in nested_conditionals_and_loops test
-		return createLoopTemplate("item in category.items", node.Content, dataScope)
-	}
-
-	if node.Iterator == "index" && node.Value == "task" && cleanedCollection == "tasks" {
-		// Special case for the loop with index and task test - FIXED: Use expected format
-		return createLoopTemplate("(index, task) in tasks", node.Content, dataScope)
-	}
-
-	if node.Iterator == "index" && node.Value == "user" && cleanedCollection == "users" {
-		// Special case for the loop with index and user test - FIXED: Use expected format
-		return createLoopTemplate("(index, user) in users", node.Content, dataScope)
-	}
-
-	// Special case for the array loop with index test
-	if node.Iterator == "index" && node.Value == "item" && cleanedCollection == "items" {
-		// This is the exact case from the test - use the expected format
-		return createLoopTemplate("(index, item) in items", node.Content, dataScope)
-	}
-
-	if node.Iterator == "key" && node.Value == "value" && cleanedCollection == "product" {
-		// Special case for object iteration in tests - FIXED: Removed parentheses
-		return createLoopTemplate("key, value of Object.entries(product)", node.Content, dataScope)
-	}
-
-	// Handle the standard cases
-	if node.IsOf {
-		// For object iteration, use Alpine.js 'of' syntax
-		if node.Value != "" {
-			// If we have both key and value, use key, value of Object.entries(collection)
-			// FIXED: Removed parentheses around key, value
-			loopExpr = fmt.Sprintf("%s, %s of Object.entries(%s)", node.Iterator, node.Value, cleanedCollection)
-		} else {
-			// If we only have one variable, we still need to use Object.entries but format differently
-			// In Alpine.js, looping over Object.entries gives [key, value] arrays
-			loopExpr = fmt.Sprintf("entry of Object.entries(%s)", cleanedCollection)
-			
-			// The original iterator variable would be used as entry[0] (key) or entry[1] (value)
-			// Add a note to the log for clarity
-			log.Printf("Object iteration with single variable %s represented as 'entry' in Alpine", node.Iterator)
-		}
+	if indexVar != "" {
+		// Both index and item: "(index, item) in collection"
+		loopExpr = fmt.Sprintf("(%s, %s) in %s", indexVar, itemVar, cleanedCollection)
 	} else {
-		// For array iteration, use standard Alpine.js 'in' syntax
-		if node.Value != "" {
-			// IMPROVED: Simplified logic for array loops with two variables
-			// For Alpine.js, we always want (index, item) format
-			// Determine which variable is the index and which is the item
-			var indexVar, itemVar string
-			
-			// Check if either variable is named like an index
-			indexLikeNames := []string{"index", "idx", "i", "position", "pos"}
-			iteratorIsIndex := false
-			valueIsIndex := false
-			
-			for _, name := range indexLikeNames {
-				if strings.ToLower(node.Iterator) == name {
-					iteratorIsIndex = true
-					break
-				}
-				if strings.ToLower(node.Value) == name {
-					valueIsIndex = true
-					break
-				}
-			}
-			
-			// Assign variables based on naming
-			if iteratorIsIndex {
-				indexVar = node.Iterator
-				itemVar = node.Value
-			} else if valueIsIndex {
-				indexVar = node.Value
-				itemVar = node.Iterator
-			} else {
-				// If neither has an index-like name, use a heuristic:
-				// Typically in loops, the first variable is the item and the second is the index
-				// But Alpine.js expects (index, item), so we swap them
-				indexVar = node.Value
-				itemVar = node.Iterator
-			}
-			
-			// Format with Alpine.js expected order: (index, item)
-			loopExpr = fmt.Sprintf("(%s, %s) in %s", indexVar, itemVar, cleanedCollection)
-		} else {
-			// If we only have one variable, use it as the item
-			loopExpr = fmt.Sprintf("%s in %s", node.Iterator, cleanedCollection)
-		}
+		// Only item: "item in items"
+		loopExpr = fmt.Sprintf("%s in %s", itemVar, cleanedCollection)
 	}
 
-	// Log the loop expression for debugging
-	log.Printf("Loop expression: %s", loopExpr)
+	log.Printf("transformLoop: generated expression: %s", loopExpr)
 
-	return createLoopTemplate(loopExpr, node.Content, dataScope)
+	// Create the template element with the loop expression
+	// Use loop body scope for transforming content
+	return createLoopTemplate(loopExpr, node.Content, loopBodyScope)
 }
 
 // createLoopTemplate creates a template element with the x-for directive
 func createLoopTemplate(loopExpr string, content []ast.Node, dataScope map[string]any) []ast.Node {
-	// Create a child scope for the loop content
-	loopScope := CreateChildScope(dataScope)
-
-	// Transform the loop content
-	transformedContent := transformNodes(content, loopScope, false)
-
-	// Create the template element with x-for directive
-	template := &ast.Element{
+	// Create a template element with x-for directive
+	templateElement := &ast.Element{
 		TagName: "template",
 		Attributes: []ast.Attribute{
 			{
-				Name:       "x-for",
-				Value:      loopExpr,
-				Dynamic:    true,
-				IsAlpine:   true,
-				AlpineType: "for",
+				Name:  "x-for",
+				Value: loopExpr,
 			},
 		},
-		Children:    transformedContent,
-		SelfClosing: false,
+		Children: []ast.Node{},
 	}
 
-	// Merge any new variables from the loop scope back to the parent scope
-	MergeScopes(dataScope, loopScope)
+	// Transform the content
+	transformedContent := transformNodes(content, dataScope, false)
+	templateElement.Children = transformedContent
 
-	return []ast.Node{template}
+	return []ast.Node{templateElement}
 }
 
 // isIndexValueSwapNeeded determines if we need to swap the order of iterator and value
@@ -162,7 +111,7 @@ func isIndexValueSwapNeeded(iterator, value string) bool {
 	if iterator == "index" && (value == "item" || value == "task" || value == "user") {
 		return true
 	}
-	
+
 	// Default - no swap needed
 	return false
 }
@@ -357,35 +306,35 @@ func transformNestedConditionalsInLoops(nodes []ast.Node, dataScope map[string]a
 			// Transform the conditional using the standard transformation
 			transformedConditional := transformConditional(n, dataScope)
 			result = append(result, transformedConditional...)
-			
+
 		case *ast.Element:
 			// Process any conditionals in the children of elements
 			if n.Children != nil {
 				n.Children = transformNestedConditionalsInLoops(n.Children, dataScope)
 			}
 			result = append(result, n)
-			
+
 		case *ast.ElseNode:
 			// Skip ElseNode as it's handled by the parent conditional
 			continue
-			
+
 		case *ast.ElseIfNode:
 			// Skip ElseIfNode as it's handled by the parent conditional
 			continue
-			
+
 		case *ast.IfEndNode:
 			// Skip IfEndNode as it's handled by the parent conditional
 			continue
-			
+
 		case *ast.ForEndNode:
 			// Skip ForEndNode as it's handled by the parent loop
 			continue
-			
+
 		case *ast.ExpressionNode:
 			// Transform expressions
 			extractVariablesFromExpr(n.Expression, dataScope)
 			result = append(result, n)
-			
+
 		default:
 			// Just add other nodes as-is
 			result = append(result, node)

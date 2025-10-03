@@ -2,6 +2,7 @@ package parser
 
 import (
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
@@ -66,10 +67,10 @@ func ExpressionParser() Parser {
 
 		// Manual parsing with whitespace handling
 		i := 1 // Skip the opening brace
-		
+
 		// Track the expression content
 		start := i
-		
+
 		// Find the closing brace, handling nested braces
 		braceDepth := 1
 		for i < len(input) && braceDepth > 0 {
@@ -78,17 +79,17 @@ func ExpressionParser() Parser {
 			} else if input[i] == '}' {
 				braceDepth--
 			}
-			
+
 			if braceDepth > 0 {
 				i++
 			}
 		}
-		
+
 		// If we found a closing brace
 		if i < len(input) && input[i] == '}' {
 			expressionContent := strings.TrimSpace(input[start:i])
 			log.Printf("[ExpressionParser] Parsed expression with whitespace handling: %s", expressionContent)
-			
+
 			return Result{
 				&ast.ExpressionNode{Expression: expressionContent},
 				input[i+1:],
@@ -97,7 +98,7 @@ func ExpressionParser() Parser {
 				false,
 			}
 		}
-		
+
 		log.Printf("[ExpressionParser] Failed to find closing brace for expression")
 		return Result{nil, input, false, "unclosed expression", false}
 	}
@@ -107,19 +108,19 @@ func ExpressionParser() Parser {
 func isDirective(input string) bool {
 	// Trim whitespace at the start for consistent checking
 	trimmed := strings.TrimLeft(input, " \t\n\r")
-	
+
 	// First character must be {
 	if !strings.HasPrefix(trimmed, "{") {
 		return false
 	}
-	
+
 	// Check for directive prefixes after the opening brace and potential whitespace
 	i := 1
 	// Skip whitespace after the opening brace
 	for i < len(trimmed) && (trimmed[i] == ' ' || trimmed[i] == '\t') {
 		i++
 	}
-	
+
 	// Now check for directive keywords
 	if i < len(trimmed) {
 		prefixes := []string{
@@ -127,7 +128,7 @@ func isDirective(input string) bool {
 			"for ", "#each ", "/for", "#for", "/each", "/#each",
 			"await ", "/await", "#await", "/await",
 		}
-		
+
 		for _, prefix := range prefixes {
 			if strings.HasPrefix(trimmed[i:], prefix) {
 				return true
@@ -139,15 +140,93 @@ func isDirective(input string) bool {
 }
 
 // FenceParser parses the fence section (---...---) and returns an *ast.FenceSection node.
+// This now properly extracts props and variables from the fence content.
 func FenceParser() Parser {
 	return Map(
 		Between(String("---"), String("---"), TakeUntil(String("---"))),
 		func(value interface{}) (interface{}, error) {
 			content := value.(string)
 			log.Printf("[FenceParser] Parsed fence with %d chars", len(content))
-			return &ast.FenceSection{RawContent: content}, nil
+
+			// Parse the fence content to extract props and variables
+			fence := parseFenceContent(content)
+			return fence, nil
 		},
 	)
+}
+
+// parseFenceContent extracts props and variables from fence section content
+func parseFenceContent(content string) *ast.FenceSection {
+	fence := &ast.FenceSection{
+		RawContent: content,
+		Props:      []ast.PropNode{},
+		Variables:  []ast.VariableNode{},
+		Imports:    []ast.ImportNode{},
+	}
+
+	lines := strings.Split(content, "\n")
+
+	// Regex patterns for parsing
+	// Note: Use (?:;)? to optionally match trailing semicolon, then trim it
+	propRegex := regexp.MustCompile(`^\s*prop\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+?)(?:;)?$`)
+	varRegex := regexp.MustCompile(`^\s*(let|const|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+?)(?:;)?$`)
+	importRegex := regexp.MustCompile(`^\s*import\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s+from\s+['"](.+?)['"](?:;)?$`)
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Check for prop declaration
+		if matches := propRegex.FindStringSubmatch(line); matches != nil {
+			propName := matches[1]
+			propValue := strings.TrimSpace(matches[2])
+
+			log.Printf("[parseFenceContent] Found prop: %s = %s", propName, propValue)
+
+			fence.Props = append(fence.Props, ast.PropNode{
+				Name:         propName,
+				DefaultValue: propValue,
+			})
+			continue
+		}
+
+		// Check for variable declaration
+		if matches := varRegex.FindStringSubmatch(line); matches != nil {
+			keyword := matches[1]
+			varName := matches[2]
+			varValue := strings.TrimSpace(matches[3])
+
+			log.Printf("[parseFenceContent] Found variable: %s %s = %s", keyword, varName, varValue)
+
+			fence.Variables = append(fence.Variables, ast.VariableNode{
+				Keyword: keyword,
+				Name:    varName,
+				Value:   varValue,
+			})
+			continue
+		}
+
+		// Check for import statement
+		if matches := importRegex.FindStringSubmatch(line); matches != nil {
+			importName := matches[1]
+			importPath := matches[2]
+
+			log.Printf("[parseFenceContent] Found import: %s from %s", importName, importPath)
+
+			fence.Imports = append(fence.Imports, ast.ImportNode{
+				Name: importName,
+				Path: importPath,
+			})
+			continue
+		}
+	}
+
+	log.Printf("[parseFenceContent] Extracted %d props, %d variables, %d imports",
+		len(fence.Props), len(fence.Variables), len(fence.Imports))
+
+	return fence
 }
 
 // ScriptParser parses the script section and returns an *ast.ScriptSection node.

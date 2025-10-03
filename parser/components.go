@@ -7,6 +7,105 @@ import (
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
+// DynamicComponentParser parses dynamic component tags with <= syntax
+// Syntax: <='./views/{comp}.html' prop={value} />
+//
+// Pattern: Service Implementation Pattern [Load: 12]
+// Cognitive Load: 12 (path extraction: 5, prop parsing: 4, validation: 3)
+//
+// This parser handles Jim's innovative dynamic component feature:
+// - <='./path.html' /> - static path
+// - <='./views/{comp}.html' /> - path with variable interpolation
+// - <='path' prop={value} {shorthand} /> - with props
+func DynamicComponentParser() Parser {
+	return func(input string) Result {
+		log.Printf("[DynamicComponentParser] Starting on: '%.30s...'", input)
+
+		trimmed := strings.TrimSpace(input)
+
+		// STEP 1: Check for <= prefix (COGNITIVE LOAD: 2)
+		if !strings.HasPrefix(trimmed, "<=") {
+			return Result{nil, input, false, "not a dynamic component tag", false}
+		}
+
+		// Calculate skip offset for whitespace
+		skipChars := len(input) - len(trimmed)
+
+		// STEP 2: Extract quoted path (COGNITIVE LOAD: 5)
+		// Move past <= to find the quote
+		afterPrefix := strings.TrimLeft(trimmed[2:], " \t\n\r")
+		if len(afterPrefix) == 0 {
+			log.Printf("[DynamicComponentParser] No content after <=")
+			return Result{nil, input, false, "no path after <=", false}
+		}
+
+		// Determine quote character (single or double)
+		var quoteChar rune
+		if strings.HasPrefix(afterPrefix, "'") {
+			quoteChar = '\''
+		} else if strings.HasPrefix(afterPrefix, "\"") {
+			quoteChar = '"'
+		} else {
+			log.Printf("[DynamicComponentParser] Path must be quoted")
+			return Result{nil, input, false, "path must be quoted", false}
+		}
+
+		// Find matching closing quote (COGNITIVE LOAD RULE: extracted helper)
+		closingQuotePos := findMatchingQuote(afterPrefix, 0, quoteChar)
+		if closingQuotePos <= 0 {
+			log.Printf("[DynamicComponentParser] No matching closing quote")
+			return Result{nil, input, false, "no matching closing quote", false}
+		}
+
+		// Extract path without quotes
+		pathExpr := afterPrefix[1:closingQuotePos]
+		log.Printf("[DynamicComponentParser] Extracted path: '%s'", pathExpr)
+
+		// Move past the closing quote
+		afterPath := strings.TrimLeft(afterPrefix[closingQuotePos+1:], " \t\n\r")
+
+		// STEP 3: Parse props after path (COGNITIVE LOAD: 4)
+		// Reuse existing prop parser
+		props := []ast.ComponentProp{}
+		selfClosing := false
+
+		// Find the closing />
+		closeTagPos := strings.Index(afterPath, "/>")
+		if closeTagPos == -1 {
+			log.Printf("[DynamicComponentParser] No closing /> found")
+			return Result{nil, input, false, "dynamic component must be self-closing", false}
+		}
+
+		selfClosing = true
+
+		// Extract prop content between path and />
+		propContent := strings.TrimSpace(afterPath[:closeTagPos])
+		if len(propContent) > 0 {
+			// Reuse existing prop parser helper (DRY principle)
+			props = parseComponentProps(propContent)
+			log.Printf("[DynamicComponentParser] Parsed %d props", len(props))
+		}
+
+		// STEP 4: Create DynamicComponentNode (COGNITIVE LOAD: 1)
+		node := &ast.DynamicComponentNode{
+			PathExpression: pathExpr,
+			Props:          props,
+			SelfClosing:    selfClosing,
+		}
+
+		// Calculate consumed length
+		// Original input minus remaining after />
+		consumed := skipChars +
+			len(trimmed) - len(afterPrefix) + // <= and whitespace
+			closingQuotePos + 1 + // path with quotes
+			len(afterPath[:closeTagPos]) + // props and whitespace
+			2 // />
+
+		log.Printf("[DynamicComponentParser] Success! Consumed %d chars", consumed)
+		return Result{node, input[consumed:], true, "", false}
+	}
+}
+
 // ComponentParser parses component tags (<Component /> or <={expr} />)
 func ComponentParser() Parser {
 	return func(input string) Result {

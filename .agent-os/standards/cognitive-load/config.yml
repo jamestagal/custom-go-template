@@ -1,0 +1,83 @@
+validation:
+  enabled: true
+  mode: strict  # strict | warning | audit
+  
+thresholds:
+  block: 30     # Total cognitive load score that blocks code generation
+  warn: 15      # Score that triggers warnings
+  suggest: 5    # Score that triggers suggestions
+  
+frameworks:
+  go:
+    enabled: true
+    patterns:
+      - GO-ERROR-CONTEXT
+      - GO-DEFER-LOOP
+      - GO-SLICE-PREALLOC
+      - GO-MAP-CONCURRENT
+      - GO-NIL-CHECK
+      - GOFAST-SIMPLE-DI
+      - GOFAST-STRATEGY-PATTERN
+      - GOFAST-ERROR-VALUES
+      - GOFAST-MINIMAL-DEPS
+      - GOFAST-EXPLICIT-CONFIG
+      - GOFAST-DTO-PATTERN
+    autofix: true
+    additional_checks:
+      - magic_numbers
+      - deep_nesting
+      - missing_comments
+      - pattern_completeness
+    
+  svelte:
+    enabled: true
+    patterns:
+      - SVELTE-STORE-LOOP
+      - SVELTE-INIT-GUARD
+    autofix: true
+    
+  sveltekit:
+    enabled: true
+    patterns:
+      - SVELTEKIT-SERVER-CLIENT
+      - SVELTEKIT-WATERFALL
+    autofix: true
+    
+reporting:
+  log_violations: true
+  track_metrics: true
+  education_mode: true  # Show detailed explanations
+  
+autofix:
+  enabled: true
+  require_confirmation: false  # Auto-apply fixes without asking
+  preserve_comments: true      # Keep existing comments when fixing
+  
+# Pattern-specific overrides
+pattern_overrides:
+  GO-DEFER-LOOP:
+    severity: error  # Always block on this pattern
+    
+  SVELTE-STORE-LOOP:
+    severity: error  # Critical - always causes bugs
+    
+  GO-ERROR-CONTEXT:
+    severity: warning  # Important but not blocking
+    
+  GOFAST-SIMPLE-DI:
+    severity: warning  # GoFast philosophy violation
+    
+  GOFAST-STRATEGY-PATTERN:
+    severity: error  # Complexity violation - block
+    
+  GOFAST-ERROR-VALUES:
+    severity: warning  # Core philosophy
+    
+  GOFAST-MINIMAL-DEPS:
+    severity: warning  # Maintainability concern
+    
+  GOFAST-EXPLICIT-CONFIG:
+    severity: warning  # Configuration clarity
+    
+  GOFAST-DTO-PATTERN:
+    severity: error  # Critical - blocks API functionality

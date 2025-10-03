@@ -114,7 +114,7 @@ prop socialLinks = [
           We focus on developer experience without sacrificing performance.
         </p>
         <div class="social-links">
-          {#for social in socialLinks}
+          {for social in socialLinks}
             <a href="{social.url }" class="social-link" title="{social.label }">
               {social.icon }
             </a>
@@ -125,7 +125,7 @@ prop socialLinks = [
       <div>
         <h3 class="footer-heading">Quick Links</h3>
         <ul class="footer-links">
-          {#for link, index in links.slice(0, 3)}
+          {for link, index in links.slice(0, 3)}
             <li class="footer-link">
               <a href="{link.url }">{link.label }</a>
             </li>
@@ -136,7 +136,7 @@ prop socialLinks = [
       <div>
         <h3 class="footer-heading">Resources</h3>
         <ul class="footer-links">
-          {#for link, index in links.slice(3)}
+          {for link, index in links.slice(3)}
             <li class="footer-link">
               <a href="{link.url }">{link.label }</a>
             </li>

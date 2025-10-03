@@ -587,18 +587,37 @@ func getDefaultValueForVar(varName string) interface{} {
 	}
 }
 
-// isValidIdentifier checks if a string is a valid JavaScript identifier
+// isValidIdentifier checks if a string is a valid JavaScript identifier (variable name).
+// It returns false for JavaScript keywords, empty strings, and invalid identifier patterns.
+//
+// A valid JavaScript identifier:
+//   - First character must be: letter (a-z, A-Z), underscore (_), or dollar sign ($)
+//   - Subsequent characters can be: letters, digits (0-9), underscore, or dollar sign
+//   - Cannot be a JavaScript reserved keyword
+//
+// Examples that return true:
+//   - "count", "userName", "_private", "$jquery"
+//   - "camelCase", "PascalCase", "__proto__", "$_"
+//   - "a1b2c3", "value123"
+//
+// Examples that return false (invalid identifiers):
+//   - JavaScript keywords: "function", "const", "let", "if", "for", "true", "false", "null"
+//   - Invalid first char: "123abc", "@invalid", "-test"
+//   - Special chars: "my-var", "my.var", "my var"
+//   - Empty string: ""
+//
+// Cognitive Load: 5 (uses helper function and regex)
 func isValidIdentifier(s string) bool {
 	if s == "" {
 		return false
 	}
 
-	// Check if it's a reserved keyword
+	// Check if it's a reserved keyword (COGNITIVE LOAD RULE: use helper function)
 	if isJSReservedKeyword(s) {
 		return false
 	}
 
-	// JavaScript identifier pattern: starts with letter/underscore, followed by letters/numbers/underscores
+	// JavaScript identifier pattern: starts with letter/underscore/dollar, followed by letters/numbers/underscores/dollar
 	return regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*$`).MatchString(s)
 }
 
@@ -613,17 +632,39 @@ func isNumericString(s string) bool {
 	return regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`).MatchString(s)
 }
 
-// isJSReservedKeyword checks if a string is a JavaScript reserved keyword
+// isJSReservedKeyword checks if a string is a JavaScript reserved keyword.
+// Returns true for keywords, literals, and future reserved words that cannot be used as identifiers.
+//
+// Cognitive Load: 4 (simple map lookup)
 func isJSReservedKeyword(s string) bool {
 	keywords := map[string]bool{
+		// Boolean and null literals
 		"true": true, "false": true, "null": true, "undefined": true,
+
+		// Variable declarations
 		"var": true, "let": true, "const": true,
+
+		// Control flow
 		"if": true, "else": true, "for": true, "while": true, "do": true,
 		"switch": true, "case": true, "default": true,
 		"break": true, "continue": true, "return": true,
+
+		// Exception handling
+		"try": true, "catch": true, "finally": true, "throw": true,
+
+		// Functions and classes
 		"function": true, "class": true, "this": true, "super": true,
+		"async": true, "await": true, "yield": true,
+
+		// Operators and keywords
 		"new": true, "delete": true, "typeof": true, "instanceof": true,
 		"void": true, "in": true, "of": true,
+
+		// Modules
+		"import": true, "export": true, "from": true,
+
+		// Miscellaneous
+		"with": true, "debugger": true, "extends": true,
 	}
 
 	return keywords[s]
