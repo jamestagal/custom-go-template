@@ -39,6 +39,28 @@
 - Correct x-for expression generation
 - Array formatting for complex types
 
+### Spec 5: Nested Conditionals Fix ✅
+**Status**: COMPLETE
+**Date**: 2025-10-03
+**Achievement**: Depth tracking for nested conditionals, Alpine.js syntax fix
+
+**Key Deliverables**:
+- Depth tracking algorithm in BlockConditionalParser
+- Proper nesting depth management (only close at depth 0)
+- Alpine.js syntax fix (negated x-if instead of invalid x-else)
+- 5 comprehensive tests for nested scenarios
+
+### Spec 6: Fence Multiline Props Fix ✅
+**Status**: COMPLETE
+**Date**: 2025-10-03
+**Achievement**: Multi-line array/object parsing in fence sections
+
+**Key Deliverables**:
+- Stack-based bracket matcher algorithm
+- Multi-line value accumulation in parseMultiLineValue()
+- JavaScript literal preservation (no JSON marshaling)
+- Footer component with 250+ char arrays now works
+
 ---
 
 ## Current Spec 🚧
@@ -178,6 +200,8 @@
 - [x] Spec 1: Recursive Components
 - [x] Spec 2: Function Expressions
 - [x] Spec 3: Loop Rendering
+- [x] Spec 5: Nested Conditionals Fix
+- [x] Spec 6: Fence Multiline Props Fix
 - [x] Core template syntax support
 - [x] Alpine.js integration
 - [x] Development server
@@ -265,6 +289,6 @@
 
 ---
 
-**Last Spec Completed**: Spec 3 (Loop Rendering) - 2025-10-03
-**Current Spec**: Spec 4 (Dynamic Component Paths) - IN PROGRESS
-**Next Spec**: TBD (likely Spec 5: Performance Optimization)
+**Last Spec Completed**: Spec 6 (Fence Multiline Props Fix) - 2025-10-03
+**Current Spec**: Spec 4 (Dynamic Component Paths) - NOT STARTED
+**Next Spec**: TBD (likely Performance Optimization)

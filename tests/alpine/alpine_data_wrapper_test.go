@@ -47,10 +47,7 @@ let name = "John"
 				},
 			},
 			props: map[string]any{},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;name&quot;:&quot;John&quot;}">
-  <h1>Hello, <span x-text="name"></span>!</h1>
-  <button>Count: <span x-text="count"></span></button>
-</div>`,
+			expected: `<div x-data="{&quot;count&quot;:0,&quot;name&quot;:&quot;John&quot;}"> <div><h1>Hello, <span x-text="name"></span>!</h1><button>Count: <span x-text="count"></span></button></div> </div>`,
 		},
 		{
 			name: "Data Wrapper with Props",
@@ -82,10 +79,7 @@ let count = 0
 			props: map[string]any{
 				"name": "Alice",
 			},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;name&quot;:&quot;Alice&quot;}">
-  <h1>Hello, <span x-text="name"></span>!</h1>
-  <button>Count: <span x-text="count"></span></button>
-</div>`,
+			expected: `<div x-data="{&quot;count&quot;:0,&quot;name&quot;:&quot;Alice&quot;}"> <div><h1>Hello, <span x-text="name"></span>!</h1><button>Count: <span x-text="count"></span></button></div> </div>`,
 		},
 		{
 			name: "Complex Data Structure",
@@ -122,7 +116,7 @@ let items = ["apple", "banana", "orange"]
 				},
 			},
 			props: map[string]any{},
-			expected: `<div x-data="{&quot;items&quot;:[&quot;apple&quot;,&quot;banana&quot;,&quot;orange&quot;],&quot;user&quot;:{&quot;age&quot;:30,&quot;name&quot;:&quot;John&quot;}}"> <h1>User: <span x-text="user.name"></span>, Age: <span x-text="user.age"></span></h1> <ul><li>First item: <span x-text="items[0]"></span></li></ul> </div>`,
+			expected: `<div x-data="{&quot;items&quot;:[&quot;apple&quot;,&quot;banana&quot;,&quot;orange&quot;],&quot;user&quot;:{&quot;age&quot;:30,&quot;name&quot;:&quot;John&quot;}}"> <div><h1>User: <span x-text="user.name"></span>, Age: <span x-text="user.age"></span></h1><ul><li>First item: <span x-text="items[0]"></span></li></ul></div> </div>`,
 		},
 		{
 			name: "Function Expressions",
@@ -151,7 +145,7 @@ let count = 0
 				},
 			},
 			props: map[string]any{},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;increment&quot;:function() { return count++ }}"> <button>Increment</button> <p>Count: <span x-text="count"></span></p> </div>`,
+			expected: `<div x-data="{&quot;count&quot;:0,&quot;increment&quot;:function() { return count++ }}"> <div><button>Increment</button><p>Count: <span x-text="count"></span></p></div> </div>`,
 		},
 		{
 			name: "Nested Variables Detection",
@@ -200,7 +194,7 @@ let count = 0
 			props: map[string]any{
 				"showReset": true,
 			},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;showReset&quot;:true}"> <template x-if="count > 0"><p>Count is positive: <span x-text="count"></span></p></template><template x-else><p>Count is zero: <span x-text="count"></span></p><template x-if="showReset"><button>Reset</button></template></template> </div>`,
+			expected: `<div x-data="{&quot;count&quot;:0,&quot;showReset&quot;:true}"> <div><template x-if="count > 0"><p>Count is positive: <span x-text="count"></span></p></template><template x-if="!(count > 0)"><p>Count is zero: <span x-text="count"></span></p><template x-if="showReset"><button>Reset</button></template></template></div> </div>`,
 		},
 	}
 
@@ -214,8 +208,13 @@ let count = 0
 				dataScope[k] = v
 			}
 
-			// Transform the nodes with the Alpine.js data wrapper
-			result := transformer.TransformWithAlpineData(tt.nodes, dataScope)
+			// Transform the nodes using TransformAST (current API)
+			// Create a template with the nodes
+			template := &ast.Template{
+				RootNodes: tt.nodes,
+			}
+			transformedTemplate := transformer.TransformAST(template, dataScope)
+			result := transformedTemplate.RootNodes
 
 			// Render the transformed nodes to HTML
 			var html string

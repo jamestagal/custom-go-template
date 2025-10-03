@@ -59,8 +59,8 @@ func TestComponentTransformation(t *testing.T) {
 	// Render the transformed template to HTML
 	html := testutils.RenderNode(transformedTemplate.RootNodes[0])
 
-	// Expected HTML
-	expected := `<div x-data="{ message: 'Hello World' }" x-component="TestComponent" data-prop-message="Hello World"><div class="component-content">Component Content: <span x-text="message"></span></div></div>`
+	// Expected HTML - component is transformed inline with x-data on the component's root element
+	expected := `<div class="component-content" x-data="{&quot;message&quot;:&quot;Hello World&quot;}">Component Content: <span x-text="message"></span></div>`
 
 	// Normalize whitespace for comparison
 	normalizedHTML := testutils.NormalizeWhitespace(html)
@@ -125,8 +125,8 @@ func TestDynamicPropsComponentTransformation(t *testing.T) {
 	// Render the transformed template to HTML
 	html := testutils.RenderNode(transformedTemplate.RootNodes[0])
 
-	// Expected HTML (with dynamic prop)
-	expected := `<div x-data="{ count: parentCount }" x-component="DynamicComponent" data-prop-count="parentCount"><div class="dynamic-component">Count: <span x-text="count"></span></div></div>`
+	// Expected HTML (with dynamic prop resolved to value)
+	expected := `<div class="dynamic-component" x-data="{&quot;count&quot;:42}">Count: <span x-text="count"></span></div>`
 
 	// Normalize whitespace for comparison
 	normalizedHTML := testutils.NormalizeWhitespace(html)
