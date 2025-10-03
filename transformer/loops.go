@@ -3,21 +3,11 @@ package transformer
 import (
 	"fmt"
 	"log"
-	"sort"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
-// getMapKeys returns sorted keys from a map for logging
-func getMapKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
 
 // transformLoop transforms a Loop node into an Alpine.js compatible structure
 func transformLoop(node *ast.Loop, dataScope map[string]any) []ast.Node {

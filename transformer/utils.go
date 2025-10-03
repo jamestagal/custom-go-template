@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -198,4 +199,14 @@ func filterOutFence(nodes []ast.Node) []ast.Node {
 	}
 
 	return result
+}
+
+// getMapKeys returns the keys of a map as a sorted slice for debugging
+func getMapKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

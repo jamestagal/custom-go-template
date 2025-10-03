@@ -1,21 +1,21 @@
 ---
-prop user = { name: "Admin", role: "admin" };
+prop user = { name: "Admin", role: "admin" }
 prop stats = {
   users: 124,
   products: 56,
   orders: 890,
   revenue: 15280.45
-};
+}
 prop recentActions = [
   { action: "Product created", user: "Jane Smith", timestamp: "2023-04-10T14:32:00Z" },
   { action: "Order fulfilled", user: "John Doe", timestamp: "2023-04-10T13:45:00Z" },
   { action: "User account suspended", user: "Admin", timestamp: "2023-04-10T12:30:00Z" },
   { action: "Inventory updated", user: "Jane Smith", timestamp: "2023-04-10T11:15:00Z" }
-];
+]
 
 // Check if user is actually an admin
 if (user.role !== "admin") {
-  throw new Error("AdminPanel component requires an admin user");
+  throw new Error("AdminPanel component requires an admin user")
 }
 
 // Format currency

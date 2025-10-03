@@ -288,7 +288,7 @@ func parseComponentProps(propString string) []ast.ComponentProp {
 		remainingProps = strings.TrimSpace(remainingProps[1:])
 
 		// Parse the prop value
-		if strings.HasPrefix(remainingProps, "{") && !strings.HasPrefix(remainingProps, "{") {
+		if strings.HasPrefix(remainingProps, "{") {
 			// Dynamic prop with expression
 			closeBracePos := findMatchingCloseBrace(remainingProps, 0)
 			if closeBracePos <= 0 {

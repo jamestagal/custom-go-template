@@ -7,26 +7,26 @@ import UserProfile from "./components/UserProfile.html";
 import Notification from "./components/Notification.html";
 
 // Define props with default values
-prop title = "Custom Template Showcase";
-prop isLoggedIn = true;
-prop user = { name: "John Doe", role: "admin", email: "john@example.com" };
+prop title = "Custom Template Showcase"
+prop isLoggedIn = true
+prop user = { name: "John Doe", role: "admin", email: "john@example.com" }
 prop products = [
   { id: 1, name: "Laptop", price: 999.99, inStock: true, featured: true, tags: ["electronics", "computers"] },
   { id: 2, name: "Phone", price: 699.99, inStock: true, featured: false, tags: ["electronics", "mobile"] },
   { id: 3, name: "Headphones", price: 149.99, inStock: false, featured: true, tags: ["electronics", "audio"] },
   { id: 4, name: "Tablet", price: 499.99, inStock: true, featured: false, tags: ["electronics", "computers"] }
-];
+]
 prop categories = [
   { name: "Electronics", items: products.filter(p => p.tags.includes("electronics")) },
   { name: "Computers", items: products.filter(p => p.tags.includes("computers")) },
   { name: "Audio", items: products.filter(p => p.tags.includes("audio")) },
   { name: "Mobile", items: products.filter(p => p.tags.includes("mobile")) }
-];
+]
 prop notifications = [
   { type: "info", message: "Welcome to our store!" },
   { type: "success", message: "Your order has been processed." },
   { type: "warning", message: "Some items are out of stock." }
-];
+]
 prop settings = {
   theme: "light",
   currency: "USD",
@@ -36,14 +36,14 @@ prop settings = {
     maxPrice: 1000,
     inStockOnly: false
   }
-};
+}
 
 // Computed values
 const filteredProducts = products.filter(p =>
   p.price >= settings.filters.minPrice &&
   p.price <= settings.filters.maxPrice &&
   (!settings.filters.inStockOnly || p.inStock)
-);
+)
 
 // Helper functions
 function formatPrice(price) {
