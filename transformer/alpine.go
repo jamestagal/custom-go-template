@@ -115,18 +115,65 @@ func isComplexJSObject(s string) bool {
 	return methodPattern.MatchString(trimmed)
 }
 
+// isJavaScriptLiteral checks if a string appears to be a JavaScript array or object literal.
+// This function determines if a value should be output as raw JavaScript without quotes.
+//
+// It returns true for:
+//   - Arrays: [1, 2, 3] or [{ label: "Home", url: "/" }]
+//   - Objects: { key: "value" } or { name: "John", age: 30 }
+//   - Expressions: new Date().getFullYear()
+//
+// Cognitive Load: 6
+func isJavaScriptLiteral(s string) bool {
+	trimmed := strings.TrimSpace(s)
+
+	if len(trimmed) == 0 {
+		return false
+	}
+
+	// Check for array literals: starts with [ and ends with ]
+	if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+		return true
+	}
+
+	// Check for object literals: starts with { and ends with }
+	if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
+		return true
+	}
+
+	// Check for common JavaScript expressions (like new Date())
+	jsExpressionPrefixes := []string{
+		"new ",
+		"Date(",
+		"Math.",
+		"JSON.",
+		"Array.",
+		"Object.",
+	}
+	for _, prefix := range jsExpressionPrefixes {
+		if strings.HasPrefix(trimmed, prefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // formatGoValueToJS converts a Go value to JavaScript literal syntax.
 // Functions are returned without quotes, strings are quoted and escaped.
 //
 // Handles:
 //   - nil → "null"
 //   - Function strings → returned as-is (no quotes)
-//   - Complex JS objects/arrays → returned as-is
+//   - JavaScript literals (arrays/objects) → returned as-is (no quotes)
 //   - Regular strings → quoted and escaped with double quotes
 //   - Booleans → "true" or "false"
 //   - Numbers → formatted as number string
 //   - Arrays → recursively formatted
 //   - Maps → formatted as JS object
+//
+// CRITICAL FIX: JavaScript arrays and objects (even without functions) are now
+// returned as-is without quotes to preserve multi-line prop values.
 //
 // Cognitive Load: 16
 func formatGoValueToJS(value any) string {
@@ -140,17 +187,19 @@ func formatGoValueToJS(value any) string {
 		// Check if this string is a function definition
 		if isFunctionExpression(v) {
 			// Return function without quotes
+			log.Printf("formatGoValueToJS: Detected function expression, returning as-is (length: %d)", len(v))
 			return v
 		}
 
-		// Check if it looks like a complex JS object/array literal
-		trimmed := strings.TrimSpace(v)
-		if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) ||
-			(strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
-			// Check if it's a complex object with methods
-			if isComplexJSObject(v) {
-				return v
-			}
+		// CRITICAL FIX: Check if it's a JavaScript literal (array or object)
+		// This preserves multi-line prop values like:
+		//   links = [{ label: "Home", url: "/" }, ...]
+		//   stats = { users: 124, products: 56 }
+		if isJavaScriptLiteral(v) {
+			log.Printf("formatGoValueToJS: Detected JavaScript literal, returning as-is (length: %d, preview: %s...)",
+				len(v),
+				truncateString(v, 50))
+			return v
 		}
 
 		// Regular string - add double quotes and escape (COGNITIVE LOAD RULE: proper escaping)
@@ -218,354 +267,69 @@ func formatGoValueToJS(value any) string {
 
 		pairs := make([]string, 0, len(v))
 		for _, key := range keys {
-			val := v[key]
-			formattedValue := formatGoValueToJS(val)
+			value := v[key]
+			formattedValue := formatGoValueToJS(value)
+			// Always quote keys for valid JavaScript syntax
 			pairs = append(pairs, fmt.Sprintf(`"%s":%s`, key, formattedValue))
 		}
 		return "{" + strings.Join(pairs, ",") + "}"
 
 	default:
-		// Fallback - convert to string and quote (COGNITIVE LOAD RULE: wrapped error context)
-		str := fmt.Sprintf("%v", v)
+		// Fallback for unknown types - convert to string and quote
+		// This should rarely be hit in normal operation
+		str := fmt.Sprintf("%v", value)
 		escaped := strings.ReplaceAll(str, `\`, `\\`)
 		escaped = strings.ReplaceAll(escaped, `"`, `\"`)
 		return fmt.Sprintf(`"%s"`, escaped)
 	}
 }
 
-// TransformWithAlpineData transforms the given nodes with an Alpine.js data wrapper
-// This is the main entry point for applying Alpine.js data binding to templates
-func TransformWithAlpineData(nodes []ast.Node, dataScope map[string]any) []ast.Node {
-	// Ensure all variables referenced in the nodes exist in the data scope
-	ensureVariablesInScope(nodes, dataScope)
-
-	// Check if we have a single root element that we can add x-data to directly
-	if len(nodes) == 1 {
-		if element, isElement := nodes[0].(*ast.Element); isElement {
-			// Add the x-data attribute to the existing div
-			addAlpineDataAttribute(element, dataScope)
-
-			// Add whitespace for test output matching
-			// Check if we're in a test environment by looking for test-specific keys
-			inTestEnvironment := false
-			testSpecificKeys := []string{"count", "name", "items", "user", "increment", "showReset"}
-			testKeyCount := 0
-
-			for key := range dataScope {
-				for _, testKey := range testSpecificKeys {
-					if key == testKey {
-						testKeyCount++
-						break
-					}
-				}
-			}
-
-			// If we have multiple test-specific keys, assume we're in a test environment
-			if testKeyCount >= 2 {
-				inTestEnvironment = true
-			}
-
-			if inTestEnvironment {
-				// Add a space after the opening div tag
-				element.Children = append([]ast.Node{&ast.TextNode{Content: " "}}, element.Children...)
-
-				// Add whitespace between elements
-				newChildren := []ast.Node{element.Children[0]} // Start with the first space
-
-				for i := 1; i < len(element.Children); i++ {
-					// Check if this is an element followed by another element
-					if i < len(element.Children)-1 {
-						// Add the current child
-						newChildren = append(newChildren, element.Children[i])
-
-						// If not the last child and the next child is an element, add a space
-						if _, nextIsElement := element.Children[i+1].(*ast.Element); nextIsElement {
-							newChildren = append(newChildren, &ast.TextNode{Content: " "})
-						}
-					} else {
-						// Last element, just add it
-						newChildren = append(newChildren, element.Children[i])
-					}
-				}
-
-				// Add a space before the closing div tag
-				newChildren = append(newChildren, &ast.TextNode{Content: " "})
-
-				// Replace the children with the new children that have spaces
-				element.Children = newChildren
-
-				// Recursively add spaces between nested elements
-				addSpacesBetweenNestedElements(element)
-			}
-
-			return nodes
-		}
+// truncateString truncates a string to maxLen characters with ellipsis
+// Helper function for logging
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
 	}
-
-	// If we don't have a single div element, create a wrapper
-	log.Printf("TransformWithAlpineData: Creating wrapper div with x-data")
-
-	// Create a wrapper div with x-data
-	var wrapper *ast.Element
-	wrapper = &ast.Element{
-		TagName: "div",
-		Attributes: []ast.Attribute{
-			{
-				Name:       "x-data",
-				Value:      alpineDataFormatter(dataScope),
-				Dynamic:    true,
-				IsAlpine:   true,
-				AlpineType: "data",
-			},
-		},
-		Children:    nodes,
-		SelfClosing: false,
-	}
-
-	// Add whitespace for test output matching
-	// Check if we're in a test environment by looking for test-specific keys
-	inTestEnvironment := false
-	testSpecificKeys := []string{"count", "name", "items", "user", "increment", "showReset"}
-	testKeyCount := 0
-
-	for _, key := range testSpecificKeys {
-		if _, exists := dataScope[key]; exists {
-			testKeyCount++
-		}
-	}
-
-	// If we have multiple test-specific keys, assume we're in a test environment
-	// and don't add extra variables
-	if testKeyCount >= 2 {
-		inTestEnvironment = true
-	}
-
-	if inTestEnvironment {
-		// Add a space after the opening div tag
-		wrapper.Children = append([]ast.Node{&ast.TextNode{Content: " "}}, wrapper.Children...)
-
-		// Add a space before the closing div tag
-		wrapper.Children = append(wrapper.Children, &ast.TextNode{Content: " "})
-
-		// Recursively add spaces between nested elements
-		addSpacesBetweenNestedElements(wrapper)
-	}
-
-	return []ast.Node{wrapper}
+	return s[:maxLen] + "..."
 }
 
-// addAlpineDataAttribute adds the Alpine.js x-data attribute to the given element
-func addAlpineDataAttribute(element *ast.Element, dataScope map[string]any) {
-	// Format the data scope as a JSON string
-	dataJSON := alpineDataFormatter(dataScope)
-
-	// Add the x-data attribute to the element
-	xDataAttr := ast.Attribute{
-		Name:       "x-data",
-		Value:      dataJSON,
-		Dynamic:    true,
-		IsAlpine:   true,
-		AlpineType: "data",
+// isDefaultPlaceholder checks if a value is a default placeholder that should be removed
+func isDefaultPlaceholder(value any) bool {
+	if value == nil {
+		return true
 	}
 
-	// Add the attribute to the element
-	element.Attributes = append(element.Attributes, xDataAttr)
-}
-
-// addSpacesBetweenNestedElements recursively adds spaces between nested elements
-func addSpacesBetweenNestedElements(element *ast.Element) {
-	// Special handling for the Nested Variables Detection test
-	// Check if this is the root div with template children
-	if element.TagName == "div" {
-		// Look for template elements and add spaces between them
-		hasTemplates := false
-		for _, child := range element.Children {
-			if childElement, ok := child.(*ast.Element); ok {
-				if childElement.TagName == "template" {
-					hasTemplates = true
-					break
-				}
-			}
-		}
-
-		if hasTemplates {
-			// This is likely the Nested Variables Detection test
-			// Create new children with spaces between templates
-			newChildren := []ast.Node{}
-
-			// Add a space after the opening div tag
-			newChildren = append(newChildren, &ast.TextNode{Content: " "})
-
-			// Process each child
-			for i, child := range element.Children {
-				// Add the child
-				newChildren = append(newChildren, child)
-
-				// If not the last child, add a space
-				if i < len(element.Children)-1 {
-					newChildren = append(newChildren, &ast.TextNode{Content: " "})
-				}
-			}
-
-			// Add a space before the closing div tag
-			newChildren = append(newChildren, &ast.TextNode{Content: " "})
-
-			// Replace the children
-			element.Children = newChildren
-		}
+	// Check for empty string
+	if str, ok := value.(string); ok {
+		return strings.TrimSpace(str) == ""
 	}
 
-	// Process each child element
-	for _, child := range element.Children {
-		// Only process element nodes
-		if childElement, ok := child.(*ast.Element); ok {
-			// If this is a template element, add spaces between its children
-			if childElement.TagName == "template" {
-				newChildren := []ast.Node{}
-
-				// Process each child of the template
-				for j, templateChild := range childElement.Children {
-					// Add the child
-					newChildren = append(newChildren, templateChild)
-
-					// If not the last child and the next child is an element, add a space
-					if j < len(childElement.Children)-1 {
-						if _, nextIsElement := childElement.Children[j+1].(*ast.Element); nextIsElement {
-							newChildren = append(newChildren, &ast.TextNode{Content: " "})
-						}
-					}
-				}
-
-				// Replace the template's children
-				childElement.Children = newChildren
-			}
-
-			// Process this element's children recursively
-			addSpacesBetweenNestedElements(childElement)
-		}
-	}
-}
-
-// wrapWithAlpineData wraps nodes with an Alpine.js x-data element
-func wrapWithAlpineData(nodes []ast.Node, dataScope map[string]any) *ast.Element {
-	// Format the data scope as a JSON string for Alpine.js x-data attribute
-	dataJSON := alpineDataFormatter(dataScope)
-
-	// Create a wrapper div with x-data
-	wrapper := &ast.Element{
-		TagName: "div",
-		Attributes: []ast.Attribute{
-			{
-				Name:  "x-data",
-				Value: dataJSON,
-			},
-		},
-		Children:    nodes,
-		SelfClosing: false,
-	}
-
-	return wrapper
-}
-
-// ensureVariablesInScope ensures all referenced variables exist in the data scope
-// This is critical for Alpine.js to work correctly with expressions
-func ensureVariablesInScope(nodes []ast.Node, dataScope map[string]any) {
-	for _, node := range nodes {
-		switch n := node.(type) {
-		case *ast.ExpressionNode:
-			// Add variables from expressions
-			extractVariablesFromExpr(n.Expression, dataScope)
-
-		case *ast.Element:
-			// IMPORTANT: Skip processing children of x-for templates
-			// Variables inside loops are local to the loop scope and should NOT be added to parent scope
-			hasXFor := false
-			for _, attr := range n.Attributes {
-				if attr.Name == "x-for" {
-					hasXFor = true
-					break
-				}
-			}
-
-			// Check attributes for expressions (but not the x-for expression itself)
-			for _, attr := range n.Attributes {
-				if attr.Name == "x-for" {
-					// Extract collection variable from x-for, but NOT the iterator
-					// e.g., "item in items" → add "items" to scope, but NOT "item"
-					extractCollectionFromXFor(attr.Value, dataScope)
-				} else if attr.Dynamic || attr.IsAlpine {
-					extractVariablesFromExpr(attr.Value, dataScope)
-				}
-			}
-
-			// Only recursively process children if NOT an x-for template
-			if !hasXFor {
-				ensureVariablesInScope(n.Children, dataScope)
-			}
-
-		case *ast.Conditional:
-			// Add variables from condition
-			extractVariablesFromExpr(n.IfCondition, dataScope)
-
-			// Process branches
-			ensureVariablesInScope(n.IfContent, dataScope)
-			for i, condition := range n.ElseIfConditions {
-				extractVariablesFromExpr(condition, dataScope)
-				if i < len(n.ElseIfContent) {
-					ensureVariablesInScope(n.ElseIfContent[i], dataScope)
-				}
-			}
-			ensureVariablesInScope(n.ElseContent, dataScope)
-
-		case *ast.Loop:
-			// This case should not be hit after transformation (Loop nodes become template elements)
-			// But handle it for safety: only add the collection, NOT the iterator
-			extractVariablesFromExpr(n.Collection, dataScope)
-
-			// DON'T add loop variables to parent scope!
-			// They are local to the loop body
-		}
-	}
-}
-
-// isDefaultPlaceholder checks if a value looks like test data that shouldn't be in production scope
-func isDefaultPlaceholder(val any) bool {
-	// Check for map with "name" and "price" (looks like default product/item data)
-	if m, ok := val.(map[string]any); ok {
-		_, hasName := m["name"]
-		_, hasPrice := m["price"]
-		if hasName && hasPrice {
-			return true
-		}
-	}
 	return false
 }
 
-// extractCollectionFromXFor extracts only the collection variable from an x-for expression
-// e.g., "item in items" → adds "items" to scope
-// e.g., "(index, item) in items" → adds "items" to scope
-func extractCollectionFromXFor(xForExpr string, dataScope map[string]any) {
-	// Handle "item in collection" or "(index, item) in collection"
-	if strings.Contains(xForExpr, " in ") {
-		parts := strings.Split(xForExpr, " in ")
-		if len(parts) == 2 {
-			collection := strings.TrimSpace(parts[1])
-			extractVariablesFromExpr(collection, dataScope)
-		}
-	} else if strings.Contains(xForExpr, " of ") {
-		// Handle "key, value of object"
-		parts := strings.Split(xForExpr, " of ")
-		if len(parts) == 2 {
-			collection := strings.TrimSpace(parts[1])
-			extractVariablesFromExpr(collection, dataScope)
-		}
-	}
-}
-
-// alpineDataFormatter formats the data scope for Alpine.js x-data attribute.
-// Uses formatGoValueToJS to properly handle functions, primitives, objects, and arrays.
+// alpineDataFormatter formats a data scope map into a JavaScript object literal
+// suitable for Alpine.js x-data attributes.
 //
-// Cognitive Load: 12
+// This function:
+//   1. Filters out loop iterator variables (item, index, etc.) that shouldn't be in root scope
+//   2. Ensures critical variables exist in the scope
+//   3. Sorts keys for deterministic output
+//   4. Formats values using formatGoValueToJS which preserves JavaScript literals
+//
+// Pattern: Service Implementation Pattern [Load: 12]
+// Cognitive Load: 12 (filtering: 3, sorting: 2, formatting: 5, string building: 2)
+//
+// Example:
+//   dataScope := map[string]any{
+//     "name": "John",
+//     "age": 30,
+//     "links": "[{ label: \"Home\", url: \"/\" }]",
+//   }
+//   alpineDataFormatter(dataScope)
+//   // Returns: {"age":30,"links":[{ label: "Home", url: "/" }],"name":"John"}
+//
+// Note: The formatGoValueToJS function now correctly preserves JavaScript arrays
+// and objects without quoting them, fixing the multi-line prop truncation issue.
 func alpineDataFormatter(dataScope map[string]any) string {
 	// Clean up any loop iterator variables that might have leaked
 	// Common iterator names that should never be in root scope
@@ -598,6 +362,7 @@ func alpineDataFormatter(dataScope map[string]any) string {
 		value := dataScope[key]
 
 		// Use the helper to format the value
+		// CRITICAL: formatGoValueToJS now preserves JavaScript literals
 		formattedValue := formatGoValueToJS(value)
 
 		// Build key-value pair (always quote keys for valid JSON-like syntax)
@@ -605,7 +370,7 @@ func alpineDataFormatter(dataScope map[string]any) string {
 	}
 
 	result := "{" + strings.Join(parts, ",") + "}"
-	log.Printf("Generated x-data object literal: %s", result)
+	log.Printf("Generated x-data object literal: %s", truncateString(result, 200))
 	return result
 }
 
@@ -617,226 +382,80 @@ func ensureCriticalVariables(dataScope map[string]any) {
 	}
 
 	// SIMPLIFIED: Don't add any extra variables
-	// The data scope should only contain variables explicitly defined in the template
-	// This function is now a no-op but kept for backward compatibility
-	return
-
-	// OLD LOGIC (disabled):
-	// Check if we're in a test environment by looking for test-specific keys
-	// This helps us avoid adding extra variables in test cases
-	testSpecificKeys := []string{"count", "name", "items", "user", "increment", "showReset"}
-	testKeyCount := 0
-
-	for _, key := range testSpecificKeys {
-		if _, exists := dataScope[key]; exists {
-			testKeyCount++
-		}
-	}
-
-	// If we have multiple test-specific keys, assume we're in a test environment
-	// and don't add extra variables
-	if testKeyCount >= 2 {
-		return
-	}
-
-	// Critical variables for conditionals
-	criticalVars := []string{
-		"isLoggedIn",
-		"isAdmin",
-		"user",
-		"status",
-		"showFeatured",
-		"inStockOnly",
-	}
-
-	// Ensure user object is properly initialized
-	if user, ok := dataScope["user"].(map[string]any); ok {
-		// Make sure user has name and email properties
-		if _, hasName := user["name"]; !hasName {
-			user["name"] = "John Doe"
-		}
-		if _, hasEmail := user["email"]; !hasEmail {
-			user["email"] = "john@example.com"
-		}
-		if _, hasRole := user["role"]; !hasRole {
-			user["role"] = "user"
-		}
-		dataScope["user"] = user
-	} else if _, hasUser := dataScope["user"]; !hasUser {
-		// If user doesn't exist, create it
-		dataScope["user"] = map[string]any{
-			"name":  "John Doe",
-			"email": "john@example.com",
-			"role":  "user",
-		}
-	}
-
-	// Ensure other critical variables exist
-	for _, varName := range criticalVars {
-		if _, exists := dataScope[varName]; !exists {
-			dataScope[varName] = getDefaultValueForKey(varName)
-		}
-	}
+	// Variables should only be added when explicitly referenced in the template
+	// This prevents pollution of the data scope with unused variables
 }
 
-// getDefaultValueForKey provides default values for common keys
-func getDefaultValueForKey(key string) any {
-	// Check common variable names and provide sensible defaults
-	switch key {
-	case "user":
-		return map[string]any{
-			"name":    "John Doe",
-			"email":   "john@example.com",
-			"isAdmin": false,
-			"role":    "user",
-			"details": map[string]any{
-				"phone": "555-1234",
+// wrapWithAlpineData wraps the given nodes with an Alpine.js x-data wrapper
+// This creates the wrapper element with formatted data scope
+func wrapWithAlpineData(nodes []ast.Node, dataScope map[string]any) *ast.Element {
+	// Format the data scope as JavaScript object literal
+	dataJSON := alpineDataFormatter(dataScope)
+
+	// Create the wrapper element
+	wrapper := &ast.Element{
+		TagName: "div",
+		Attributes: []ast.Attribute{
+			{
+				Name:       "x-data",
+				Value:      dataJSON,
+				IsAlpine:   true,
+				AlpineType: "data",
 			},
-		}
-	case "products", "filteredProducts":
-		return []any{
-			map[string]any{"name": "Product 1", "price": 19.99, "inStock": true},
-			map[string]any{"name": "Product 2", "price": 29.99, "inStock": true},
-		}
-	case "categories":
-		return []any{
-			map[string]any{
-				"name": "Category 1",
-				"items": []any{
-					map[string]any{"name": "Item 1", "tags": []string{"tag1", "tag2"}},
-				},
-			},
-			map[string]any{
-				"name":  "Category 2",
-				"items": []any{},
-			},
-		}
-	case "settings":
-		return map[string]any{
-			"theme":    "",
-			"currency": "",
-			"filters": map[string]any{
-				"inStockOnly": false,
-			},
-		}
-	case "isAdmin", "isLoggedIn":
-		return false
-	case "title":
-		return "Default Title"
-	case "description":
-		return "Default Description"
-	case "count", "index", "length":
-		return 0
-	case "price", "total", "amount":
-		return 0.0
-	case "name", "label", "text":
-		return ""
-	default:
-		// For unknown keys, return null
-		return nil
+		},
+		Children:    nodes,
+		SelfClosing: false,
 	}
+
+	return wrapper
 }
 
-// parseSimpleObject does a very simple parsing of a JavaScript object literal
-func parseSimpleObject(s string) map[string]any {
-	result := make(map[string]any)
+// ensureVariablesInScope ensures all referenced variables exist in the data scope
+// This is critical for Alpine.js to work correctly with expressions
+func ensureVariablesInScope(nodes []ast.Node, dataScope map[string]any) {
+	for _, node := range nodes {
+		switch n := node.(type) {
+		case *ast.ExpressionNode:
+			// Add variables from expressions
+			extractVariablesFromExpr(n.Expression, dataScope)
 
-	// Trim the braces
-	s = strings.TrimSpace(s)
-	s = strings.TrimPrefix(s, "{")
-	s = strings.TrimSuffix(s, "}")
-
-	// Split by commas (very naive, won't handle nested objects correctly)
-	pairs := strings.Split(s, ",")
-	for _, pair := range pairs {
-		parts := strings.SplitN(pair, ":", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-
-			// Remove quotes from key if present
-			key = strings.Trim(key, "\"'")
-
-			// Handle different value types
-			if value == "true" {
-				result[key] = true
-			} else if value == "false" {
-				result[key] = false
-			} else if value == "null" {
-				result[key] = nil
-			} else if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
-				result[key] = strings.Trim(value, "\"")
-			} else if strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'") {
-				result[key] = strings.Trim(value, "'")
-			} else {
-				// Try to parse as number
-				result[key] = value
+		case *ast.Element:
+			// Check attributes for expressions
+			for _, attr := range n.Attributes {
+				if attr.Dynamic || attr.IsAlpine {
+					extractVariablesFromExpr(attr.Value, dataScope)
+				}
 			}
+
+			// Recursively process children
+			ensureVariablesInScope(n.Children, dataScope)
+
+		case *ast.Conditional:
+			// Add variables from condition
+			extractVariablesFromExpr(n.IfCondition, dataScope)
+
+			// Process branches
+			ensureVariablesInScope(n.IfContent, dataScope)
+			for i, condition := range n.ElseIfConditions {
+				extractVariablesFromExpr(condition, dataScope)
+				if i < len(n.ElseIfContent) {
+					ensureVariablesInScope(n.ElseIfContent[i], dataScope)
+				}
+			}
+			ensureVariablesInScope(n.ElseContent, dataScope)
+
+		case *ast.Loop:
+			// Add loop variables
+			dataScope[n.Iterator] = nil
+			if n.Value != "" {
+				dataScope[n.Value] = nil
+			}
+
+			// Add array variable
+			extractVariablesFromExpr(n.Collection, dataScope)
+
+			// Process loop body
+			ensureVariablesInScope(n.Content, dataScope)
 		}
 	}
-
-	return result
-}
-
-// parseSimpleArray does a very simple parsing of a JavaScript array literal
-func parseSimpleArray(s string) []any {
-	var result []any
-
-	// Trim the brackets
-	s = strings.TrimSpace(s)
-	s = strings.TrimPrefix(s, "[")
-	s = strings.TrimSuffix(s, "]")
-
-	// Split by commas (very naive, won't handle nested arrays correctly)
-	items := strings.Split(s, ",")
-	for _, item := range items {
-		value := strings.TrimSpace(item)
-
-		// Handle different value types
-		if value == "true" {
-			result = append(result, true)
-		} else if value == "false" {
-			result = append(result, false)
-		} else if value == "null" {
-			result = append(result, nil)
-		} else if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
-			result = append(result, strings.Trim(value, "\""))
-		} else if strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'") {
-			result = append(result, strings.Trim(value, "'"))
-		} else {
-			// Try to parse as number
-			result = append(result, value)
-		}
-	}
-
-	return result
-}
-
-func initializeDefaultDataScope() map[string]any {
-	return map[string]any{
-		"user": map[string]any{
-			"name": "",
-			"role": "",
-		},
-		"products":   []any{},
-		"categories": []any{},
-		"settings": map[string]any{
-			"theme":    "",
-			"currency": "",
-			"filters": map[string]any{
-				"inStockOnly": false,
-			},
-		},
-		"filteredProducts": []any{},
-	}
-}
-
-func escapeJSString(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, "\n", "\\n")
-	s = strings.ReplaceAll(s, "\r", "\\r")
-	s = strings.ReplaceAll(s, "\t", "\\t")
-	s = strings.ReplaceAll(s, "'", "\\'")
-	s = strings.ReplaceAll(s, "\"", "\\\"")
-	return s
 }

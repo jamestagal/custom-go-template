@@ -48,99 +48,96 @@ func TextParser(delimiters ...Parser) Parser {
 	}
 }
 
-// ExpressionParser parses an {expression} or {expression} and returns an *ast.ExpressionNode
-// This version is more flexible with whitespace inside the braces
+// ExpressionParser parses expressions in curly braces: {variable}
 func ExpressionParser() Parser {
 	return func(input string) Result {
-		log.Printf("[ExpressionParser] Starting on: '%.30s...'", input)
+		// Use the lex-based expression parser
+		exprRes := LexExpressionParser()(input)
+		if !exprRes.Successful {
+			return exprRes
+		}
 
-		// Check if it starts with a brace
+		expr, ok := exprRes.Value.(string)
+		if !ok {
+			return Result{nil, input, false, "expression parser did not return string", false}
+		}
+
+		log.Printf("[ExpressionParser] Found expression: '%s'", expr)
+		return Result{
+			Value:      &ast.ExpressionNode{Expression: expr},
+			Remaining:  exprRes.Remaining,
+			Successful: true,
+			Error:      "",
+			Dynamic:    true,
+		}
+	}
+}
+
+// LexExpressionParser uses a lexing-based approach to parse expressions.
+// It recognizes single curly-brace expressions: {expr}.
+func LexExpressionParser() Parser {
+	return func(input string) Result {
 		if !strings.HasPrefix(input, "{") {
 			return Result{nil, input, false, "not an expression", false}
 		}
 
-		// Check if it's a directive - must be done before attempting to parse as expression
-		if isDirective(input) {
-			log.Printf("[ExpressionParser] Looks like a directive, not a simple expression")
-			return Result{nil, input, false, "looks like a directive, not a simple expression", false}
+		// If it starts with "{if", "{for", "{else", or "{/", it's a directive, not an expression
+		if strings.HasPrefix(input, "{if ") || strings.HasPrefix(input, "{if}") ||
+			strings.HasPrefix(input, "{for ") ||
+			strings.HasPrefix(input, "{else}") ||
+			strings.HasPrefix(input, "{else if ") ||
+			strings.HasPrefix(input, "{/") {
+			return Result{nil, input, false, "not an expression (directive)", false}
 		}
 
-		// Manual parsing with whitespace handling
-		i := 1 // Skip the opening brace
+		// Find the closing brace
+		depth := 0
+		inString := false
+		escaped := false
+		var stringChar rune
 
-		// Track the expression content
-		start := i
-
-		// Find the closing brace, handling nested braces
-		braceDepth := 1
-		for i < len(input) && braceDepth > 0 {
-			if input[i] == '{' {
-				braceDepth++
-			} else if input[i] == '}' {
-				braceDepth--
+		for i, ch := range input {
+			if escaped {
+				escaped = false
+				continue
 			}
 
-			if braceDepth > 0 {
-				i++
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+
+			if !inString {
+				if ch == '"' || ch == '\'' {
+					inString = true
+					stringChar = ch
+					continue
+				}
+
+				if ch == '{' {
+					depth++
+				} else if ch == '}' {
+					depth--
+					if depth == 0 {
+						// Found the closing brace
+						expr := input[1:i] // Extract expression without braces
+						remaining := input[i+1:]
+						return Result{expr, remaining, true, "", false}
+					}
+				}
+			} else {
+				if ch == stringChar {
+					inString = false
+				}
 			}
 		}
 
-		// If we found a closing brace
-		if i < len(input) && input[i] == '}' {
-			expressionContent := strings.TrimSpace(input[start:i])
-			log.Printf("[ExpressionParser] Parsed expression with whitespace handling: %s", expressionContent)
-
-			return Result{
-				&ast.ExpressionNode{Expression: expressionContent},
-				input[i+1:],
-				true,
-				"",
-				false,
-			}
-		}
-
-		log.Printf("[ExpressionParser] Failed to find closing brace for expression")
+		// No matching closing brace found
 		return Result{nil, input, false, "unclosed expression", false}
 	}
 }
 
-// isDirective checks if an input string appears to be a directive, handling whitespace
-func isDirective(input string) bool {
-	// Trim whitespace at the start for consistent checking
-	trimmed := strings.TrimLeft(input, " \t\n\r")
-
-	// First character must be {
-	if !strings.HasPrefix(trimmed, "{") {
-		return false
-	}
-
-	// Check for directive prefixes after the opening brace and potential whitespace
-	i := 1
-	// Skip whitespace after the opening brace
-	for i < len(trimmed) && (trimmed[i] == ' ' || trimmed[i] == '\t') {
-		i++
-	}
-
-	// Now check for directive keywords
-	if i < len(trimmed) {
-		prefixes := []string{
-			"if ", "#if ", "else", "/if", "end",
-			"for ", "#each ", "/for", "#for", "/each", "/#each",
-			"await ", "/await", "#await", "/await",
-		}
-
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(trimmed[i:], prefix) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// FenceParser parses the fence section (---...---) and returns an *ast.FenceSection node.
-// This now properly extracts props and variables from the fence content.
+// FenceParser parses the fence section (delimited by ---).
 func FenceParser() Parser {
 	return Map(
 		Between(String("---"), String("---"), TakeUntil(String("---"))),
@@ -156,6 +153,7 @@ func FenceParser() Parser {
 }
 
 // parseFenceContent extracts props and variables from fence section content
+// Now handles multi-line values for arrays and objects
 func parseFenceContent(content string) *ast.FenceSection {
 	fence := &ast.FenceSection{
 		RawContent: content,
@@ -167,66 +165,177 @@ func parseFenceContent(content string) *ast.FenceSection {
 	lines := strings.Split(content, "\n")
 
 	// Regex patterns for parsing
-	// Note: Use (?:;)? to optionally match trailing semicolon, then trim it
-	propRegex := regexp.MustCompile(`^\s*prop\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+?)(?:;)?$`)
-	varRegex := regexp.MustCompile(`^\s*(let|const|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+?)(?:;)?$`)
+	propRegex := regexp.MustCompile(`^\s*prop\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$`)
+	varRegex := regexp.MustCompile(`^\s*(let|const|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$`)
 	importRegex := regexp.MustCompile(`^\s*import\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s+from\s+['"](.+?)['"](?:;)?$`)
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
+	// Process lines with multi-line support
+	i := 0
+	for i < len(lines) {
+		line := lines[i]
+		trimmedLine := strings.TrimSpace(line)
+
+		if trimmedLine == "" {
+			i++
 			continue
 		}
 
 		// Check for prop declaration
-		if matches := propRegex.FindStringSubmatch(line); matches != nil {
+		if matches := propRegex.FindStringSubmatch(trimmedLine); matches != nil {
 			propName := matches[1]
-			propValue := strings.TrimSpace(matches[2])
+			firstLineValue := matches[2]
 
-			log.Printf("[parseFenceContent] Found prop: %s = %s", propName, propValue)
+			// Check if this is a multi-line value (starts with [ or {)
+			firstChar := strings.TrimSpace(firstLineValue)
+			if len(firstChar) > 0 && (firstChar[0] == '[' || firstChar[0] == '{' || firstChar[0] == '(') {
+				// Multi-line value - accumulate lines until brackets are matched
+				fullValue, endIndex := parseMultiLineValue(lines, i, firstLineValue)
+				if fullValue != "" {
+					preview := fullValue
+					if len(fullValue) > 50 {
+						preview = fullValue[:50] + "..."
+					}
+					log.Printf("[parseFenceContent] Found multi-line prop: %s = %s (total %d chars)", propName, preview, len(fullValue))
+					fence.Props = append(fence.Props, ast.PropNode{
+						Name:         propName,
+						DefaultValue: fullValue,
+					})
+					i = endIndex + 1
+					continue
+				}
+			}
 
+			// Single-line value
+			// Remove trailing semicolon if present
+			value := strings.TrimSpace(firstLineValue)
+			value = strings.TrimSuffix(value, ";")
+
+			log.Printf("[parseFenceContent] Found prop: %s = %s", propName, value)
 			fence.Props = append(fence.Props, ast.PropNode{
 				Name:         propName,
-				DefaultValue: propValue,
+				DefaultValue: value,
 			})
+			i++
 			continue
 		}
 
 		// Check for variable declaration
-		if matches := varRegex.FindStringSubmatch(line); matches != nil {
+		if matches := varRegex.FindStringSubmatch(trimmedLine); matches != nil {
 			keyword := matches[1]
 			varName := matches[2]
-			varValue := strings.TrimSpace(matches[3])
+			firstLineValue := matches[3]
 
-			log.Printf("[parseFenceContent] Found variable: %s %s = %s", keyword, varName, varValue)
+			// Check if this is a multi-line value
+			firstChar := strings.TrimSpace(firstLineValue)
+			if len(firstChar) > 0 && (firstChar[0] == '[' || firstChar[0] == '{' || firstChar[0] == '(') {
+				// Multi-line value
+				fullValue, endIndex := parseMultiLineValue(lines, i, firstLineValue)
+				if fullValue != "" {
+					preview := fullValue
+					if len(fullValue) > 50 {
+						preview = fullValue[:50] + "..."
+					}
+					log.Printf("[parseFenceContent] Found multi-line variable: %s %s = %s (total %d chars)", keyword, varName, preview, len(fullValue))
+					fence.Variables = append(fence.Variables, ast.VariableNode{
+						Keyword: keyword,
+						Name:    varName,
+						Value:   fullValue,
+					})
+					i = endIndex + 1
+					continue
+				}
+			}
 
+			// Single-line value
+			value := strings.TrimSpace(firstLineValue)
+			value = strings.TrimSuffix(value, ";")
+
+			log.Printf("[parseFenceContent] Found variable: %s %s = %s", keyword, varName, value)
 			fence.Variables = append(fence.Variables, ast.VariableNode{
 				Keyword: keyword,
 				Name:    varName,
-				Value:   varValue,
+				Value:   value,
 			})
+			i++
 			continue
 		}
 
 		// Check for import statement
-		if matches := importRegex.FindStringSubmatch(line); matches != nil {
+		if matches := importRegex.FindStringSubmatch(trimmedLine); matches != nil {
 			importName := matches[1]
 			importPath := matches[2]
 
 			log.Printf("[parseFenceContent] Found import: %s from %s", importName, importPath)
-
 			fence.Imports = append(fence.Imports, ast.ImportNode{
 				Name: importName,
 				Path: importPath,
 			})
+			i++
 			continue
 		}
+
+		// Unknown line, skip it
+		i++
 	}
 
 	log.Printf("[parseFenceContent] Extracted %d props, %d variables, %d imports",
 		len(fence.Props), len(fence.Variables), len(fence.Imports))
 
 	return fence
+}
+
+// parseMultiLineValue accumulates lines until all brackets/braces are matched
+// Returns the full value string and the index of the last line consumed
+func parseMultiLineValue(lines []string, startIndex int, firstLineValue string) (string, int) {
+	matcher := newBracketMatcher()
+	var accumulator strings.Builder
+
+	log.Printf("[parseMultiLineValue] Starting with firstLineValue: %q, startIndex=%d, total lines=%d", firstLineValue, startIndex, len(lines))
+
+	// Start with the first line value
+	accumulator.WriteString(firstLineValue)
+
+	// Process characters from first line
+	for _, char := range firstLineValue {
+		matcher.processChar(char)
+	}
+
+	log.Printf("[parseMultiLineValue] After first line: isComplete=%v, stack depth=%d", matcher.isComplete(), len(matcher.stack))
+
+	// Check if already complete (single-line case)
+	if matcher.isComplete() {
+		log.Printf("[parseMultiLineValue] Single-line complete: %q", accumulator.String())
+		return accumulator.String(), startIndex
+	}
+
+	// Continue with subsequent lines
+	for i := startIndex + 1; i < len(lines); i++ {
+		line := lines[i]
+
+		log.Printf("[parseMultiLineValue] Processing line %d: %q", i, line)
+
+		// Add newline before appending next line
+		accumulator.WriteString("\n")
+		accumulator.WriteString(line)
+
+		// Process each character in this line
+		for _, char := range line {
+			matcher.processChar(char)
+		}
+
+		log.Printf("[parseMultiLineValue] After line %d: isComplete=%v, stack depth=%d", i, matcher.isComplete(), len(matcher.stack))
+
+		// Check if complete
+		if matcher.isComplete() {
+			log.Printf("[parseMultiLineValue] Multi-line complete at line %d: %q", i, accumulator.String())
+			return accumulator.String(), i
+		}
+	}
+
+	// Unclosed brackets - return empty string to indicate error
+	// The caller will fall back to single-line parsing
+	log.Printf("[parseMultiLineValue] Warning: unclosed brackets in multi-line value starting at line %d, final stack depth=%d", startIndex, len(matcher.stack))
+	return "", -1
 }
 
 // ScriptParser parses the script section and returns an *ast.ScriptSection node.

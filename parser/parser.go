@@ -191,6 +191,11 @@ func BlockConditionalParser() Parser {
 		currentBranch := ifBranch
 		currentElseIfIndex := -1
 
+		// Depth tracking: Track nesting level to ensure we only close when depth reaches 0
+		// This prevents nested {if} blocks from prematurely closing the parent conditional
+		depth := 1
+		log.Printf("[BlockConditionalParser] Starting depth tracking at depth=%d", depth)
+
 		// Parse content until we hit else-if, else, or /if
 		iterationCount := 0
 		maxIterations := 10000
@@ -208,52 +213,67 @@ func BlockConditionalParser() Parser {
 				}
 			}
 
-			// Check for block terminators
+			// Check for block terminators FIRST, before parsing nodes
 			elseIfRes := ElseIfParser()(remaining)
 			elseRes := ElseParser()(remaining)
 			ifEndRes := IfEndParser()(remaining)
 
 			// Check if we hit the end of the if block
 			if ifEndRes.Successful {
-				log.Printf("[BlockConditionalParser] Found {/if}, completing conditional block")
-				return Result{
-					Value:      conditional,
-					Remaining:  ifEndRes.Remaining,
-					Successful: true,
-					Error:      "",
-				}
-			}
+				depth--
+				log.Printf("[BlockConditionalParser] Found {/if}, depth=%d", depth)
 
-			// Check if we hit an else-if
-			if elseIfRes.Successful {
-				elseIfNode, ok := elseIfRes.Value.(*ast.ElseIfNode)
-				if !ok {
-					return Result{nil, input, false, "ElseIfParser did not return *ast.ElseIfNode", false}
+				// Only close this conditional block if we're back to depth 0
+				if depth == 0 {
+					log.Printf("[BlockConditionalParser] Depth=0, completing conditional block")
+					return Result{
+						Value:      conditional,
+						Remaining:  ifEndRes.Remaining,
+						Successful: true,
+						Error:      "",
+					}
 				}
 
-				log.Printf("[BlockConditionalParser] Found {else if %s}", elseIfNode.Condition)
-
-				// Add the else-if condition
-				conditional.ElseIfConditions = append(conditional.ElseIfConditions, elseIfNode.Condition)
-				conditional.ElseIfContent = append(conditional.ElseIfContent, []ast.Node{})
-
-				// Switch to else-if branch
-				currentBranch = elseIfBranch
-				currentElseIfIndex = len(conditional.ElseIfConditions) - 1
-
-				remaining = elseIfRes.Remaining
+				// This {/if} belongs to a nested conditional, continue parsing
+				log.Printf("[BlockConditionalParser] {/if} belongs to nested conditional (depth=%d), continuing", depth)
+				remaining = ifEndRes.Remaining
 				continue
 			}
 
-			// Check if we hit an else
-			if elseRes.Successful {
-				log.Printf("[BlockConditionalParser] Found {else}")
+			// Only recognize {else if} and {else} at our depth (depth == 1)
+			// This prevents capturing else-if/else from nested conditionals
+			if depth == 1 {
+				// Check if we hit an else-if
+				if elseIfRes.Successful {
+					elseIfNode, ok := elseIfRes.Value.(*ast.ElseIfNode)
+					if !ok {
+						return Result{nil, input, false, "ElseIfParser did not return *ast.ElseIfNode", false}
+					}
 
-				// Switch to else branch
-				currentBranch = elseBranch
+					log.Printf("[BlockConditionalParser] Found {else if %s} at depth=1", elseIfNode.Condition)
 
-				remaining = elseRes.Remaining
-				continue
+					// Add the else-if condition
+					conditional.ElseIfConditions = append(conditional.ElseIfConditions, elseIfNode.Condition)
+					conditional.ElseIfContent = append(conditional.ElseIfContent, []ast.Node{})
+
+					// Switch to else-if branch
+					currentBranch = elseIfBranch
+					currentElseIfIndex = len(conditional.ElseIfConditions) - 1
+
+					remaining = elseIfRes.Remaining
+					continue
+				}
+
+				// Check if we hit an else
+				if elseRes.Successful {
+					log.Printf("[BlockConditionalParser] Found {else} at depth=1")
+
+					// Switch to else branch
+					currentBranch = elseBranch
+
+					remaining = elseRes.Remaining
+					continue
+				}
 			}
 
 			// Parse one node of content for the current branch
@@ -278,6 +298,8 @@ func BlockConditionalParser() Parser {
 			}
 
 			// Add the parsed node to the appropriate branch
+			// NOTE: Nested conditionals have already consumed their own closing tags,
+			// so we don't need to adjust depth when we see a Conditional node
 			if node, ok := nodeRes.Value.(ast.Node); ok && node != nil {
 				switch currentBranch {
 				case ifBranch:

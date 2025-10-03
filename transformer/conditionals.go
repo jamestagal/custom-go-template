@@ -34,18 +34,35 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 	result := []ast.Node{templateElement}
 
 	// Handle else-if and else branches if present
+	// Alpine.js doesn't support x-else-if or x-else, so we need to use negated x-if conditions
+	// Build up negation of all previous conditions
+	var previousConditions []string
+	previousConditions = append(previousConditions, node.IfCondition)
+
 	if len(node.ElseIfConditions) > 0 {
 		for i, condition := range node.ElseIfConditions {
 			// Extract variables from the else-if condition
 			extractVariablesFromExpr(condition, dataScope)
 
-			// Create a template element for the else-if branch
+			// Build the negated condition: !(A) && (B)
+			// Where A is all previous conditions and B is current condition
+			negatedPrevious := ""
+			for j, prev := range previousConditions {
+				if j > 0 {
+					negatedPrevious += " && "
+				}
+				negatedPrevious += "!(" + prev + ")"
+			}
+
+			elseIfCondition := "(" + negatedPrevious + ") && (" + condition + ")"
+
+			// Create a template element for the else-if branch using x-if
 			elseIfTemplate := &ast.Element{
 				TagName: "template",
 				Attributes: []ast.Attribute{
 					{
-						Name:  "x-else-if",
-						Value: condition,
+						Name:  "x-if",
+						Value: elseIfCondition,
 					},
 				},
 				Children: []ast.Node{},
@@ -57,18 +74,30 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 
 			// Add the else-if template to the result
 			result = append(result, elseIfTemplate)
+
+			// Track this condition for future else-if/else branches
+			previousConditions = append(previousConditions, condition)
 		}
 	}
 
 	// Handle the else branch if present
 	if len(node.ElseContent) > 0 {
-		// Create a template element for the else branch with x-else attribute
+		// Build the negation of all previous conditions: !(A) && !(B) && ...
+		negatedAll := ""
+		for i, prev := range previousConditions {
+			if i > 0 {
+				negatedAll += " && "
+			}
+			negatedAll += "!(" + prev + ")"
+		}
+
+		// Create a template element for the else branch using negated x-if
 		elseTemplate := &ast.Element{
 			TagName: "template",
 			Attributes: []ast.Attribute{
 				{
-					Name:  "x-else",
-					Value: "",
+					Name:  "x-if",
+					Value: negatedAll,
 				},
 			},
 			Children: []ast.Node{},
