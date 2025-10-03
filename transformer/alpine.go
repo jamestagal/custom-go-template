@@ -115,6 +115,72 @@ func isComplexJSObject(s string) bool {
 	return methodPattern.MatchString(trimmed)
 }
 
+// isJavaScriptExpression checks if a string appears to be a JavaScript expression
+// that should be evaluated by Alpine.js (not quoted as a string).
+//
+// It returns true for:
+//   - Arithmetic expressions: age + 50, count * 2, total - discount
+//   - Comparison expressions: count > 0, name !== "admin"
+//   - Ternary operators: isActive ? "yes" : "no"
+//   - Property access: user.name, items[0], obj.nested.prop
+//   - Method calls: items.filter(), Math.random()
+//   - Logical expressions: isValid && isActive, !disabled || isFree
+//
+// Cognitive Load: 8
+func isJavaScriptExpression(s string) bool {
+	trimmed := strings.TrimSpace(s)
+
+	if len(trimmed) == 0 {
+		return false
+	}
+
+	// If it starts/ends with quotes, it's a string literal, not an expression
+	if (strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`)) ||
+		(strings.HasPrefix(trimmed, `'`) && strings.HasSuffix(trimmed, `'`)) ||
+		(strings.HasPrefix(trimmed, "`") && strings.HasSuffix(trimmed, "`")) {
+		return false
+	}
+
+	// Check for arithmetic operators: + - * / %
+	arithmeticOperators := []string{" + ", " - ", " * ", " / ", " % "}
+	for _, op := range arithmeticOperators {
+		if strings.Contains(trimmed, op) {
+			return true
+		}
+	}
+
+	// Check for comparison operators: > < >= <= == != === !==
+	comparisonOperators := []string{" > ", " < ", " >= ", " <= ", " == ", " != ", " === ", " !== "}
+	for _, op := range comparisonOperators {
+		if strings.Contains(trimmed, op) {
+			return true
+		}
+	}
+
+	// Check for logical operators: && || !
+	if strings.Contains(trimmed, " && ") || strings.Contains(trimmed, " || ") {
+		return true
+	}
+
+	// Check for ternary operator: condition ? value1 : value2
+	if strings.Contains(trimmed, "?") && strings.Contains(trimmed, ":") {
+		return true
+	}
+
+	// Check for property/method access with dots or brackets
+	// Examples: user.name, items[0], obj.method()
+	if strings.Contains(trimmed, ".") || (strings.Contains(trimmed, "[") && strings.Contains(trimmed, "]")) {
+		return true
+	}
+
+	// Check for method calls: something()
+	if strings.Contains(trimmed, "(") && strings.Contains(trimmed, ")") {
+		return true
+	}
+
+	return false
+}
+
 // isJavaScriptLiteral checks if a string appears to be a JavaScript array or object literal.
 // This function determines if a value should be output as raw JavaScript without quotes.
 //
@@ -199,6 +265,13 @@ func formatGoValueToJS(value any) string {
 			log.Printf("formatGoValueToJS: Detected JavaScript literal, returning as-is (length: %d, preview: %s...)",
 				len(v),
 				truncateString(v, 50))
+			return v
+		}
+
+		// CRITICAL FIX: Check if it's a JavaScript expression that needs to be evaluated
+		// This includes arithmetic (age + 50), property access (user.name), etc.
+		if isJavaScriptExpression(v) {
+			log.Printf("formatGoValueToJS: Detected JavaScript expression, returning as-is: %s", v)
 			return v
 		}
 
