@@ -28,7 +28,20 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 
 	// Transform the content of the if branch
 	transformedContent := transformNodes(node.IfContent, dataScope, false)
-	templateElement.Children = transformedContent
+
+	// Alpine.js x-if requires exactly ONE child element
+	// If we have multiple children OR the child is a template element, wrap in a div
+	if needsWrapper(transformedContent) {
+		log.Printf("transformConditional: wrapping %d nodes in container div for if branch", len(transformedContent))
+		// Create a wrapper div to hold all the content
+		wrapperDiv := &ast.Element{
+			TagName:  "div",
+			Children: transformedContent,
+		}
+		templateElement.Children = []ast.Node{wrapperDiv}
+	} else {
+		templateElement.Children = transformedContent
+	}
 
 	// Create a result slice with the if template
 	result := []ast.Node{templateElement}
@@ -70,7 +83,18 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 
 			// Transform the content of the else-if branch
 			elseIfContent := transformNodes(node.ElseIfContent[i], dataScope, false)
-			elseIfTemplate.Children = elseIfContent
+
+			// Alpine.js x-if requires exactly ONE child element
+			if needsWrapper(elseIfContent) {
+				log.Printf("transformConditional: wrapping %d nodes in container div for else-if branch", len(elseIfContent))
+				wrapperDiv := &ast.Element{
+					TagName:  "div",
+					Children: elseIfContent,
+				}
+				elseIfTemplate.Children = []ast.Node{wrapperDiv}
+			} else{
+				elseIfTemplate.Children = elseIfContent
+			}
 
 			// Add the else-if template to the result
 			result = append(result, elseIfTemplate)
@@ -105,7 +129,18 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 
 		// Transform the content of the else branch
 		elseContent := transformNodes(node.ElseContent, dataScope, false)
-		elseTemplate.Children = elseContent
+
+		// Alpine.js x-if requires exactly ONE child element
+		if needsWrapper(elseContent) {
+			log.Printf("transformConditional: wrapping %d nodes in container div for else branch", len(elseContent))
+			wrapperDiv := &ast.Element{
+				TagName:  "div",
+				Children: elseContent,
+			}
+			elseTemplate.Children = []ast.Node{wrapperDiv}
+		} else {
+			elseTemplate.Children = elseContent
+		}
 
 		// Add the else template to the result
 		result = append(result, elseTemplate)

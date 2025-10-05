@@ -46,36 +46,37 @@ let comp = "UserProfile"
         <Age name="Bo" age={age + 50} />
         <Age name="Baggins" age={201} />
       </div>
+
+      <!-- Dynamic components (Jim's innovative <= syntax) -->
+      <div style="margin: 2rem 0;">
+        <h2>Dynamic Component Examples</h2>
+        <={`./components/UserProfile.html`} name={name} age={age} />
+        <='{path}' name="Dynamic User" age={25} />
+        <={`./components/{comp}.html`} name="Variable Path User" age={30} />
+      </div>
+
+      <!-- Loops with nested conditionals -->
+      <div class="animals" style="background-color: #f0f0f0; padding: 1rem; margin: 2rem 0;">
+        <h2>Animals Loop</h2>
+        {for animal of animals}
+          {if animal == "cat"}
+            <div>Hi {animal}!</div>
+          {else}
+            <div>Bye {animal}.</div>
+          {/if}
+          <div class="type-{animal}">{name} likes: {animal}s</div>
+          <br>
+        {/for}
+      </div>
+
+      <!-- Advanced loop example -->
+      <div style="margin: 2rem 0;">
+        <h2>More Loop Examples</h2>
+        {for word of ["word", "up", "my", "friend"]}
+          <div>{name} {word}</div>
+        {/for}
+      </div>
     {/if}
-
-    <!-- Dynamic components (Jim's innovative <= syntax) -->
-    <div style="margin: 2rem 0;">
-      <h2>Dynamic Component Examples</h2>
-      <={`./components/UserProfile.html`} name={name} age={age} />
-      <='{path}' name="Dynamic User" age={25} />
-      <={`./components/{comp}.html`} name="Variable Path User" age={30} />
-    </div>
-    <!-- Loops with nested conditionals -->
-    <div class="animals" style="background-color: #f0f0f0; padding: 1rem; margin: 2rem 0;">
-      <h2>Animals Loop</h2>
-      {for animal of animals}
-        {if animal == "cat"}
-          <div>Hi {animal}!</div>
-        {else}
-          <div>Bye {animal}.</div>
-        {/if}
-        <div class="type-{animal}">{name} likes: {animal}s</div>
-        <br>
-      {/for}
-    </div>
-
-    <!-- Advanced loop example -->
-    <div style="margin: 2rem 0;">
-      <h2>More Loop Examples</h2>
-      {for word of ["word", "up", "my", "friend"]}
-        <div>{name} {word}</div>
-      {/for}
-    </div>
   </main>
 
   <Footer />
