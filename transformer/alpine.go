@@ -141,6 +141,12 @@ func isJavaScriptExpression(s string) bool {
 		return false
 	}
 
+	// FIX: If it has spaces but no function calls, it's likely a literal string, not an expression
+	// Examples: "Custom Template Co." (literal), "Hello World" (literal)
+	if strings.Contains(trimmed, " ") && !strings.Contains(trimmed, "(") {
+		return false
+	}
+
 	// Check for arithmetic operators: + - * / %
 	arithmeticOperators := []string{" + ", " - ", " * ", " / ", " % "}
 	for _, op := range arithmeticOperators {
@@ -167,9 +173,12 @@ func isJavaScriptExpression(s string) bool {
 		return true
 	}
 
-	// Check for property/method access with dots or brackets
-	// Examples: user.name, items[0], obj.method()
-	if strings.Contains(trimmed, ".") || (strings.Contains(trimmed, "[") && strings.Contains(trimmed, "]")) {
+	// CRITICAL FIX: Property/method access should only match valid JavaScript identifiers
+	// Must start with identifier, then dot, then another identifier
+	// Examples that should match: user.name, obj.prop, items[0].name
+	// Examples that should NOT match: ./components/file.html, /path/to/file.js
+	propertyAccessPattern := regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*\.`)
+	if propertyAccessPattern.MatchString(trimmed) {
 		return true
 	}
 
@@ -225,6 +234,41 @@ func isJavaScriptLiteral(s string) bool {
 	return false
 }
 
+// isQuotedString checks if a string is already a properly quoted JavaScript string literal.
+// Returns true if the string starts and ends with matching quotes (", ', or `).
+//
+// Examples that return true:
+//   - "\"hello\""
+//   - "'world'"
+//   - "`template`"
+//   - "\"./components/file.html\""
+//
+// Cognitive Load: 3
+func isQuotedString(s string) bool {
+	trimmed := strings.TrimSpace(s)
+
+	if len(trimmed) < 2 {
+		return false
+	}
+
+	// Check for double quotes
+	if strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`) {
+		return true
+	}
+
+	// Check for single quotes
+	if strings.HasPrefix(trimmed, `'`) && strings.HasSuffix(trimmed, `'`) {
+		return true
+	}
+
+	// Check for backticks (template literals)
+	if strings.HasPrefix(trimmed, "`") && strings.HasSuffix(trimmed, "`") {
+		return true
+	}
+
+	return false
+}
+
 // formatGoValueToJS converts a Go value to JavaScript literal syntax.
 // Functions are returned without quotes, strings are quoted and escaped.
 //
@@ -232,17 +276,19 @@ func isJavaScriptLiteral(s string) bool {
 //   - nil → "null"
 //   - Function strings → returned as-is (no quotes)
 //   - JavaScript literals (arrays/objects) → returned as-is (no quotes)
+//   - Already quoted strings → returned as-is (no double-quoting)
 //   - Regular strings → quoted and escaped with double quotes
 //   - Booleans → "true" or "false"
 //   - Numbers → formatted as number string
 //   - Arrays → recursively formatted
 //   - Maps → formatted as JS object
 //
-// CRITICAL FIX: JavaScript arrays and objects (even without functions) are now
-// returned as-is without quotes to preserve multi-line prop values.
+// CRITICAL: JavaScript literals are returned AS-IS without modification.
+// Alpine.js accepts BOTH JavaScript object syntax {key: value} and JSON {"key": "value"}
+// We preserve the original JavaScript syntax to maintain expressions like ternaries.
 //
 // Cognitive Load: 16
-func formatGoValueToJS(value any) string {
+func FormatGoValueToJS(value any) string {
 	// Handle nil (COGNITIVE LOAD RULE: error handling)
 	if value == nil {
 		return "null"
@@ -250,6 +296,16 @@ func formatGoValueToJS(value any) string {
 
 	switch v := value.(type) {
 	case string:
+		log.Printf("[DEBUG formatGoValueToJS] Processing string: %q (len=%d)", v, len(v))
+
+		// CRITICAL FIX: Check if string is already quoted
+		// If the fence section parser stored the value with quotes (like `"./components/UserProfile.html"`),
+		// we should return it as-is, not add another layer of quotes
+		if isQuotedString(v) {
+			log.Printf("formatGoValueToJS: Detected already-quoted string, returning as-is: %s", v)
+			return v
+		}
+
 		// Check if this string is a function definition
 		if isFunctionExpression(v) {
 			// Return function without quotes
@@ -258,13 +314,14 @@ func formatGoValueToJS(value any) string {
 		}
 
 		// CRITICAL FIX: Check if it's a JavaScript literal (array or object)
-		// This preserves multi-line prop values like:
-		//   links = [{ label: "Home", url: "/" }, ...]
-		//   stats = { users: 124, products: 56 }
+		// Return AS-IS without any conversion - Alpine.js will handle it
+		// This preserves JavaScript syntax including ternaries, property access, etc.
 		if isJavaScriptLiteral(v) {
 			log.Printf("formatGoValueToJS: Detected JavaScript literal, returning as-is (length: %d, preview: %s...)",
 				len(v),
 				truncateString(v, 50))
+			// Return the JavaScript literal unchanged
+			// Alpine.js accepts JavaScript object syntax: {isLoggedIn: false, navItems: isLoggedIn ? [...] : [...]}
 			return v
 		}
 
@@ -272,13 +329,16 @@ func formatGoValueToJS(value any) string {
 		// This includes arithmetic (age + 50), property access (user.name), etc.
 		if isJavaScriptExpression(v) {
 			log.Printf("formatGoValueToJS: Detected JavaScript expression, returning as-is: %s", v)
+			log.Printf("[DEBUG] String '%s' classified as JavaScript expression!", v)
 			return v
 		}
 
 		// Regular string - add double quotes and escape (COGNITIVE LOAD RULE: proper escaping)
 		escaped := strings.ReplaceAll(v, `\`, `\\`)
 		escaped = strings.ReplaceAll(escaped, `"`, `\"`)
-		return fmt.Sprintf(`"%s"`, escaped)
+		result := fmt.Sprintf(`"%s"`, escaped)
+		log.Printf("formatGoValueToJS: Regular string, quoting: %s → %s", v, result)
+		return result
 
 	case bool:
 		if v {
@@ -317,7 +377,7 @@ func formatGoValueToJS(value any) string {
 		// Array - format elements (COGNITIVE LOAD RULE: preallocate slice)
 		elements := make([]string, 0, len(v))
 		for _, item := range v {
-			elements = append(elements, formatGoValueToJS(item))
+			elements = append(elements, FormatGoValueToJS(item))
 		}
 		return "[" + strings.Join(elements, ",") + "]"
 
@@ -325,7 +385,7 @@ func formatGoValueToJS(value any) string {
 		// Array of objects - format each object
 		elements := make([]string, 0, len(v))
 		for _, item := range v {
-			elements = append(elements, formatGoValueToJS(item))
+			elements = append(elements, FormatGoValueToJS(item))
 		}
 		return "[" + strings.Join(elements, ",") + "]"
 
@@ -341,9 +401,10 @@ func formatGoValueToJS(value any) string {
 		pairs := make([]string, 0, len(v))
 		for _, key := range keys {
 			value := v[key]
-			formattedValue := formatGoValueToJS(value)
-			// Always quote keys for valid JavaScript syntax
-			pairs = append(pairs, fmt.Sprintf(`"%s":%s`, key, formattedValue))
+			formattedValue := FormatGoValueToJS(value)
+			// Use unquoted keys for JavaScript object syntax
+			// Alpine.js accepts: {name: "John", age: 30}
+			pairs = append(pairs, fmt.Sprintf(`%s:%s`, key, formattedValue))
 		}
 		return "{" + strings.Join(pairs, ",") + "}"
 
@@ -380,29 +441,251 @@ func isDefaultPlaceholder(value any) bool {
 	return false
 }
 
+// extractDependencies extracts variable names referenced in a JavaScript expression
+// Returns a map of variable names that this expression depends on
+//
+// Cognitive Load: 12
+func extractDependencies(expr string) map[string]bool {
+	deps := make(map[string]bool)
+
+	// Skip simple values that have no dependencies
+	trimmed := strings.TrimSpace(expr)
+	if len(trimmed) == 0 {
+		return deps
+	}
+
+	// Skip string literals
+	if isQuotedString(trimmed) {
+		return deps
+	}
+
+	// Skip boolean literals
+	if trimmed == "true" || trimmed == "false" || trimmed == "null" {
+		return deps
+	}
+
+	// Skip number literals
+	if regexp.MustCompile(`^-?[0-9]+(\.[0-9]+)?$`).MatchString(trimmed) {
+		return deps
+	}
+
+	// Extract variable references from JavaScript expressions
+	// Patterns to match:
+	// - user.name, user.role (object property access)
+	// - isLoggedIn ? ... : ... (ternary conditional)
+	// - items.filter(Boolean) (method calls)
+
+	// Pattern: identifier followed by . (property access like user.name, user.role)
+	propertyPattern := regexp.MustCompile(`\b([a-zA-Z_$][a-zA-Z0-9_$]*)\.[a-zA-Z_$]`)
+	matches := propertyPattern.FindAllStringSubmatch(expr, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			varName := match[1]
+			deps[varName] = true
+			log.Printf("extractDependencies: Found property access dependency: %s", varName)
+		}
+	}
+
+	// Pattern: standalone identifiers (variables like isLoggedIn, items)
+	// This pattern matches identifiers that are NOT followed by ( (function calls)
+	// and NOT preceded by . (property names)
+	identifierPattern := regexp.MustCompile(`(?:^|[^a-zA-Z0-9_$.])\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b(?:[^a-zA-Z0-9_$(.]|$)`)
+	matches = identifierPattern.FindAllStringSubmatch(expr, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			varName := match[1]
+			// Skip JavaScript keywords and built-in objects
+			if !isJavaScriptKeyword(varName) {
+				deps[varName] = true
+				log.Printf("extractDependencies: Found identifier dependency: %s", varName)
+			}
+		}
+	}
+
+	return deps
+}
+
+// isJavaScriptKeyword checks if a string is a JavaScript keyword or built-in
+func isJavaScriptKeyword(name string) bool {
+	keywords := map[string]bool{
+		// JavaScript keywords
+		"if": true, "else": true, "for": true, "while": true, "do": true,
+		"switch": true, "case": true, "default": true, "break": true, "continue": true,
+		"return": true, "function": true, "var": true, "let": true, "const": true,
+		"class": true, "extends": true, "static": true, "async": true, "await": true,
+		"try": true, "catch": true, "finally": true, "throw": true,
+		"new": true, "this": true, "super": true, "typeof": true, "instanceof": true,
+		"in": true, "of": true, "delete": true, "void": true,
+
+		// Literals
+		"true": true, "false": true, "null": true, "undefined": true,
+
+		// Built-in objects
+		"Array": true, "Object": true, "String": true, "Number": true, "Boolean": true,
+		"Date": true, "Math": true, "JSON": true, "RegExp": true,
+		"Map": true, "Set": true, "Promise": true, "Symbol": true,
+		"console": true, "window": true, "document": true,
+	}
+	return keywords[name]
+}
+
+// topologicalSort performs a topological sort on properties based on their dependencies
+// Returns keys sorted so that dependencies come before dependents
+//
+// Cognitive Load: 18
+func topologicalSort(dataScope map[string]any) []string {
+	// Build dependency graph
+	dependencies := make(map[string]map[string]bool)
+
+	for key, value := range dataScope {
+		// Convert value to string to analyze dependencies
+		valueStr := ""
+		if str, ok := value.(string); ok {
+			valueStr = str
+		}
+
+		// Extract dependencies from the value
+		deps := extractDependencies(valueStr)
+
+		// Only keep dependencies that actually exist in dataScope
+		filteredDeps := make(map[string]bool)
+		for dep := range deps {
+			if _, exists := dataScope[dep]; exists {
+				filteredDeps[dep] = true
+			}
+		}
+
+		dependencies[key] = filteredDeps
+
+		if len(filteredDeps) > 0 {
+			log.Printf("topologicalSort: %s depends on: %v", key, getKeys(filteredDeps))
+		}
+	}
+
+	// Perform topological sort using Kahn's algorithm
+	// 1. Find all nodes with no dependencies (in-degree = 0)
+	// 2. Add them to result
+	// 3. Remove them from dependency graph
+	// 4. Repeat until all nodes processed
+
+	result := make([]string, 0, len(dataScope))
+	processed := make(map[string]bool)
+
+	// Keep processing until all keys are added to result
+	for len(result) < len(dataScope) {
+		// Find keys with no unprocessed dependencies
+		var noDeps []string
+		for key := range dataScope {
+			if processed[key] {
+				continue
+			}
+
+			// Check if all dependencies are processed
+			hasUnprocessedDep := false
+			for dep := range dependencies[key] {
+				if !processed[dep] {
+					hasUnprocessedDep = true
+					break
+				}
+			}
+
+			if !hasUnprocessedDep {
+				noDeps = append(noDeps, key)
+			}
+		}
+
+		// If no keys found, we have a circular dependency
+		// Fall back to alphabetical order for remaining keys
+		if len(noDeps) == 0 {
+			log.Printf("topologicalSort: Circular dependency detected, using alphabetical order for remaining keys")
+			for key := range dataScope {
+				if !processed[key] {
+					noDeps = append(noDeps, key)
+				}
+			}
+			sort.Strings(noDeps)
+		} else {
+			// Sort noDeps alphabetically for deterministic output
+			sort.Strings(noDeps)
+		}
+
+		// Add to result and mark as processed
+		for _, key := range noDeps {
+			result = append(result, key)
+			processed[key] = true
+		}
+	}
+
+	log.Printf("topologicalSort: Final order: %v", result)
+	return result
+}
+
+// getKeys returns a sorted slice of keys from a map
+func getKeys(m map[string]bool) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// hasSelfReferences checks if any property in dataScope references another property
+// Returns true if there are self-references (needs function wrapper)
+//
+// Cognitive Load: 10
+func hasSelfReferences(dataScope map[string]any) bool {
+	for key, value := range dataScope {
+		// Get value as string
+		valueStr := ""
+		if str, ok := value.(string); ok {
+			valueStr = str
+		}
+
+		// Extract dependencies
+		deps := extractDependencies(valueStr)
+
+		// Check if this value references other properties in the same scope
+		for dep := range deps {
+			if dep != key && dataScope[dep] != nil {
+				log.Printf("hasSelfReferences: Property '%s' references '%s' - needs function wrapper", key, dep)
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // alpineDataFormatter formats a data scope map into a JavaScript object literal
 // suitable for Alpine.js x-data attributes.
 //
 // This function:
 //   1. Filters out loop iterator variables (item, index, etc.) that shouldn't be in root scope
 //   2. Ensures critical variables exist in the scope
-//   3. Sorts keys for deterministic output
-//   4. Formats values using formatGoValueToJS which preserves JavaScript literals
+//   3. Detects self-referencing properties
+//   4. Wraps in function syntax if self-referencing detected
+//   5. Sorts keys using topological sort (dependencies first)
+//   6. Formats values using formatGoValueToJS which preserves JavaScript literals
 //
-// Pattern: Service Implementation Pattern [Load: 12]
-// Cognitive Load: 12 (filtering: 3, sorting: 2, formatting: 5, string building: 2)
+// Pattern: Service Implementation Pattern [Load: 18]
+// Cognitive Load: 18 (filtering: 3, self-ref detection: 4, sorting: 2, formatting: 6, string building: 3)
 //
-// Example:
+// Example without self-reference:
 //   dataScope := map[string]any{
 //     "name": "John",
 //     "age": 30,
-//     "links": "[{ label: \"Home\", url: \"/\" }]",
 //   }
 //   alpineDataFormatter(dataScope)
-//   // Returns: {"age":30,"links":[{ label: "Home", url: "/" }],"name":"John"}
+//   // Returns: {age:30,name:"John"}
 //
-// Note: The formatGoValueToJS function now correctly preserves JavaScript arrays
-// and objects without quoting them, fixing the multi-line prop truncation issue.
+// Example with self-reference:
+//   dataScope := map[string]any{
+//     "isLoggedIn": false,
+//     "navItems": "isLoggedIn ? [...] : [...]",
+//   }
+//   alpineDataFormatter(dataScope)
+//   // Returns: () => { const isLoggedIn = false; const navItems = isLoggedIn ? [...] : [...]; return {isLoggedIn,navItems}; }
 func alpineDataFormatter(dataScope map[string]any) string {
 	// Clean up any loop iterator variables that might have leaked
 	// Common iterator names that should never be in root scope
@@ -417,13 +700,46 @@ func alpineDataFormatter(dataScope map[string]any) string {
 	// Ensure critical variables exist
 	ensureCriticalVariables(dataScope)
 
-	// Sort keys for consistent output (COGNITIVE LOAD RULE: deterministic behavior)
-	keys := make([]string, 0, len(dataScope))
-	for key := range dataScope {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	// CRITICAL: Detect if we need function wrapper for self-referencing
+	needsFunctionWrapper := hasSelfReferences(dataScope)
 
+	// Use topological sort to ensure dependencies come first
+	keys := topologicalSort(dataScope)
+
+	if needsFunctionWrapper {
+		// Generate function syntax: () => { const k1 = v1; const k2 = v2; return {k1, k2}; }
+		log.Printf("alpineDataFormatter: Self-references detected, using function wrapper syntax")
+
+		// Build const declarations (COGNITIVE LOAD RULE: preallocate)
+		declarations := make([]string, 0, len(dataScope))
+		returnProps := make([]string, 0, len(dataScope))
+
+		for _, key := range keys {
+			// Skip internal Alpine.js variables
+			if strings.HasPrefix(key, "$") {
+				continue
+			}
+
+			value := dataScope[key]
+			formattedValue := FormatGoValueToJS(value)
+
+			// Build: const key = value;
+			declarations = append(declarations, fmt.Sprintf(`const %s = %s;`, key, formattedValue))
+
+			// Add to return object properties
+			returnProps = append(returnProps, key)
+		}
+
+		// Build function: () => { const x = y; const z = w; return {x, z}; }
+		result := fmt.Sprintf(`() => { %s return {%s}; }`,
+			strings.Join(declarations, " "),
+			strings.Join(returnProps, ","))
+
+		log.Printf("Generated x-data function wrapper: %s", truncateString(result, 200))
+		return result
+	}
+
+	// No self-references - use object literal syntax
 	// Build object literal using formatGoValueToJS (COGNITIVE LOAD RULE: preallocate)
 	parts := make([]string, 0, len(dataScope))
 	for _, key := range keys {
@@ -434,12 +750,25 @@ func alpineDataFormatter(dataScope map[string]any) string {
 
 		value := dataScope[key]
 
-		// Use the helper to format the value
-		// CRITICAL: formatGoValueToJS now preserves JavaScript literals
-		formattedValue := formatGoValueToJS(value)
+		// Format value based on type - handle dynamic expressions specially
+		var formattedValue string
+		if strVal, ok := value.(string); ok {
+			// Check if this is a dynamic expression (variable reference or expression)
+			// CRITICAL FIX: Pass dataScope to isDynamicExpression for scope checking
+			if isDynamicExpression(strVal, dataScope) {
+				// Don't quote dynamic expressions - Alpine.js will evaluate them
+				formattedValue = strVal
+			} else {
+				// Regular string - use formatGoValueToJS to properly quote it
+				formattedValue = FormatGoValueToJS(value)
+			}
+		} else {
+			// Non-string values - use formatGoValueToJS
+			formattedValue = FormatGoValueToJS(value)
+		}
 
-		// Build key-value pair (always quote keys for valid JSON-like syntax)
-		parts = append(parts, fmt.Sprintf(`"%s":%s`, key, formattedValue))
+		// Build key-value pair with unquoted keys (JavaScript object syntax)
+		parts = append(parts, fmt.Sprintf(`%s:%s`, key, formattedValue))
 	}
 
 	result := "{" + strings.Join(parts, ",") + "}"
@@ -462,7 +791,7 @@ func ensureCriticalVariables(dataScope map[string]any) {
 // wrapWithAlpineData wraps the given nodes with an Alpine.js x-data wrapper
 // This creates the wrapper element with formatted data scope
 func wrapWithAlpineData(nodes []ast.Node, dataScope map[string]any) *ast.Element {
-	// Format the data scope as JavaScript object literal
+	// Format the data scope as JavaScript object literal or function
 	dataJSON := alpineDataFormatter(dataScope)
 
 	// Create the wrapper element

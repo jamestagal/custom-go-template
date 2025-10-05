@@ -2,6 +2,7 @@ package transformer
 
 import (
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
@@ -149,6 +150,12 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			log.Printf("transformNodes: Transforming DynamicComponent node: path=%s", n.PathExpression)
 			dynComponentNodes := transformDynamicComponent(n, dataScope)
 			transformedNodes = append(transformedNodes, dynComponentNodes...)
+
+		case *ast.StyleSection, *ast.ScriptSection:
+			// Pass through style and script sections unchanged
+			// They will be extracted separately by the renderer
+			transformedNodes = append(transformedNodes, n)
+
 		default:
 			// Unknown node type, pass through as is
 			log.Printf("transformNodes: Unknown node type: %T", n)
@@ -323,9 +330,54 @@ func createAlpineWrapper(dataScope map[string]any, children []ast.Node) *ast.Ele
 	return wrapper
 }
 
+// Pattern to detect {expression} in attribute values
+var dynamicAttrPattern = regexp.MustCompile(`\{([^}]+)\}`)
+
+// transformAttributes transforms HTML attributes, detecting dynamic {expression} patterns
+// and converting them to Alpine.js :bind syntax
 func transformAttributes(attributes []ast.Attribute, dataScope map[string]any) []ast.Attribute {
-	transformedAttributes := make([]ast.Attribute, len(attributes))
-	copy(transformedAttributes, attributes)
+	transformedAttributes := make([]ast.Attribute, 0, len(attributes))
+
+	for _, attr := range attributes {
+		// Skip Alpine directives - they're already handled
+		if attr.IsAlpine {
+			transformedAttributes = append(transformedAttributes, attr)
+			continue
+		}
+
+		// Skip already dynamic attributes
+		if attr.Dynamic {
+			transformedAttributes = append(transformedAttributes, attr)
+			continue
+		}
+
+		// Check if the attribute value contains {expression} pattern
+		if matches := dynamicAttrPattern.FindStringSubmatch(attr.Value); len(matches) > 0 {
+			// Extract the expression from {expression}
+			expression := strings.TrimSpace(matches[1])
+
+			// Add the variable to data scope
+			extractVariablesFromExpr(expression, dataScope)
+
+			// Transform to Alpine.js bind syntax
+			transformedAttr := ast.Attribute{
+				Name:       attr.Name,      // Keep original attribute name
+				Value:      expression,     // Just the expression without braces
+				Dynamic:    true,           // Mark as dynamic so renderer uses :attribute
+				IsAlpine:   false,          // Not an Alpine directive itself
+				AlpineType: "",
+				AlpineKey:  "",
+			}
+
+			log.Printf("transformAttributes: Transformed %s=\"%s\" to dynamic binding with value \"%s\"",
+				attr.Name, attr.Value, expression)
+
+			transformedAttributes = append(transformedAttributes, transformedAttr)
+		} else {
+			// No dynamic expression, keep as is
+			transformedAttributes = append(transformedAttributes, attr)
+		}
+	}
 
 	return transformedAttributes
 }

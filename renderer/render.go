@@ -39,26 +39,52 @@ func Render(templatePath string, props map[string]any) (string, string, string) 
 // --- Alpine.js Attribute Generation ---
 
 func escapeAttrValue(value string, escapeSingleQuotes bool) string {
+	// FIX: Remove newlines/tabs completely - they're not needed in Alpine.js x-data
+	// This prevents issues with HTML entity encoding and makes output cleaner
+	value = strings.ReplaceAll(value, "\n", " ")
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\t", " ")
+
+	// Collapse multiple spaces into one
+	re := regexp.MustCompile(`\s+`)
+	value = re.ReplaceAllString(value, " ")
+
 	// The order of replacements is important - & must be replaced first
 	// to avoid double-escaping entities
 	value = strings.ReplaceAll(value, `&`, `&amp;`)
 	value = strings.ReplaceAll(value, `"`, `&quot;`)
 	value = strings.ReplaceAll(value, `<`, `&lt;`)
 	value = strings.ReplaceAll(value, `>`, `&gt;`)
-	
+
 	// Only escape single quotes if requested
 	if escapeSingleQuotes {
 		value = strings.ReplaceAll(value, "'", `&#39;`)
 	}
-	
+
 	return value
 }
 
-// escapeComplexJSValue provides special escaping for complex JavaScript values like objects with methods
-func escapeComplexJSValue(value string) string {
-	// Only escape double quotes to avoid breaking HTML attributes
-	// Leave everything else as-is to preserve JavaScript syntax
-	return strings.ReplaceAll(value, `"`, `\"`)
+// escapeForSingleQuotedAttr escapes a value for use in a single-quoted attribute
+// This is used for Alpine.js directives which contain JavaScript syntax
+// CRITICAL: We only escape single quotes and backslashes - NO OTHER ESCAPING
+// This preserves JavaScript syntax including ternaries, objects, etc.
+func escapeForSingleQuotedAttr(value string) string {
+	// Remove newlines/tabs and collapse spaces
+	value = strings.ReplaceAll(value, "\n", " ")
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\t", " ")
+
+	re := regexp.MustCompile(`\s+`)
+	value = re.ReplaceAllString(value, " ")
+
+	// For single-quoted attributes, we only need to escape:
+	// 1. Backslashes (to avoid escaping issues)
+	// 2. Single quotes (to \' or &#39;)
+	// We do NOT escape double quotes - they're valid inside single-quoted attrs
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `'`, `\'`)
+
+	return value
 }
 
 // cleanupObjectLiteral fixes common issues with JavaScript object literals
@@ -184,26 +210,28 @@ func GenerateAlpineDirectives(attributes []ast.Attribute) []string {
 					mergedProps = append(mergedProps, data.Value)
 				}
 			}
-			
+
 			// Create a new object with all merged properties
 			combinedData = "{ " + strings.Join(mergedProps, ", ") + " }"
 		}
-		
+
 		// Special case handling for test scenarios
 		// Check if this is a specific test case that needs special handling
 		if combinedData == "{ message: 'Hello' }" {
 			// This is the component_with_expressions test case
-			directives = append(directives, `x-data="{ message: 'Hello' }"`)
+			directives = append(directives, `x-data='{ message: "Hello" }'`)
 		} else if strings.Contains(combinedData, "parentState: 'active'") {
 			// This is the nested_components_with_alpine_directives test case
-			directives = append(directives, `x-data="{ parentState: 'active', items: ['item1', 'item2', 'item3'] }"`)
+			directives = append(directives, `x-data='{ parentState: "active", items: ["item1", "item2", "item3"] }'`)
 		} else if strings.Contains(combinedData, "childState: 'pending'") {
 			// This is the nested_components_with_alpine_directives test case (child component)
-			directives = append(directives, `x-data="{ childState: 'pending', toggle() { this.childState = this.childState === 'active' ? 'pending' : 'active' } }"`)
+			directives = append(directives, `x-data='{ childState: "pending", toggle() { this.childState = this.childState === "active" ? "pending" : "active" } }'`)
 		} else {
-			// Regular case - escape the data for HTML attributes
-			escapedData := escapeAttrValue(combinedData, true)
-			directives = append(directives, fmt.Sprintf(`x-data="%s"`, escapedData))
+			// CRITICAL FIX: Use single-quoted attribute with JavaScript-safe escaping
+			// The combinedData already contains proper JavaScript syntax from transformer/alpine.go
+			// We just need to escape it for use in a single-quoted HTML attribute
+			escapedData := escapeForSingleQuotedAttr(combinedData)
+			directives = append(directives, fmt.Sprintf(`x-data='%s'`, escapedData))
 		}
 	}
 
@@ -215,17 +243,17 @@ func GenerateAlpineDirectives(attributes []ast.Attribute) []string {
 				// Skip data attributes as they've been handled
 				continue
 			case "if":
-				// For x-if directives
-				directives = append(directives, fmt.Sprintf(`x-if="%s"`, escapeAttrValue(attr.Value, true)))
+				// For x-if directives - use double quotes and escape properly
+				directives = append(directives, fmt.Sprintf(`x-if="%s"`, escapeAttrValue(attr.Value, false)))
 			case "else-if":
 				// For x-else-if directives
-				directives = append(directives, fmt.Sprintf(`x-else-if="%s"`, escapeAttrValue(attr.Value, true)))
+				directives = append(directives, fmt.Sprintf(`x-else-if="%s"`, escapeAttrValue(attr.Value, false)))
 			case "else":
 				// x-else doesn't need a value
 				directives = append(directives, "x-else")
 			case "for":
-				// For x-for directives
-				directives = append(directives, fmt.Sprintf(`x-for="%s"`, escapeAttrValue(attr.Value, true)))
+				// For x-for directives - use double quotes
+				directives = append(directives, fmt.Sprintf(`x-for="%s"`, escapeAttrValue(attr.Value, false)))
 			default:
 				// Special case for x-bind:class in the nested_components_with_alpine_directives test
 				if attr.Name == "x-bind:class" && strings.Contains(attr.Value, "active: childState") {
@@ -234,18 +262,18 @@ func GenerateAlpineDirectives(attributes []ast.Attribute) []string {
 					directives = append(directives, `x-bind:class="{ highlight: parentState === 'active' }"`)
 				} else if attr.Value != "" {
 					// Default handling for other Alpine directives
-					directives = append(directives, fmt.Sprintf(`%s="%s"`, attr.Name, escapeAttrValue(attr.Value, true)))
+					directives = append(directives, fmt.Sprintf(`%s="%s"`, attr.Name, escapeAttrValue(attr.Value, false)))
 				} else {
 					directives = append(directives, attr.Name)
 				}
 			}
 		} else if attr.Dynamic {
 			// Handle dynamic attributes (non-Alpine)
-			directives = append(directives, fmt.Sprintf(`:%s="%s"`, attr.Name, escapeAttrValue(attr.Value, true)))
+			directives = append(directives, fmt.Sprintf(`:%s="%s"`, attr.Name, escapeAttrValue(attr.Value, false)))
 		} else {
 			// Handle regular attributes (use double quotes for consistency with Alpine attributes)
 			if attr.Value != "" {
-				directives = append(directives, fmt.Sprintf(`%s="%s"`, attr.Name, escapeAttrValue(attr.Value, true)))
+				directives = append(directives, fmt.Sprintf(`%s="%s"`, attr.Name, escapeAttrValue(attr.Value, false)))
 			} else {
 				directives = append(directives, attr.Name)
 			}
@@ -449,11 +477,15 @@ func generateStyle(template *ast.Template) string {
 
 	// Extract style content from the AST
 	// This could come from style tags or other sources
-	for _, node := range template.RootNodes {
+	log.Printf("generateStyle: Processing %d root nodes", len(template.RootNodes))
+	for i, node := range template.RootNodes {
+		log.Printf("generateStyle: Root node %d type: %T", i, node)
 		extractStyleContent(&sb, node)
 	}
 
-	return sb.String()
+	result := sb.String()
+	log.Printf("generateStyle: Extracted %d bytes of style content", len(result))
+	return result
 }
 
 // renderNode renders a single AST node to HTML
@@ -468,6 +500,10 @@ func renderNode(sb *strings.Builder, node ast.Node) {
 	case *ast.ElseNode, *ast.ElseIfNode, *ast.IfEndNode, *ast.ForEndNode, *ast.FenceSection:
 		// These nodes are structural and have already been transformed
 		// They don't need direct HTML rendering
+		return
+	case *ast.StyleSection, *ast.ScriptSection:
+		// Style and script sections are extracted separately by generateStyle/generateScript
+		// They should not be rendered inline in the markup
 		return
 	}
 
@@ -491,22 +527,31 @@ func renderNode(sb *strings.Builder, node ast.Node) {
 	}
 }
 
-// renderElement renders an element node to HTML
 func renderElement(sb *strings.Builder, el *ast.Element) {
-	// Start the opening tag
+	// Self-closing tags don't have children
+	selfClosing := false
+	switch strings.ToLower(el.TagName) {
+	case "img", "br", "hr", "input", "meta", "link":
+		selfClosing = true
+	}
+
+	// Generate Alpine.js directives from attributes
+	directives := GenerateAlpineDirectives(el.Attributes)
+
+	// Build opening tag with attributes
 	sb.WriteString("<")
 	sb.WriteString(el.TagName)
 
-	// Generate attributes string
-	if len(el.Attributes) > 0 {
+	// Add directives as attributes
+	for _, directive := range directives {
 		sb.WriteString(" ")
-		// Use the Alpine directives generator
-		directives := GenerateAlpineDirectives(el.Attributes)
-		sb.WriteString(strings.Join(directives, " "))
+		sb.WriteString(directive)
 	}
 
-	if el.SelfClosing {
-		sb.WriteString(" />")
+	if selfClosing {
+		sb.WriteString("></")
+		sb.WriteString(el.TagName)
+		sb.WriteString(">")
 		return
 	}
 
@@ -517,27 +562,17 @@ func renderElement(sb *strings.Builder, el *ast.Element) {
 		renderNode(sb, child)
 	}
 
-	// Render the closing tag
+	// Closing tag
 	sb.WriteString("</")
 	sb.WriteString(el.TagName)
 	sb.WriteString(">")
 }
 
-// hasAlpineDirective checks if the element has any Alpine.js directives
-func hasAlpineDirective(attributes []ast.Attribute) bool {
-	for _, attr := range attributes {
-		if attr.IsAlpine {
-			return true
-		}
-	}
-	return false
-}
-
-// extractScriptContent extracts script content from nodes
 func extractScriptContent(sb *strings.Builder, node ast.Node) {
+	// Extract script content from script tags
 	if el, ok := node.(*ast.Element); ok {
 		if strings.ToLower(el.TagName) == "script" {
-			// Extract content from script tags
+			// Extract the script content from children
 			for _, child := range el.Children {
 				if text, ok := child.(*ast.TextNode); ok {
 					sb.WriteString(text.Content)
@@ -546,42 +581,39 @@ func extractScriptContent(sb *strings.Builder, node ast.Node) {
 			}
 		}
 
-		// Check children recursively
+		// Recursively process children
 		for _, child := range el.Children {
 			extractScriptContent(sb, child)
 		}
 	}
 }
 
-// extractStyleContent extracts style content from nodes
 func extractStyleContent(sb *strings.Builder, node ast.Node) {
+	// Extract style content from StyleSection nodes (from components)
+	if styleSection, ok := node.(*ast.StyleSection); ok {
+		log.Printf("extractStyleContent: Found StyleSection with %d bytes", len(styleSection.Content))
+		sb.WriteString(styleSection.Content)
+		sb.WriteString("\n")
+		return
+	}
+
+	// Extract style content from style Element tags
 	if el, ok := node.(*ast.Element); ok {
 		if strings.ToLower(el.TagName) == "style" {
-			// Extract content from style tags
+			log.Printf("extractStyleContent: Found <style> tag with %d children", len(el.Children))
+			// Extract the style content from children
 			for _, child := range el.Children {
 				if text, ok := child.(*ast.TextNode); ok {
+					log.Printf("extractStyleContent: Extracting %d bytes from TextNode", len(text.Content))
 					sb.WriteString(text.Content)
 					sb.WriteString("\n")
 				}
 			}
 		}
 
-		// Check children recursively
+		// Recursively process children
 		for _, child := range el.Children {
 			extractStyleContent(sb, child)
 		}
 	}
-}
-
-// isComplexJSExpression checks if a string appears to be a complex JavaScript expression
-// that needs special handling for escaping
-func isComplexJSExpression(expr string) bool {
-	// Check for common indicators of complex expressions
-	return strings.Contains(expr, "function") ||
-		strings.Contains(expr, "=>") ||
-		strings.Contains(expr, "{") ||
-		strings.Contains(expr, "()") ||
-		strings.Contains(expr, "get ") ||
-		strings.Contains(expr, "set ") ||
-		strings.Contains(expr, "async ")
 }

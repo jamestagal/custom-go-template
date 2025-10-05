@@ -43,6 +43,15 @@ func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
 	return template, exists
 }
 
+// GetAllRegisteredKeys returns all registered component template keys for debugging
+func GetAllRegisteredKeys() []string {
+	keys := make([]string, 0, len(componentTemplateRegistry))
+	for key := range componentTemplateRegistry {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
 // formatComponentData formats the component data scope for the x-data attribute
 // This is a special formatter for components to match the expected output format
 func formatComponentData(dataScope map[string]any) string {
@@ -74,7 +83,7 @@ func formatComponentData(dataScope map[string]any) string {
 		case string:
 			// Check if this is a dynamic expression (no quotes)
 			// We need to handle variable references without quotes
-			if isDynamicExpression(v) {
+			if isDynamicExpression(v, dataScope) {
 				// This is a variable reference or expression, don't quote it
 				result.WriteString(v)
 			} else {
@@ -103,67 +112,96 @@ func formatComponentData(dataScope map[string]any) string {
 	return result.String()
 }
 
-// isDynamicExpression checks if a string is a dynamic expression that should not be quoted
-func isDynamicExpression(s string) bool {
-	// Common patterns that indicate a dynamic expression
-	if strings.Contains(s, ".") ||
-	   strings.Contains(s, "[") ||
-	   strings.Contains(s, "(") ||
-	   strings.Contains(s, "+") ||
-	   strings.Contains(s, "-") ||
-	   strings.Contains(s, "*") ||
-	   strings.Contains(s, "/") {
+// Helper function to determine if a string value is a dynamic expression (not a literal)
+func isDynamicExpression(value string, dataScope map[string]any) bool {
+	// Check if the value is a reference to a variable in the data scope
+	if _, exists := dataScope[value]; exists {
 		return true
 	}
 
-	// Check if it's a simple variable name (no spaces, quotes, etc.)
-	if len(s) > 0 && isValidVariableName(s) {
+	// Check for common JavaScript expressions
+	// Variable references: item, user.name, etc.
+	// Function calls: formatDate(date), etc.
+	// Operators: count + 1, etc.
+	if strings.Contains(value, "(") || // Function call
+		strings.Contains(value, "+") || // Addition
+		strings.Contains(value, "-") || // Subtraction
+		strings.Contains(value, "*") || // Multiplication
+		strings.Contains(value, "/") || // Division
+		strings.Contains(value, ".") { // Property access
 		return true
 	}
 
 	return false
 }
 
-// isValidVariableName checks if a string is a valid JavaScript variable name
-func isValidVariableName(s string) bool {
-	if len(s) == 0 {
-		return false
-	}
+// extractPropValue extracts the value from a component prop, handling dynamic vs static values
+func extractPropValue(prop ast.ComponentProp, parentDataScope map[string]any) any {
+	if prop.IsDynamic {
+		// For dynamic props ({var}), resolve from parent scope
+		// Remove curly braces and whitespace
+		varName := strings.TrimSpace(strings.Trim(prop.Value, "{}"))
 
-	// First character must be a letter, underscore, or dollar sign
-	firstChar := s[0]
-	if !((firstChar >= 'a' && firstChar <= 'z') ||
-		 (firstChar >= 'A' && firstChar <= 'Z') ||
-		 firstChar == '_' ||
-		 firstChar == '$') {
-		return false
-	}
-
-	// Rest of the characters must be letters, numbers, underscores, or dollar signs
-	for i := 1; i < len(s); i++ {
-		c := s[i]
-		if !((c >= 'a' && c <= 'z') ||
-			 (c >= 'A' && c <= 'Z') ||
-			 (c >= '0' && c <= '9') ||
-			 c == '_' ||
-			 c == '$') {
-			return false
+		// Check if it's a variable reference or expression
+		if val, exists := parentDataScope[varName]; exists {
+			// Direct variable reference - return the value
+			return val
 		}
+
+		// It's an expression (e.g., age + 10) - return as-is for Alpine.js to evaluate
+		return varName
 	}
 
-	return true
+	// Static prop value - return as string literal
+	return prop.Value
 }
 
-// transformComponent transforms a component node into an Alpine.js compatible structure
-// using a three-phase recursive transformation process.
+// transformComponentProps converts component props to a data scope map
+// This handles both static and dynamic prop values
+func transformComponentProps(props []ast.ComponentProp, parentDataScope map[string]any) map[string]any {
+	propScope := make(map[string]any)
+
+	for _, prop := range props {
+		propScope[prop.Name] = extractPropValue(prop, parentDataScope)
+	}
+
+	return propScope
+}
+
+
+// TransformComponent is the main entry point for component transformation
+// It's called by the main transformer for ComponentNode AST nodes
+func TransformComponent(node *ast.ComponentNode, parentDataScope map[string]any) []ast.Node {
+	return transformComponent(node, parentDataScope)
+}
+
+// transformComponent handles both regular and dynamic component transformation
 //
-// Pattern: Service Implementation Pattern [Load: 5 + 8 + 4 + 6 = 23]
-// Cognitive Load: 23 (Dynamic check: 6, Phase 1: 5, Phase 2: 8, Phase 3: 4)
+// Pattern: Service Implementation Pattern [Load: 25]
+// Cognitive Load: 25 (complex multi-phase transformation)
 //
-// Dynamic Component Support (Task 2.7) - handles <{componentVar} /> syntax
-// Phase 1: Component lookup and scope creation (Task 2.4) ✓
-// Phase 2: Process component fence and resolve props (Task 2.5) ✓
-// Phase 3: Transform component body and add wrapper (Task 2.6) ✓
+// This function implements the component transformation with prop resolution:
+//
+// PHASE 1: Component lookup and scope creation (Task 2.4) ✓
+//   - Look up component template from registry
+//   - Create isolated data scope for this instance
+//
+// PHASE 2: Process component fence and resolve props (Task 2.5) ✓
+//   - Extract fence props and their defaults
+//   - Resolve passed props against parent scope
+//   - Merge into component data scope
+//
+// PHASE 3: Transform component body (Task 2.6) ✓
+//   - Recursively transform component's AST nodes
+//   - Use component data scope (isolated from parent)
+//
+// PHASE 4: Wrap with x-data (Task 2.4) ✓
+//   - Add x-data attribute to root element or wrapper
+//   - Format data scope as Alpine.js object
+//
+// Example transformation:
+//   Input:  <UserCard name={user.name} age={user.age} />
+//   Output: <div x-data='{name:"John",age:30}' class="card">...</div>
 func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any) []ast.Node {
 	componentName := node.Name
 	log.Printf("Recursively transforming component: %s", componentName)
@@ -265,152 +303,90 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 
 	// PHASE 2: Process component fence and resolve props (Task 2.5) ✓
 
-	// Step 3: Process component's own fence section
-	fence := FindFenceSection(componentTemplate.Template.RootNodes)
-	if fence != nil {
-		// Extract variables, prop defaults, and functions from component's fence
-		collectComponentFenceData(fence, componentDataScope)
-		log.Printf("Collected fence data for component '%s': %d items", componentName, len(componentDataScope))
+	// Step 1: Extract component's fence props and defaults
+	// Look for fence section in the component template
+	for _, rootNode := range componentTemplate.Template.RootNodes {
+		if fence, ok := rootNode.(*ast.FenceSection); ok {
+			log.Printf("DEBUG: Found fence section with %d props and %d variables", len(fence.Props), len(fence.Variables))
+
+			// Add fence props with their default values
+			for _, fenceProp := range fence.Props {
+				componentDataScope[fenceProp.Name] = fenceProp.DefaultValue
+				log.Printf("DEBUG: Added fence prop '%s' with default value: %v", fenceProp.Name, fenceProp.DefaultValue)
+			}
+
+			// Add fence variables
+			for _, fenceVar := range fence.Variables {
+				componentDataScope[fenceVar.Name] = fenceVar.Value
+				log.Printf("DEBUG: Added fence variable '%s' with value: %v", fenceVar.Name, fenceVar.Value)
+			}
+		}
 	}
 
-	// Step 4: Resolve passed props from parent and add to component scope (overwriting defaults)
-	for _, passedProp := range node.Props {
-		propName := passedProp.Name
-		resolvedValue := resolvePropValue(passedProp, parentDataScope)
-		componentDataScope[propName] = resolvedValue
-		log.Printf("Resolved prop '%s' for component '%s': %v (type: %T)",
-			propName, componentName, resolvedValue, resolvedValue)
+	// Step 2: Resolve passed props and override defaults
+	for _, prop := range node.Props {
+		propName := prop.Name
+		propValue := extractPropValue(prop, parentDataScope)
+
+		componentDataScope[propName] = propValue
+		log.Printf("DEBUG: Override prop '%s' with passed value: %v (type: %T)", propName, propValue, propValue)
 	}
 
-	// PHASE 3: Transform component body and add wrapper (Task 2.6) ✓
+	log.Printf("DEBUG: Final component data scope for '%s': %+v", componentName, componentDataScope)
 
-	// Step 5: Transform component body (excluding fence section)
-	componentBodyNodes := filterOutFence(componentTemplate.Template.RootNodes)
+	// PHASE 3: Transform component body (Task 2.6) ✓
+
+	// Filter out fence section from component body
+	componentBodyNodes := []ast.Node{}
+	for _, node := range componentTemplate.Template.RootNodes {
+		if _, isFence := node.(*ast.FenceSection); !isFence {
+			componentBodyNodes = append(componentBodyNodes, node)
+		}
+	}
 	// Recursively transform component body with its isolated scope
-	transformedChildren := transformNodes(componentBodyNodes, componentDataScope, false)
-	log.Printf("Transformed %d body nodes for component '%s'", len(transformedChildren), componentName)
+	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false)
 
-	// Step 6: Add x-data wrapper and return
-	finalComponentNodes := addComponentDataWrapper(transformedChildren, componentDataScope)
-	log.Printf("Finished transforming component '%s', returning %d nodes", componentName, len(finalComponentNodes))
+	// PHASE 4: Wrap with x-data (Task 2.4) ✓
 
-	return finalComponentNodes
+	// Add x-data to the root element or wrap in a div
+	return wrapWithXData(transformedNodes, componentDataScope)
 }
 
-
-// resolvePropValue resolves a component prop value using the parent scope.
+// wrapWithXData ensures the component output has an x-data attribute
 //
-// This function handles three types of component props:
-//   1. Dynamic props: {expression} - evaluated from parent scope at runtime
-//   2. Shorthand props: {varName} - direct variable reference from parent scope
-//   3. Static props: "literal value" - parsed as literal value
+// Pattern: Helper Function [Load: 10]
+// Cognitive Load: 10 (element type checking: 4, attribute manipulation: 6)
 //
-// For dynamic props:
-//   - If the expression is a simple variable reference found in parent scope, returns its value
-//   - Otherwise, returns the expression string for Alpine.js to evaluate at runtime
-//
-// For shorthand props:
-//   - Returns the value from parent scope if found
-//   - Returns nil and logs a warning if not found
-//
-// For static props:
-//   - Parses the value using parseValue() to convert strings like "true", "42", "[1,2,3]" to appropriate types
-//
-// Pattern: Service Implementation Pattern [Load: 8]
-// Cognitive Load: 8 (three distinct code paths with clear separation)
+// Requirements from Task 2.4:
+// 1. Format data scope as Alpine.js object
+// 2. Add x-data to single root element if it exists
+// 3. Wrap multiple nodes in div with x-data
 //
 // Example:
-//   // Dynamic prop: user={currentUser}
-//   resolvePropValue(ComponentProp{Name: "user", Value: "currentUser", IsDynamic: true}, parentScope)
-//   // Returns: parentScope["currentUser"] if exists, else "currentUser" string
+//   Single element: <div class="card">content</div>
+//     → <div x-data='{...}' class="card">content</div>
 //
-//   // Shorthand prop: {title}
-//   resolvePropValue(ComponentProp{Name: "title", IsShorthand: true}, parentScope)
-//   // Returns: parentScope["title"] if exists, else nil
-//
-//   // Static prop: count="42"
-//   resolvePropValue(ComponentProp{Name: "count", Value: "42"}, parentScope)
-//   // Returns: 42 (int)
-func resolvePropValue(prop ast.ComponentProp, parentScope map[string]any) any {
-	// COGNITIVE LOAD RULE: Handle each prop type in separate if block for clarity
-
-	if prop.IsDynamic {
-		// Dynamic prop: value is an expression referencing parent scope
-		// Example: user={currentUser} or count={items.length}
-
-		// Clean the expression - remove braces and whitespace
-		expr := strings.TrimSpace(prop.Value)
-		expr = strings.TrimPrefix(strings.TrimSuffix(expr, "}"), "{")
-		expr = strings.TrimSpace(expr)
-
-		log.Printf("DEBUG resolvePropValue: prop=%s, expr=%s, IsDynamic=true", prop.Name, expr)
-		log.Printf("DEBUG resolvePropValue: Looking for '%s' in parentScope with %d keys", expr, len(parentScope))
-		log.Printf("DEBUG resolvePropValue: parentScope = %+v", parentScope)
-
-		// Try to resolve as simple variable reference first
-		if val, ok := parentScope[expr]; ok {
-			// Found in parent scope - return the actual value
-			// This allows child components to receive primitive values directly
-			log.Printf("DEBUG resolvePropValue: FOUND '%s' in parentScope with value: %v (type: %T)", expr, val, val)
-			return val
-		}
-
-		// Complex expression (e.g., "user.name", "items[0]", "count + 1")
-		// Return expression string - Alpine.js will evaluate it at runtime
-		log.Printf("DEBUG resolvePropValue: NOT FOUND '%s' in parentScope, returning as expression string", expr)
-		log.Printf("  Prop '%s' is dynamic expression '%s', passing expression string.", prop.Name, expr)
-		return expr
-
-	} else if prop.IsShorthand {
-		// Shorthand prop: {prop} means prop={prop}
-		// Example: {title} is equivalent to title={title}
-
-		if val, ok := parentScope[prop.Name]; ok {
-			return val
-		}
-
-		// COGNITIVE LOAD RULE: Wrapped error with context
-		log.Printf("  Warning: Shorthand prop '%s' not found in parent scope.", prop.Name)
-		return nil
-
-	} else {
-		// Static prop: literal value that needs parsing
-		// Example: count="42", label="Click me", enabled="true"
-
-		// parseValue() converts string literals to appropriate Go types
-		// "true" -> bool(true), "42" -> int(42), etc.
-		return parseValue(prop.Value)
-	}
-}
-
-// addComponentDataWrapper adds x-data attribute to component's root element(s)
-//
-// Function signature: func addComponentDataWrapper(nodes []ast.Node, dataScope map[string]any) []ast.Node
-//
-// Requirements from Task 2.1 tests:
-// 1. Handle Empty/Nil Input: Empty or nil nodes slice → return empty slice []ast.Node{}
-// 2. Single Root Element: If len(nodes) == 1 and it's *ast.Element, add x-data attribute directly to it
-// 3. Non-Element Single Node or Multiple Nodes: Create wrapper <div> element with x-data attribute
-// 4. x-data Attribute: Format dataScope using alpineDataFormatter(dataScope)
-//
-// Pattern: Basic Patterns [Cognitive Load: 8]
-// Cognitive Load: 8 (clear conditional branches with explicit handling)
-func addComponentDataWrapper(nodes []ast.Node, dataScope map[string]any) []ast.Node {
-	// Handle empty/nil input (REQUIREMENT 1)
-	if len(nodes) == 0 {
-		return []ast.Node{}
-	}
-
-	// Format the data scope for Alpine.js (REQUIREMENT 4)
-	dataScopeStr := alpineDataFormatter(dataScope)
-
-	// Create x-data attribute with required properties
+//   Multiple nodes: [<h1>Title</h1>, <p>Content</p>]
+//     → <div x-data='{...}'><h1>Title</h1><p>Content</p></div>
+func wrapWithXData(nodes []ast.Node, dataScope map[string]any) []ast.Node {
+	// REQUIREMENT 1: Format data scope (COGNITIVE LOAD: 2)
+	xDataValue := formatComponentData(dataScope)
 	xDataAttr := ast.Attribute{
-		Name:       "x-data",
-		Value:      dataScopeStr,
-		Dynamic:    true,  // Required by tests
-		IsAlpine:   true,
-		AlpineType: "data",
+		Name:  "x-data",
+		Value: xDataValue,
+	}
+
+	// REQUIREMENT 2: Check for single root element (COGNITIVE LOAD: 4)
+	// If there's exactly one node and it's an Element, add x-data to it
+	if len(nodes) == 0 {
+		// No nodes - return empty div with x-data
+		return []ast.Node{
+			&ast.Element{
+				TagName:    "div",
+				Attributes: []ast.Attribute{xDataAttr},
+				Children:   []ast.Node{},
+			},
+		}
 	}
 
 	// Check for single root element (REQUIREMENT 2)
@@ -474,77 +450,39 @@ func getAlpineComponentName(componentName string) string {
 
 	// Ensure first letter is capitalized
 	if len(baseName) > 0 {
-		firstChar := baseName[0]
-		if firstChar >= 'a' && firstChar <= 'z' {
-			baseName = string(firstChar-32) + baseName[1:]
-		}
+		baseName = strings.ToUpper(string(baseName[0])) + baseName[1:]
 	}
 
 	return baseName + "Component"
 }
 
-// formatComponentProps formats component props as a JavaScript object
-func formatComponentProps(props map[string]any) string {
-	if len(props) == 0 {
-		return "{}"
-	}
-
-	var result strings.Builder
-	result.WriteString("{")
-
-	first := true
-	for key, value := range props {
-		if !first {
-			result.WriteString(", ")
-		}
-		first = false
-
-		result.WriteString(key)
-		result.WriteString(": ")
-
-		// Format value based on type
-		switch v := value.(type) {
-		case string:
-			// Check if this is a dynamic expression (no quotes)
-			if isDynamicExpression(v) {
-				result.WriteString(v)
-			} else {
-				result.WriteString("'")
-				result.WriteString(v)
-				result.WriteString("'")
-			}
-		case bool:
-			if v {
-				result.WriteString("true")
-			} else {
-				result.WriteString("false")
-			}
-		case int, int64, float64:
-			result.WriteString(fmt.Sprintf("%v", v))
-		default:
-			result.WriteString(fmt.Sprintf("'%v'", v))
-		}
-	}
-
-	result.WriteString("}")
-	return result.String()
+// TransformDynamicComponent is the public entry point for dynamic component transformation
+func TransformDynamicComponent(node *ast.DynamicComponentNode, parentDataScope map[string]any) []ast.Node {
+	return transformDynamicComponent(node, parentDataScope)
 }
 
-// transformDynamicComponent transforms a dynamic component node (<= syntax) into Alpine.js compatible nodes
+// transformDynamicComponent handles dynamic component transformation (<= syntax)
 //
 // Pattern: Service Implementation Pattern [Load: 25]
-// Cognitive Load: 25 (path resolution: 8, variable extraction: 5, component lookup: 7, placeholder: 5)
+// Cognitive Load: 25 (path resolution: 8, variable extraction: 5, component lookup: 7, transformation: 5)
 //
-// This implements Jim's innovative dynamic component path feature:
-// - <='./path.html' /> - static path resolved at build time
-// - <='./views/{comp}.html' /> - path with variable interpolation resolved at runtime
-// - <='path' prop={value} /> - with props passed to component
+// This function implements Jim's innovative dynamic component feature (<= syntax):
 //
-// The function follows a 4-phase process:
-// PHASE 1: Extract variables from path expression and add to data scope
-// PHASE 2: Try to resolve path at transformation time (build-time optimization)
-// PHASE 3: Look up component template if path is resolved
-// PHASE 4: Transform like regular component OR create placeholder for runtime resolution
+// PHASE 1: Extract variables from path expression (COGNITIVE LOAD: 5)
+//   Example: "./views/{comp}.html" → extract "comp" variable
+//
+// PHASE 2: Try to resolve path at transformation time (COGNITIVE LOAD: 8)
+//   If path is static or variables have known values, resolve now for build-time optimization
+//
+// PHASE 3: Look up component template (COGNITIVE LOAD: 7)
+//   If found, proceed with transformation. If not, create placeholder.
+//
+// PHASE 4: Transform like regular component (COGNITIVE LOAD: 5)
+//   Reuse transformComponent logic with resolved path
+//
+// Example transformation:
+//   Input:  <='./components/UserProfile.html' name={user.name} age={30} />
+//   Output: <div x-data='{name:"John",age:30}' class="profile">...</div>
 func transformDynamicComponent(node *ast.DynamicComponentNode, parentDataScope map[string]any) []ast.Node {
 	log.Printf("transformDynamicComponent: path=%s, props=%d", node.PathExpression, len(node.Props))
 
@@ -555,11 +493,20 @@ func transformDynamicComponent(node *ast.DynamicComponentNode, parentDataScope m
 	// PHASE 2: Try to resolve path at transformation time (COGNITIVE LOAD: 8)
 	// If path is static or variables have known values, resolve now for build-time optimization
 	resolvedPath := resolveDynamicPath(node.PathExpression, parentDataScope)
-	log.Printf("transformDynamicComponent: resolved path: %s", resolvedPath)
+	log.Printf("transformDynamicComponent: resolved path: '%s'", resolvedPath)
 
 	// PHASE 3: Look up component template (COGNITIVE LOAD: 7)
 	_, exists := GetComponentTemplate(resolvedPath)
 	if !exists {
+		// DEBUG: Log all registered keys when lookup fails
+		allKeys := GetAllRegisteredKeys()
+		log.Printf("WARNING: Dynamic component lookup failed!")
+		log.Printf("  Resolved path: '%s'", resolvedPath)
+		log.Printf("  All registered keys (%d):", len(allKeys))
+		for i, key := range allKeys {
+			log.Printf("    [%d] '%s'", i, key)
+		}
+
 		// Path couldn't be resolved at build time - check if it still has variables
 		if strings.Contains(resolvedPath, "{") {
 			log.Printf("transformDynamicComponent: Path contains unresolved variables: %s", resolvedPath)
@@ -685,7 +632,7 @@ func createDynamicComponentPlaceholder(node *ast.DynamicComponentNode, path stri
 	// Create base attributes (COGNITIVE LOAD: 2)
 	attrs := []ast.Attribute{
 		{
-			Name:  "x-component-dynamic",
+			Name:  "x-component",
 			Value: path,
 		},
 	}
@@ -693,12 +640,14 @@ func createDynamicComponentPlaceholder(node *ast.DynamicComponentNode, path stri
 	// Add props as data-prop-* attributes (COGNITIVE LOAD: 3)
 	for _, prop := range node.Props {
 		propValue := resolvePropValueForPlaceholder(prop, dataScope)
+
 		attrs = append(attrs, ast.Attribute{
 			Name:  "data-prop-" + prop.Name,
 			Value: propValue,
 		})
 	}
 
+	// Return placeholder element
 	return []ast.Node{
 		&ast.Element{
 			TagName:    "div",
@@ -708,24 +657,19 @@ func createDynamicComponentPlaceholder(node *ast.DynamicComponentNode, path stri
 	}
 }
 
-// resolvePropValueForPlaceholder resolves a prop value for placeholder attributes
+// resolvePropValueForPlaceholder resolves a prop value for use in a placeholder element
 //
-// Pattern: Helper Function [Load: 4]
-// Cognitive Load: 4 (prop type checking: 2, value extraction: 2)
+// Pattern: Helper Function [Load: 5]
+// Cognitive Load: 5 (type checking: 2, value extraction: 3)
 //
-// This is similar to resolvePropValue but always returns a string suitable for data-prop-* attributes.
-// Dynamic expressions are returned as-is for runtime evaluation.
+// For dynamic props ({var}), extracts the variable name.
+// For static props, returns the value as-is.
 func resolvePropValueForPlaceholder(prop ast.ComponentProp, dataScope map[string]any) string {
 	if prop.IsDynamic {
-		// Dynamic prop - return expression as-is for runtime evaluation
-		expr := strings.TrimSpace(prop.Value)
-		expr = strings.TrimPrefix(strings.TrimSuffix(expr, "}"), "{")
-		return strings.TrimSpace(expr)
-	} else if prop.IsShorthand {
-		// Shorthand prop - return variable name
-		return prop.Name
-	} else {
-		// Static prop - return value as-is
-		return prop.Value
+		// For dynamic props ({var}), extract the variable name
+		return strings.TrimSpace(strings.Trim(prop.Value, "{}"))
 	}
+
+	// For static props, return the value as-is
+	return prop.Value
 }
