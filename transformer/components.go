@@ -74,37 +74,55 @@ func formatComponentData(dataScope map[string]any) string {
 		}
 		first = false
 
-		// Add key
-		result.WriteString(key)
-		result.WriteString(": ")
-
 		// Add value based on type
 		switch v := value.(type) {
 		case string:
+			// SPECIAL CASE: If the string starts and ends with quotes, it means the parser
+			// stored it AS-IS from the fence section. We need to strip those quotes first.
+			cleanValue := v
+			if len(v) >= 2 {
+				if (strings.HasPrefix(v, "\"") && strings.HasSuffix(v, "\"")) ||
+					(strings.HasPrefix(v, "'") && strings.HasSuffix(v, "'")) ||
+					(strings.HasPrefix(v, "`") && strings.HasSuffix(v, "`")) {
+					// Strip the outer quotes
+					cleanValue = v[1 : len(v)-1]
+				}
+			}
+
 			// Check if this is a dynamic expression (no quotes)
 			// We need to handle variable references without quotes
-			if isDynamicExpression(v, dataScope) {
-				// This is a variable reference or expression, don't quote it
-				result.WriteString(v)
+			isDynamic := isDynamicExpression(cleanValue, dataScope)
+			if isDynamic {
+				// CRITICAL FIX: Check if this expression references other variables in the same data scope
+				// If it does, we need to use a getter function so it can access 'this'
+				if referencesOtherScopeVars(cleanValue, key, dataScope) {
+					// Use getter syntax: get navItems() { return this.isLoggedIn ? [...] : [...] }
+					result.WriteString("get ")
+					result.WriteString(key)
+					result.WriteString("() { return ")
+					// Replace variable references with this.varName
+					getterValue := replaceVarRefsWithThis(cleanValue, dataScope)
+					result.WriteString(getterValue)
+					result.WriteString(" }")
+				} else {
+					// This is a variable reference or expression, don't quote it
+					result.WriteString(key)
+					result.WriteString(": ")
+					result.WriteString(cleanValue)
+				}
 			} else {
 				// This is a literal string, add quotes
+				result.WriteString(key)
+				result.WriteString(": ")
 				result.WriteString("'")
-				result.WriteString(v)
+				result.WriteString(cleanValue)
 				result.WriteString("'")
-			}
-		case int, int64, float64:
-			// Format numbers directly
-			result.WriteString(fmt.Sprintf("%v", v))
-		case bool:
-			// Format booleans
-			if v {
-				result.WriteString("true")
-			} else {
-				result.WriteString("false")
 			}
 		default:
-			// For other types, use a generic string representation
-			result.WriteString(fmt.Sprintf("'%v'", v))
+			// For all other types (bool, int, float, etc.), use FormatGoValueToJS for consistency
+			result.WriteString(key)
+			result.WriteString(": ")
+			result.WriteString(FormatGoValueToJS(v))
 		}
 	}
 
@@ -112,26 +130,122 @@ func formatComponentData(dataScope map[string]any) string {
 	return result.String()
 }
 
+// isValidVariableName checks if a string is a valid JavaScript variable name
+func isValidVariableName(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+
+	// First character must be a letter, underscore, or dollar sign
+	firstChar := s[0]
+	if !((firstChar >= 'a' && firstChar <= 'z') ||
+		(firstChar >= 'A' && firstChar <= 'Z') ||
+		firstChar == '_' ||
+		firstChar == '$') {
+		return false
+	}
+
+	// Rest of the characters must be letters, numbers, underscores, or dollar signs
+	for i := 1; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') ||
+			c == '_' ||
+			c == '$') {
+			return false
+		}
+	}
+
+	return true
+}
+
+// referencesOtherScopeVars checks if an expression references other variables in the data scope
+// (excluding the current variable itself). This is used to determine if we need a getter function.
+func referencesOtherScopeVars(expr string, currentVar string, dataScope map[string]any) bool {
+	// Check each variable in the data scope (except the current one)
+	for varName := range dataScope {
+		if varName == currentVar || strings.HasPrefix(varName, "$") {
+			continue
+		}
+
+		// Check if this variable name appears in the expression
+		// Use word boundaries to avoid false positives (e.g., "user" in "username")
+		varPattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(varName) + `\b`)
+		if varPattern.MatchString(expr) {
+			log.Printf("referencesOtherScopeVars: Expression '%s' references scope var '%s'", expr, varName)
+			return true
+		}
+	}
+	return false
+}
+
+// replaceVarRefsWithThis replaces variable references in an expression with this.varName
+// so they can be used in a getter function that accesses the object's properties
+func replaceVarRefsWithThis(expr string, dataScope map[string]any) string {
+	result := expr
+
+	// Replace each variable reference with this.varName
+	for varName := range dataScope {
+		if strings.HasPrefix(varName, "$") {
+			continue
+		}
+
+		// Replace word-boundary matches: varName -> this.varName
+		// But avoid replacing if already prefixed with this.
+		varPattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(varName) + `\b`)
+		result = varPattern.ReplaceAllStringFunc(result, func(match string) string {
+			// Check if already prefixed with "this."
+			// This is a simple check - in production you'd want more robust parsing
+			return "this." + match
+		})
+	}
+
+	log.Printf("replaceVarRefsWithThis: '%s' -> '%s'", expr, result)
+	return result
+}
+
 // Helper function to determine if a string value is a dynamic expression (not a literal)
+// THE ROBUST SOLUTION: Check operators first, then variable existence in scope
 func isDynamicExpression(value string, dataScope map[string]any) bool {
-	// Check if the value is a reference to a variable in the data scope
-	if _, exists := dataScope[value]; exists {
+	trimmed := strings.TrimSpace(value)
+
+	// STEP 1: Check for obvious operators/syntax that indicate expressions
+	// These are ALWAYS dynamic regardless of scope
+
+	// Arithmetic operators: age + 50, count * 2
+	if strings.Contains(trimmed, "+") ||
+		strings.Contains(trimmed, "-") ||
+		strings.Contains(trimmed, "*") ||
+		strings.Contains(trimmed, "/") ||
+		strings.Contains(trimmed, "%") {
 		return true
 	}
 
-	// Check for common JavaScript expressions
-	// Variable references: item, user.name, etc.
-	// Function calls: formatDate(date), etc.
-	// Operators: count + 1, etc.
-	if strings.Contains(value, "(") || // Function call
-		strings.Contains(value, "+") || // Addition
-		strings.Contains(value, "-") || // Subtraction
-		strings.Contains(value, "*") || // Multiplication
-		strings.Contains(value, "/") || // Division
-		strings.Contains(value, ".") { // Property access
+	// Array access: items[0]
+	if strings.Contains(trimmed, "[") && strings.Contains(trimmed, "]") {
 		return true
 	}
 
+	// Function calls: formatDate()
+	if strings.Contains(trimmed, "(") && strings.Contains(trimmed, ")") {
+		return true
+	}
+
+	// Property access: user.name (must start with valid identifier)
+	propertyAccessPattern := regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*\.`)
+	if propertyAccessPattern.MatchString(trimmed) {
+		return true
+	}
+
+	// STEP 2: Check if it's a valid variable name AND exists in scope
+	if isValidVariableName(trimmed) {
+		if _, exists := dataScope[trimmed]; exists {
+			return true  // It's a variable reference
+		}
+	}
+
+	// STEP 3: Otherwise it's a literal string
 	return false
 }
 
@@ -310,9 +424,11 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 			log.Printf("DEBUG: Found fence section with %d props and %d variables", len(fence.Props), len(fence.Variables))
 
 			// Add fence props with their default values
+			// CRITICAL FIX: Parse the string value to get the proper type (bool, int, etc.)
 			for _, fenceProp := range fence.Props {
-				componentDataScope[fenceProp.Name] = fenceProp.DefaultValue
-				log.Printf("DEBUG: Added fence prop '%s' with default value: %v", fenceProp.Name, fenceProp.DefaultValue)
+				parsedValue := parseValue(fenceProp.DefaultValue)
+				componentDataScope[fenceProp.Name] = parsedValue
+				log.Printf("DEBUG: Added fence prop '%s' with default value: %v (type: %T)", fenceProp.Name, parsedValue, parsedValue)
 			}
 
 			// Add fence variables

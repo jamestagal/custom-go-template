@@ -3,8 +3,8 @@ import Header from "./components/Header.html";
 import Footer from "./components/Footer.html";
 import Age from "./components/Age.html";
 
-prop name = "Jim"
-prop age = 35
+prop name = "Benjamin"
+prop age = 55
 prop animals = ["dog", "cat", "bird"]
 
 let salutation = "Hello"
@@ -21,7 +21,7 @@ let comp = "UserProfile"
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body>
-  <Header title="Welcome to Custom Go Template" />
+  <Header title="Plenti Custom Go Template" />
 
   <main style="padding: 2rem;">
     <h1>{salutation} {name}!</h1>
@@ -42,7 +42,7 @@ let comp = "UserProfile"
     {if age > 0}
       <div style="margin: 2rem 0;">
         <h2>Age Component Examples</h2>
-        <Age name="Bill" age={age} />
+        <Age name={name} age={age} />
         <Age name="Bo" age={age + 50} />
         <Age name="Baggins" age={201} />
       </div>
@@ -55,7 +55,6 @@ let comp = "UserProfile"
       <='{path}' name="Dynamic User" age={25} />
       <={`./components/{comp}.html`} name="Variable Path User" age={30} />
     </div>
-
     <!-- Loops with nested conditionals -->
     <div class="animals" style="background-color: #f0f0f0; padding: 1rem; margin: 2rem 0;">
       <h2>Animals Loop</h2>
