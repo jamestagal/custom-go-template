@@ -153,7 +153,7 @@ func FenceParser() Parser {
 }
 
 // parseFenceContent extracts props and variables from fence section content
-// Now handles multi-line values for arrays and objects
+// Now handles multi-line values for arrays, objects, and ternary expressions
 func parseFenceContent(content string) *ast.FenceSection {
 	fence := &ast.FenceSection{
 		RawContent: content,
@@ -185,10 +185,9 @@ func parseFenceContent(content string) *ast.FenceSection {
 			propName := matches[1]
 			firstLineValue := matches[2]
 
-			// Check if this is a multi-line value (starts with [ or {)
-			firstChar := strings.TrimSpace(firstLineValue)
-			if len(firstChar) > 0 && (firstChar[0] == '[' || firstChar[0] == '{' || firstChar[0] == '(') {
-				// Multi-line value - accumulate lines until brackets are matched
+			// Check if this is a potentially multi-line value
+			if isMultiLineValue(firstLineValue) {
+				// Multi-line value - accumulate lines until complete
 				fullValue, endIndex := parseMultiLineValue(lines, i, firstLineValue)
 				if fullValue != "" {
 					preview := fullValue
@@ -225,9 +224,8 @@ func parseFenceContent(content string) *ast.FenceSection {
 			varName := matches[2]
 			firstLineValue := matches[3]
 
-			// Check if this is a multi-line value
-			firstChar := strings.TrimSpace(firstLineValue)
-			if len(firstChar) > 0 && (firstChar[0] == '[' || firstChar[0] == '{' || firstChar[0] == '(') {
+			// Check if this is a potentially multi-line value
+			if isMultiLineValue(firstLineValue) {
 				// Multi-line value
 				fullValue, endIndex := parseMultiLineValue(lines, i, firstLineValue)
 				if fullValue != "" {
@@ -284,10 +282,48 @@ func parseFenceContent(content string) *ast.FenceSection {
 	return fence
 }
 
+// isMultiLineValue checks if a value is likely to span multiple lines
+// This includes:
+// - Values starting with [ or { (arrays/objects)
+// - Values containing ternary operators (? :)
+// - Values ending with an opening bracket/brace (incomplete expression)
+func isMultiLineValue(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if len(trimmed) == 0 {
+		return false
+	}
+
+	// Check if starts with array/object/paren
+	firstChar := trimmed[0]
+	if firstChar == '[' || firstChar == '{' || firstChar == '(' {
+		return true
+	}
+
+	// Check if contains a ternary operator followed by [ or {
+	// This handles cases like: isLoggedIn ? [...]
+	if strings.Contains(trimmed, "?") {
+		// Look for ? followed by whitespace and then [ or {
+		ternaryPattern := regexp.MustCompile(`\?\s*[\[{]`)
+		if ternaryPattern.MatchString(trimmed) {
+			return true
+		}
+	}
+
+	// Check if line ends with opening bracket/brace (incomplete)
+	lastChar := trimmed[len(trimmed)-1]
+	if lastChar == '[' || lastChar == '{' || lastChar == '(' {
+		return true
+	}
+
+	return false
+}
+
 // parseMultiLineValue accumulates lines until all brackets/braces are matched
 // Returns the full value string and the index of the last line consumed
+// Now handles ternary operators properly
 func parseMultiLineValue(lines []string, startIndex int, firstLineValue string) (string, int) {
 	matcher := newBracketMatcher()
+	ternaryMatcher := newTernaryMatcher()
 	var accumulator strings.Builder
 
 	log.Printf("[parseMultiLineValue] Starting with firstLineValue: %q, startIndex=%d, total lines=%d", firstLineValue, startIndex, len(lines))
@@ -298,12 +334,15 @@ func parseMultiLineValue(lines []string, startIndex int, firstLineValue string) 
 	// Process characters from first line
 	for _, char := range firstLineValue {
 		matcher.processChar(char)
+		ternaryMatcher.processChar(char)
 	}
 
-	log.Printf("[parseMultiLineValue] After first line: isComplete=%v, stack depth=%d", matcher.isComplete(), len(matcher.stack))
+	log.Printf("[parseMultiLineValue] After first line: bracketsComplete=%v, ternaryComplete=%v, stack depth=%d, ternary depth=%d",
+		matcher.isComplete(), ternaryMatcher.isComplete(), len(matcher.stack), ternaryMatcher.depth)
 
 	// Check if already complete (single-line case)
-	if matcher.isComplete() {
+	// Must have both brackets matched AND ternary complete (or no ternary)
+	if matcher.isComplete() && ternaryMatcher.isComplete() {
 		log.Printf("[parseMultiLineValue] Single-line complete: %q", accumulator.String())
 		return accumulator.String(), startIndex
 	}
@@ -321,21 +360,83 @@ func parseMultiLineValue(lines []string, startIndex int, firstLineValue string) 
 		// Process each character in this line
 		for _, char := range line {
 			matcher.processChar(char)
+			ternaryMatcher.processChar(char)
 		}
 
-		log.Printf("[parseMultiLineValue] After line %d: isComplete=%v, stack depth=%d", i, matcher.isComplete(), len(matcher.stack))
+		log.Printf("[parseMultiLineValue] After line %d: bracketsComplete=%v, ternaryComplete=%v, stack depth=%d, ternary depth=%d",
+			i, matcher.isComplete(), ternaryMatcher.isComplete(), len(matcher.stack), ternaryMatcher.depth)
 
-		// Check if complete
-		if matcher.isComplete() {
+		// Check if complete - both brackets and ternary must be complete
+		if matcher.isComplete() && ternaryMatcher.isComplete() {
 			log.Printf("[parseMultiLineValue] Multi-line complete at line %d: %q", i, accumulator.String())
 			return accumulator.String(), i
 		}
 	}
 
-	// Unclosed brackets - return empty string to indicate error
+	// Unclosed brackets or incomplete ternary - return empty string to indicate error
 	// The caller will fall back to single-line parsing
-	log.Printf("[parseMultiLineValue] Warning: unclosed brackets in multi-line value starting at line %d, final stack depth=%d", startIndex, len(matcher.stack))
+	log.Printf("[parseMultiLineValue] Warning: incomplete expression starting at line %d, bracket depth=%d, ternary depth=%d",
+		startIndex, len(matcher.stack), ternaryMatcher.depth)
 	return "", -1
+}
+
+// ternaryMatcher tracks ternary operator (? :) nesting
+type ternaryMatcher struct {
+	depth      int  // Number of ? without matching :
+	inString   bool
+	stringChar rune
+	escaped    bool
+}
+
+func newTernaryMatcher() *ternaryMatcher {
+	return &ternaryMatcher{
+		depth:      0,
+		inString:   false,
+		stringChar: 0,
+		escaped:    false,
+	}
+}
+
+func (tm *ternaryMatcher) processChar(char rune) {
+	// Handle escape sequences
+	if tm.escaped {
+		tm.escaped = false
+		return
+	}
+
+	if char == '\\' {
+		tm.escaped = true
+		return
+	}
+
+	// Handle string literals
+	if tm.inString {
+		if char == tm.stringChar {
+			tm.inString = false
+			tm.stringChar = 0
+		}
+		return
+	}
+
+	// Check if entering a string
+	if char == '"' || char == '\'' {
+		tm.inString = true
+		tm.stringChar = char
+		return
+	}
+
+	// Track ternary operators outside of strings
+	if char == '?' {
+		tm.depth++
+	} else if char == ':' {
+		if tm.depth > 0 {
+			tm.depth--
+		}
+	}
+}
+
+func (tm *ternaryMatcher) isComplete() bool {
+	return tm.depth == 0 && !tm.inString
 }
 
 // ScriptParser parses the script section and returns an *ast.ScriptSection node.

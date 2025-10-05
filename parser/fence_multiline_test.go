@@ -233,6 +233,67 @@ const config = {
 	}
 }
 
+func TestParseFenceContent_NavItemsConditional(t *testing.T) {
+	// Real-world test case from Header.html - complex ternary with arrays
+	input := `const navItems = isLoggedIn ? [
+  { label: "Home", url: "/" },
+  { label: "Products", url: "/products" },
+  { label: "Categories", url: "/categories" },
+  user.role === "admin" ? { label: "Admin Panel", url: "/admin" } : null,
+  { label: "Account", url: "/account" }
+].filter(Boolean) : [
+  { label: "Home", url: "/" },
+  { label: "Products", url: "/products" },
+  { label: "Login", url: "/login" },
+  { label: "Register", url: "/register" }
+]`
+
+	fence := parseFenceContent(input)
+
+	if len(fence.Variables) != 1 {
+		t.Errorf("Expected 1 variable, got %d", len(fence.Variables))
+		return
+	}
+
+	if fence.Variables[0].Name != "navItems" {
+		t.Errorf("Expected variable name 'navItems', got '%s'", fence.Variables[0].Name)
+	}
+
+	if fence.Variables[0].Keyword != "const" {
+		t.Errorf("Expected keyword 'const', got '%s'", fence.Variables[0].Keyword)
+	}
+
+	value := fence.Variables[0].Value
+
+	// Check that it was NOT truncated to just "isLoggedIn ? ["
+	if value == "isLoggedIn ? [" {
+		t.Fatal("Bug detected: value was truncated to first line only!")
+	}
+
+	// Check that it contains key parts of the conditional
+	requiredStrings := []string{
+		"isLoggedIn",
+		"filter(Boolean)",
+		"Login",
+		"Register",
+		"Admin Panel",
+		"Categories",
+	}
+
+	for _, str := range requiredStrings {
+		if !contains(value, str) {
+			t.Errorf("Missing '%s' in navItems value", str)
+		}
+	}
+
+	// Should be multi-line and substantial
+	if len(value) < 200 {
+		t.Errorf("Value seems too short for the full ternary, only %d chars: %s", len(value), value)
+	}
+
+	t.Logf("Successfully parsed navItems with %d characters", len(value))
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 &&
