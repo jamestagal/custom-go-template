@@ -132,9 +132,185 @@ Use the project-manager subagent to read @.agent-os/product/roadmap.md and mark 
 
 </step>
 
-<step number="5" subagent="project-manager" name="document_recap">
+<step number="5" name="final_cognitive_load_validation">
 
-### Step 5: Create Recap Document
+### Step 5: Final Cognitive Load Validation
+
+Run comprehensive cognitive load validation across ALL files modified during the entire spec implementation to ensure code quality standards.
+
+<validation_scope>
+  <scan_all_modified_files>
+    IDENTIFY: All files changed in commits for this spec
+    SCAN: Each file for cognitive load violations
+    AGGREGATE: Violations across all tasks
+    CALCULATE: Total cognitive load score per file
+  </scan_all_modified_files>
+</validation_scope>
+
+<aggregate_report_format>
+  ## 📊 Final Cognitive Load Validation Report
+
+  **Spec**: [spec name from spec-lite.md]
+  **Date**: [completion date]
+  **Files Modified**: [total count]
+  **Total Lines Changed**: [+additions -deletions]
+
+  ### Summary by Pattern Category
+
+  **Error Handling**:
+  - GO-ERROR-CONTEXT: X violations (Y auto-fixed, Z manual)
+  - Overall: ✅ PASS | ⚠️ WARNING | ❌ FAIL
+
+  **Resource Management**:
+  - GO-DEFER-LOOP: X violations (Y auto-fixed, Z manual)
+  - GO-SLICE-PREALLOC: X violations (Y auto-fixed, Z manual)
+  - GO-MAP-CONCURRENT: X violations (Y auto-fixed, Z manual)
+  - Overall: ✅ PASS | ⚠️ WARNING | ❌ FAIL
+
+  **GoFast Philosophy**:
+  - GOFAST-SIMPLE-DI: X violations (Y auto-fixed, Z manual)
+  - GOFAST-STRATEGY-PATTERN: X violations (Y auto-fixed, Z manual)
+  - GOFAST-ERROR-VALUES: X violations (Y auto-fixed, Z manual)
+  - GOFAST-MINIMAL-DEPS: X violations (Y auto-fixed, Z manual)
+  - GOFAST-EXPLICIT-CONFIG: X violations (Y auto-fixed, Z manual)
+  - Overall: ✅ PASS | ⚠️ WARNING | ❌ FAIL
+
+  **Svelte/SvelteKit** (if applicable):
+  - SVELTE-STORE-LOOP: X violations (Y auto-fixed, Z manual)
+  - SVELTEKIT-WATERFALL: X violations (Y auto-fixed, Z manual)
+  - Overall: ✅ PASS | ⚠️ WARNING | ❌ FAIL
+
+  ### Cognitive Load Score by File
+
+  | File | Score | Status | Issues |
+  |------|-------|--------|--------|
+  | parser/html.go | 8/30 | ✅ PASS | None |
+  | transformer/loops.go | 12/30 | ✅ PASS | 2 fixed |
+  | [other files] | X/30 | status | details |
+
+  **Average Score**: X/30 across Y files
+  **Max Score**: X/30 (file: [filename])
+
+  ### Auto-Fixes Applied
+
+  **Total Auto-Fixes**: [count]
+
+  [IF auto-fixes were applied:]
+  - Added error context wrapping: X locations
+  - Preallocated slices: X locations
+  - Fixed store references: X locations
+  - Extracted defer from loops: X locations
+  - [Other fixes]
+
+  **Files Modified by Auto-Fix**:
+  - `file1.go`: 3 fixes
+  - `file2.go`: 2 fixes
+
+  [IF no auto-fixes needed:]
+  ✅ No auto-fixes required - code already follows all patterns
+
+  ### Manual Review Required
+
+  [IF manual reviews needed:]
+  ⚠️ The following issues require developer attention:
+
+  **High Priority** (blocking patterns):
+  - GO-MAP-CONCURRENT in `cache.go:78-92` - Add mutex protection
+  - GO-DEFER-LOOP in `processor.go:145-160` - Extract to separate function
+
+  **Medium Priority** (warnings):
+  - GOFAST-EXPLICIT-CONFIG in `config.go:23` - Extract magic number to constant
+  - GO-NIL-CHECK in `validator.go:56` - Use len() instead of nil check
+
+  [IF no manual review needed:]
+  ✅ No manual review required
+
+  ### Quality Gate Status
+
+  [IF all files score ≤ 15:]
+  ✅ **PASSED** - All files meet cognitive load standards
+  - Ready for code review
+  - No refactoring required
+
+  [IF any file scores 16-30:]
+  ⚠️ **WARNING** - Some files could benefit from refactoring
+  - Recommend addressing warnings before merge
+  - Not blocking but impacts maintainability
+
+  [IF any file scores > 30:]
+  ❌ **BLOCKED** - Refactoring required before proceeding
+  - Cannot proceed until violations are resolved
+  - See "Manual Review Required" section above
+
+  ### Recommendations
+
+  [IF score > 15:]
+  Consider these improvements for future iterations:
+  1. [Specific recommendation based on patterns found]
+  2. [Specific recommendation based on patterns found]
+
+  [IF score ≤ 15:]
+  ✅ Code quality excellent - no recommendations
+
+  ### Metrics
+
+  - **Total Patterns Checked**: [count]
+  - **Violations Per File Average**: X
+  - **Auto-Fix Success Rate**: Y%
+  - **Time Saved by Auto-Fixes**: ~[estimate] minutes
+</aggregate_report_format>
+
+<instructions>
+  ACTION: Scan all files modified in this spec's commits
+  IDENTIFY: Use git diff or git log to find changed files
+  CHECK: Each file against patterns in `.agent-os/standards/cognitive-load/foundational-patterns.md`
+  REFERENCE: Thresholds from `.agent-os/standards/cognitive-load/config.yml`
+  CALCULATE: Aggregate statistics across entire spec
+  AUTO-FIX: Apply any remaining fixable patterns
+  REPORT: Comprehensive validation summary
+  BLOCK: If any file scores > 30 (quality gate failure)
+  EDUCATE: Provide actionable recommendations
+</instructions>
+
+<validation_workflow>
+  <step_1>Git diff to identify all modified files</step_1>
+  <step_2>Read each modified file</step_2>
+  <step_3>Check against Go/Svelte patterns as applicable</step_3>
+  <step_4>Calculate score per file</step_4>
+  <step_5>Apply auto-fixes where enabled</step_5>
+  <step_6>Aggregate statistics</step_6>
+  <step_7>Generate comprehensive report</step_7>
+</validation_workflow>
+
+<quality_gate_criteria>
+  <pass>
+    - All files score ≤ 15/30
+    - No critical violations (GO-DEFER-LOOP, GO-MAP-CONCURRENT, SVELTE-STORE-LOOP)
+    - All auto-fixable patterns resolved
+  </pass>
+  <warning>
+    - Some files score 16-30/30
+    - Non-critical violations present
+    - Recommend addressing before merge
+  </warning>
+  <fail>
+    - Any file scores > 30/30
+    - Critical violations present
+    - Must refactor before proceeding
+  </fail>
+</quality_gate_criteria>
+
+<validation_reference>
+  <patterns_doc>`.agent-os/standards/cognitive-load/foundational-patterns.md`</patterns_doc>
+  <config_file>`.agent-os/standards/cognitive-load/config.yml`</config_file>
+  <quick_ref>`.agent-os/standards/cognitive-load/quick-reference.md`</quick_ref>
+</validation_reference>
+
+</step>
+
+<step number="6" subagent="project-manager" name="document_recap">
+
+### Step 6: Create Recap Document
 
 Use the project-manager subagent to create a recap document in .agent-os/recaps/ folder that summarizes what was built for this spec.
 
@@ -177,9 +353,9 @@ Use the project-manager subagent to create a recap document in .agent-os/recaps/
 
 </step>
 
-<step number="6" subagent="project-manager" name="completion_summary">
+<step number="7" subagent="project-manager" name="completion_summary">
 
-### Step 6: Completion Summary
+### Step 7: Completion Summary
 
 Use the project-manager subagent to create a structured summary message with emojis showing what was done, any issues, testing instructions, and PR link.
 
@@ -225,9 +401,9 @@ Use the project-manager subagent to create a structured summary message with emo
 
 </step>
 
-<step number="7" subagent="project-manager" name="completion_notification">
+<step number="8" subagent="project-manager" name="completion_notification">
 
-### Step 7: Task Completion Notification
+### Step 8: Task Completion Notification
 
 Use the project-manager subagent to play a system sound to alert the user that tasks are complete.
 

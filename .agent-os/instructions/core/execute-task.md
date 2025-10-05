@@ -256,6 +256,153 @@ IMPORTANT: In the tasks.md file, mark this task and its sub-tasks complete by up
 
 </step>
 
+<step number="8" name="cognitive_load_validation">
+
+### Step 8: Cognitive Load Validation Report
+
+After completing task implementation, validate code quality against cognitive load patterns and report violations found in all modified files.
+
+<validation_requirements>
+  <check_patterns>
+    FOR Go code (.go files):
+      - GO-ERROR-CONTEXT (naked error returns without context)
+      - GO-DEFER-LOOP (defer statements inside loops)
+      - GO-SLICE-PREALLOC (slices without preallocation)
+      - GO-MAP-CONCURRENT (concurrent map access without sync)
+      - GO-NIL-CHECK (nil checks instead of len() for slices)
+      - GOFAST-SIMPLE-DI (complex DI containers)
+      - GOFAST-STRATEGY-PATTERN (over-abstracted patterns)
+      - GOFAST-ERROR-VALUES (panic/recover instead of errors)
+      - GOFAST-MINIMAL-DEPS (external deps for stdlib tasks)
+      - GOFAST-EXPLICIT-CONFIG (hardcoded magic numbers)
+      - GOFAST-DTO-PATTERN (sql.Null* in API responses)
+
+    FOR Svelte code (.svelte files):
+      - SVELTE-STORE-LOOP (direct store assignments in reactive contexts)
+      - SVELTE-INIT-GUARD (missing initialization guards in onMount)
+
+    FOR SvelteKit code (+page.ts, +page.server.ts):
+      - SVELTEKIT-SERVER-CLIENT (browser APIs in server files)
+      - SVELTEKIT-WATERFALL (data fetching in onMount instead of load)
+  </check_patterns>
+</validation_requirements>
+
+<scoring_criteria>
+  <thresholds>
+    - BLOCK: score > 30 (stop and refactor)
+    - WARN: score 16-30 (suggest improvements)
+    - PASS: score ≤ 15 (good to proceed)
+  </thresholds>
+  <pattern_scores>
+    - GO-MAP-CONCURRENT: 9 points (critical)
+    - GO-DEFER-LOOP: 7 points (high)
+    - SVELTE-STORE-LOOP: 7 points (high)
+    - GO-SLICE-PREALLOC: 4 points (medium)
+    - GO-ERROR-CONTEXT: 3 points (low)
+  </pattern_scores>
+</scoring_criteria>
+
+<report_format>
+  ## 📊 Cognitive Load Validation Report
+
+  **Task**: [Task name and number]
+  **Files Modified**: [Count and list]
+  **Patterns Checked**: [Count of patterns relevant to tech stack]
+
+  ### Violations Found
+
+  [IF violations found:]
+  - **GO-ERROR-CONTEXT**: X violations (auto-fixed: Y)
+    - Files: [list affected files with line numbers]
+  - **GO-DEFER-LOOP**: X violations (blocked/fixed)
+    - Files: [list affected files with line numbers]
+  - **[Other patterns]**: X violations
+
+  [IF no violations:]
+  ✅ No cognitive load violations detected
+
+  ### Cognitive Load Score
+
+  **Total Score**: X/30 (threshold: 30)
+  **Status**: [✅ PASS | ⚠️ WARNING | ❌ BLOCKED]
+
+  **Per-File Breakdown**:
+  - `file1.go`: X/30
+  - `file2.go`: X/30
+
+  ### Auto-Fixes Applied
+
+  [IF auto-fixes applied:]
+  - Added error context wrapping with fmt.Errorf (3 locations)
+  - Preallocated slices with known capacity (2 locations)
+  - [Other fixes]
+
+  [IF no auto-fixes needed:]
+  ✅ No auto-fixes required
+
+  ### Manual Review Required
+
+  [IF manual review needed:]
+  ⚠️ The following patterns require manual refactoring:
+  - GO-DEFER-LOOP in `parser.go:145` - Extract to separate function
+  - GO-MAP-CONCURRENT in `cache.go:78` - Add mutex protection
+
+  [IF no manual review needed:]
+  ✅ No manual review required
+
+  ### Quality Gate
+
+  [IF score ≤ 15:]
+  ✅ **PASSED** - Code meets cognitive load standards
+
+  [IF score 16-30:]
+  ⚠️ **WARNING** - Consider refactoring for better maintainability
+
+  [IF score > 30:]
+  ❌ **BLOCKED** - Refactoring required before proceeding
+</report_format>
+
+<instructions>
+  ACTION: Scan all files modified during this task
+  CHECK: Against patterns in `.agent-os/standards/cognitive-load/foundational-patterns.md`
+  REFERENCE: Thresholds from `.agent-os/standards/cognitive-load/config.yml`
+  CALCULATE: Total cognitive load score per file
+  AUTO-FIX: Apply fixes for patterns with autofix: true
+  REPORT: Detailed violation summary with locations
+  BLOCK: If any file scores > 30
+  EDUCATE: Provide context for violations found
+</instructions>
+
+<pattern_detection_examples>
+  <go_error_context>
+    DETECT: `return err` without fmt.Errorf wrapper
+    AUTO-FIX: Wrap with context: `return fmt.Errorf("functionName: operation failed: %w", err)`
+  </go_error_context>
+
+  <go_defer_loop>
+    DETECT: defer statement inside for/range loop
+    MANUAL: Suggest extracting loop body to separate function
+  </go_defer_loop>
+
+  <go_slice_prealloc>
+    DETECT: `var slice []Type` followed by append in loop
+    AUTO-FIX: Add preallocation: `slice := make([]Type, 0, knownCapacity)`
+  </go_slice_prealloc>
+
+  <svelte_store_loop>
+    DETECT: Direct store assignment in reactive context
+    AUTO-FIX: Add spread operator: `data = { ...store.value }`
+  </svelte_store_loop>
+</pattern_detection_examples>
+
+<validation_reference>
+  <patterns_doc>`.agent-os/standards/cognitive-load/foundational-patterns.md`</patterns_doc>
+  <config_file>`.agent-os/standards/cognitive-load/config.yml`</config_file>
+  <quick_ref>`.agent-os/standards/cognitive-load/quick-reference.md`</quick_ref>
+</validation_reference>
+
+</step>
+
 </process_flow>
 
 <post_flight_check>

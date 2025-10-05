@@ -98,6 +98,18 @@ func needsWrapper(content []ast.Node) bool {
 
 // createLoopTemplate creates a template element with the x-for directive
 func createLoopTemplate(loopExpr string, content []ast.Node, dataScope map[string]any) []ast.Node {
+	// Log what content we received
+	contentDescs := make([]string, len(content))
+	for i, node := range content {
+		if elem, ok := node.(*ast.Element); ok {
+			contentDescs[i] = fmt.Sprintf("<%s>", elem.TagName)
+		} else if _, ok := node.(*ast.TextNode); ok {
+			contentDescs[i] = "TEXT"
+		} else {
+			contentDescs[i] = fmt.Sprintf("%T", node)
+		}
+	}
+	log.Printf("createLoopTemplate: received %d content nodes: %v", len(content), contentDescs)
 	// Transform the content first
 	transformedContent := transformNodes(content, dataScope, false)
 

@@ -1,9 +1,33 @@
 package transformer
 
 import (
+	"fmt"
+	"log"
 	"strings"
 	"github.com/jimafisk/custom_go_template/ast"
 )
+
+// getNodeDesc returns a brief description of a node for logging
+func getNodeDesc(node ast.Node) string {
+	if elem, ok := node.(*ast.Element); ok {
+		attrs := ""
+		for _, attr := range elem.Attributes {
+			if attr.Name == "x-if" || attr.Name == "x-for" || attr.Name == "class" {
+				attrs += fmt.Sprintf(" %s=%q", attr.Name, attr.Value)
+				break
+			}
+		}
+		return fmt.Sprintf("<%s%s>", elem.TagName, attrs)
+	}
+	if text, ok := node.(*ast.TextNode); ok {
+		content := text.Content
+		if len(content) > 20 {
+			content = content[:20] + "..."
+		}
+		return fmt.Sprintf("TEXT(%q)", content)
+	}
+	return fmt.Sprintf("%T", node)
+}
 
 // fixNestedLoops handles special cases for nested loops that should be fixed
 func fixNestedLoops(nodes []ast.Node) []ast.Node {
@@ -20,7 +44,7 @@ func fixNestedLoops(nodes []ast.Node) []ast.Node {
 					break
 				}
 			}
-			
+
 			// If it's a loop over "categories", check its children
 			if isForLoop && strings.Contains(forExpression, "category in categories") {
 				for _, child := range element.Children {
@@ -32,7 +56,7 @@ func fixNestedLoops(nodes []ast.Node) []ast.Node {
 			}
 		}
 	}
-	
+
 	return nodes
 }
 
@@ -46,7 +70,7 @@ func fixNestedLoopsInElement(element *ast.Element) {
 			for i, attr := range childTemplate.Attributes {
 				if attr.Name == "x-for" {
 					isForLoop = true
-					
+
 					// Fix the loop over items to be category.items if needed
 					if strings.Contains(attr.Value, "item in items") {
 						childTemplate.Attributes[i].Value = "item in category.items"
@@ -54,7 +78,7 @@ func fixNestedLoopsInElement(element *ast.Element) {
 					break
 				}
 			}
-			
+
 			// Recursively fix loops in this template's children
 			if isForLoop {
 				for _, grandchild := range childTemplate.Children {
@@ -75,12 +99,33 @@ func fixNestedLoopsInElement(element *ast.Element) {
 func ensureProperNesting(nodes []ast.Node) []ast.Node {
 	// Special case fix for nested loops
 	nodes = fixNestedLoops(nodes)
-	
+
 	// Process nodes to identify template-content pairs
+	result := processNestingLevel(nodes)
+
+	// Recursively process children of all elements
+	for _, node := range result {
+		if element, isElement := node.(*ast.Element); isElement && len(element.Children) > 0 {
+			element.Children = ensureProperNesting(element.Children)
+		}
+	}
+
+	return result
+}
+
+// processNestingLevel processes a single level of nodes for proper nesting
+func processNestingLevel(nodes []ast.Node) []ast.Node {
 	var result []ast.Node
 	var currentTemplate *ast.Element
 	var contentBuffer []ast.Node
-	
+
+	// Log what we're processing
+	nodeDescs := make([]string, len(nodes))
+	for i, node := range nodes {
+		nodeDescs[i] = getNodeDesc(node)
+	}
+	log.Printf("processNestingLevel: Processing %d nodes: %v", len(nodes), nodeDescs)
+
 	for i, node := range nodes {
 		// Check if this is a template element
 		if element, isElement := node.(*ast.Element); isElement && element.TagName == "template" {
@@ -88,15 +133,17 @@ func ensureProperNesting(nodes []ast.Node) []ast.Node {
 			if currentTemplate != nil && len(contentBuffer) > 0 {
 				// Add the buffered content to the template's children
 				currentTemplate.Children = append(currentTemplate.Children, contentBuffer...)
+				log.Printf("processNestingLevel: Added %d buffered nodes to template", len(contentBuffer))
 				// Add the template to the result
 				result = append(result, currentTemplate)
 				// Clear the buffer
 				contentBuffer = nil
 			} else if currentTemplate != nil {
 				// Add the template with existing children
+				log.Printf("processNestingLevel: Adding template %s with %d children to result", getNodeDesc(currentTemplate), len(currentTemplate.Children))
 				result = append(result, currentTemplate)
 			}
-			
+
 			// Check if this is an x-if, x-else-if, or x-else template
 			isConditionalTemplate := false
 			for _, attr := range element.Attributes {
@@ -105,7 +152,7 @@ func ensureProperNesting(nodes []ast.Node) []ast.Node {
 					break
 				}
 			}
-			
+
 			// If it's an x-for template, we need to look at the next nodes
 			isLoopTemplate := false
 			for _, attr := range element.Attributes {
@@ -114,29 +161,33 @@ func ensureProperNesting(nodes []ast.Node) []ast.Node {
 					break
 				}
 			}
-			
+
 			// Check if this template might be followed by content that should be inside it
 			if isConditionalTemplate || isLoopTemplate {
 				// This is a new template that might need content
+				log.Printf("processNestingLevel: Setting currentTemplate %s (conditional=%v, loop=%v)", getNodeDesc(element), isConditionalTemplate, isLoopTemplate)
 				currentTemplate = element
 				contentBuffer = nil // Clear any previous buffer
 				continue
 			}
-			
+
 			// Regular template - just add to result
 			result = append(result, element)
 			currentTemplate = nil // Reset current template
 		} else if currentTemplate != nil {
 			// Not a template - might be content that needs to be nested inside the currentTemplate
-			
-			// Special case: don't collect text nodes that are just whitespace
+
+			// Get node type for logging
+			nodeDesc := getNodeDesc(node)
+
+			// Special case: don't process text nodes that are just whitespace
 			if textNode, isText := node.(*ast.TextNode); isText {
 				if isWhitespaceOnly(textNode.Content) {
-					// Skip whitespace nodes
+					result = append(result, node) // Preserve whitespace between elements
 					continue
 				}
 			}
-			
+
 			// Check if the next node is a template with attributes that suggest it's
 			// related to the current one (like else/else-if after an if)
 			isPartOfConditional := false
@@ -150,20 +201,39 @@ func ensureProperNesting(nodes []ast.Node) []ast.Node {
 					}
 				}
 			}
-			
+
 			if isPartOfConditional {
 				// Add to current template's children directly
+				log.Printf("processNestingLevel: Node %s is part of conditional, adding to currentTemplate children", nodeDesc)
 				currentTemplate.Children = append(currentTemplate.Children, node)
 			} else {
-				// Buffer this content for the current template
-				contentBuffer = append(contentBuffer, node)
+				// THIS IS THE FIX:
+				// This node is NOT part of the conditional chain, so the conditional is complete.
+				// Finalize the current template and treat this node as a new sibling.
+
+				log.Printf("processNestingLevel: Node %s is NOT part of conditional chain, finalizing template %s and adding as sibling", nodeDesc, getNodeDesc(currentTemplate))
+
+				// 1. Finalize currentTemplate (add buffered content if any)
+				if len(contentBuffer) > 0 {
+					currentTemplate.Children = append(currentTemplate.Children, contentBuffer...)
+					contentBuffer = nil
+				}
+
+				// 2. Add currentTemplate to results
+				result = append(result, currentTemplate)
+
+				// 3. Clear currentTemplate
+				currentTemplate = nil
+
+				// 4. Add this node as a sibling (not buffered!)
+				result = append(result, node)
 			}
 		} else {
 			// Not related to a template - add directly to result
 			result = append(result, node)
 		}
 	}
-	
+
 	// Handle any remaining template/content
 	if currentTemplate != nil {
 		if len(contentBuffer) > 0 {
@@ -173,7 +243,14 @@ func ensureProperNesting(nodes []ast.Node) []ast.Node {
 		// Add the template to the result
 		result = append(result, currentTemplate)
 	}
-	
+
+	// Log result
+	resultDescs := make([]string, len(result))
+	for i, node := range result {
+		resultDescs[i] = getNodeDesc(node)
+	}
+	log.Printf("processNestingLevel: Returning %d nodes: %v (started with %d)", len(result), resultDescs, len(nodes))
+
 	return result
 }
 
