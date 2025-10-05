@@ -6,24 +6,43 @@ import (
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
+// NOTE: This file contains directive post-processing functions that are NO LONGER USED.
+//
+// These functions were previously called from parseChildren in parser/html.go to post-process
+// directive nodes (conditionals and loops) after initial parsing. However, this created a
+// "two-parsing-paths" bug where:
+//
+// 1. BlockConditionalParser and BlockLoopParser correctly parse directives with depth tracking
+// 2. Then processDirectiveNodes would try to re-organize the already-parsed nodes
+// 3. This caused content after {/if} and {/for} to be incorrectly consumed into the directive
+//
+// FIX (Spec: 2025-10-06-parser-unification):
+// - Removed calls to processDirectiveNodes from parser/html.go (lines 280, 308)
+// - Now using ONLY BlockConditionalParser and BlockLoopParser via AnyNodeParser
+// - Single parsing path = correct AST structure
+//
+// These functions are kept for reference but should NOT be called.
+
 // processDirectiveNodes processes directives like if/else/for to build nested structures
+// DEPRECATED: No longer used (see note above)
 func processDirectiveNodes(nodes []ast.Node) []ast.Node {
 	log.Printf("[processDirectiveNodes] Processing %d nodes", len(nodes))
-	
+
 	// First process conditionals (if/else-if/else)
 	processedNodes := processConditionals(nodes)
-	
+
 	// Then process loops (for/each)
 	processedNodes = processLoops(processedNodes)
-	
+
 	// Finally, handle nested directives (conditionals inside loops, loops inside conditionals)
 	processedNodes = processNestedDirectives(processedNodes)
-	
+
 	log.Printf("[processDirectiveNodes] Completed processing, now have %d nodes", len(processedNodes))
 	return processedNodes
 }
 
 // processConditionals converts flat conditional nodes into proper nested structures
+// DEPRECATED: No longer used (see note above)
 func processConditionals(nodes []ast.Node) []ast.Node {
 	var result []ast.Node
 	var currentConditional *ast.Conditional
@@ -32,39 +51,39 @@ func processConditionals(nodes []ast.Node) []ast.Node {
 	var inElseIf bool
 	var inElse bool
 	var currentElseIfIndex int
-	
+
 	log.Printf("[processConditionals] Processing %d nodes", len(nodes))
-	
+
 	for i, node := range nodes {
 		log.Printf("[processConditionals] Processing node %d: %T", i, node)
-		
+
 		switch n := node.(type) {
 		case *ast.Conditional:
 			// Start of a new conditional
 			log.Printf("[processConditionals] Found start of conditional: %s", n.IfCondition)
-			
+
 			// If we're already in a conditional, finalize it first
 			if inConditional && currentConditional != nil {
 				finalizeConditional(currentConditional, currentContent, inElseIf, inElse, currentElseIfIndex)
 				result = append(result, currentConditional)
 			}
-			
+
 			inConditional = true
 			currentConditional = n
 			currentContent = []ast.Node{}
 			inElseIf = false
 			inElse = false
-		
+
 		case *ast.ElseIfNode:
 			// Add current content to the appropriate section
 			if inConditional && currentConditional != nil {
 				log.Printf("[processConditionals] Found else-if: %s", n.Condition)
-				
+
 				if inElseIf {
 					// Add content to the previous else-if section
 					if currentElseIfIndex < len(currentConditional.ElseIfContent) {
 						currentConditional.ElseIfContent[currentElseIfIndex] = append(
-							currentConditional.ElseIfContent[currentElseIfIndex], 
+							currentConditional.ElseIfContent[currentElseIfIndex],
 							currentContent...,
 						)
 					}
@@ -75,7 +94,7 @@ func processConditionals(nodes []ast.Node) []ast.Node {
 					// Add content to the if section
 					currentConditional.IfContent = append(currentConditional.IfContent, currentContent...)
 				}
-				
+
 				// Add this else-if condition
 				currentConditional.ElseIfConditions = append(currentConditional.ElseIfConditions, n.Condition)
 				currentConditional.ElseIfContent = append(currentConditional.ElseIfContent, []ast.Node{})
@@ -87,17 +106,17 @@ func processConditionals(nodes []ast.Node) []ast.Node {
 				// Orphaned else-if, treat as text
 				result = append(result, &ast.TextNode{Content: "{else if " + n.Condition + "}"})
 			}
-		
+
 		case *ast.ElseNode:
 			// Add current content to the appropriate section
 			if inConditional && currentConditional != nil {
 				log.Printf("[processConditionals] Found else")
-				
+
 				if inElseIf {
 					// Add content to the previous else-if section
 					if currentElseIfIndex < len(currentConditional.ElseIfContent) {
 						currentConditional.ElseIfContent[currentElseIfIndex] = append(
-							currentConditional.ElseIfContent[currentElseIfIndex], 
+							currentConditional.ElseIfContent[currentElseIfIndex],
 							currentContent...,
 						)
 					}
@@ -105,7 +124,7 @@ func processConditionals(nodes []ast.Node) []ast.Node {
 					// Add content to the if section
 					currentConditional.IfContent = append(currentConditional.IfContent, currentContent...)
 				}
-				
+
 				inElseIf = false
 				inElse = true
 				currentContent = []ast.Node{}
@@ -114,15 +133,15 @@ func processConditionals(nodes []ast.Node) []ast.Node {
 				// Orphaned else, treat as text
 				result = append(result, &ast.TextNode{Content: "{else}"})
 			}
-		
+
 		case *ast.IfEndNode:
 			// End of conditional - finalize and add to result
 			if inConditional && currentConditional != nil {
 				log.Printf("[processConditionals] Found end of conditional")
-				
+
 				finalizeConditional(currentConditional, currentContent, inElseIf, inElse, currentElseIfIndex)
 				result = append(result, currentConditional)
-				
+
 				inConditional = false
 				inElseIf = false
 				inElse = false
@@ -132,7 +151,7 @@ func processConditionals(nodes []ast.Node) []ast.Node {
 				// Orphaned end tag, treat as text
 				result = append(result, &ast.TextNode{Content: "{/if}"})
 			}
-		
+
 		default:
 			// Regular node
 			if inConditional {
@@ -146,14 +165,14 @@ func processConditionals(nodes []ast.Node) []ast.Node {
 			}
 		}
 	}
-	
+
 	// Handle any unclosed conditionals (shouldn't happen in well-formed templates)
 	if inConditional && currentConditional != nil {
 		log.Printf("[processConditionals] WARNING: Unclosed conditional at end of template")
 		finalizeConditional(currentConditional, currentContent, inElseIf, inElse, currentElseIfIndex)
 		result = append(result, currentConditional)
 	}
-	
+
 	log.Printf("[processConditionals] Processed %d nodes into %d result nodes", len(nodes), len(result))
 	return result
 }
@@ -175,32 +194,33 @@ func finalizeConditional(conditional *ast.Conditional, content []ast.Node, inEls
 }
 
 // processLoops converts flat loop nodes into proper nested structures
+// DEPRECATED: No longer used (see note above)
 func processLoops(nodes []ast.Node) []ast.Node {
 	var result []ast.Node
 	var currentLoop *ast.Loop
 	var currentContent []ast.Node
 	var inLoop bool
-	
+
 	log.Printf("[processLoops] Processing %d nodes", len(nodes))
-	
+
 	for i, node := range nodes {
 		log.Printf("[processLoops] Processing node %d: %T", i, node)
-		
+
 		switch n := node.(type) {
 		case *ast.Loop:
 			// Start of a new loop
 			log.Printf("[processLoops] Found start of loop: %s in %s", n.Value, n.Collection)
-			
+
 			// If we're already in a loop, finalize it first
 			if inLoop && currentLoop != nil {
 				currentLoop.Content = append(currentLoop.Content, currentContent...)
 				result = append(result, currentLoop)
 			}
-			
+
 			inLoop = true
 			currentLoop = n
 			currentContent = []ast.Node{}
-		
+
 		case *ast.ForEndNode:
 			// End of loop - finalize and add to result
 			if inLoop && currentLoop != nil {
@@ -214,7 +234,7 @@ func processLoops(nodes []ast.Node) []ast.Node {
 				// Orphaned end tag, treat as text
 				result = append(result, &ast.TextNode{Content: "{/for}"})
 			}
-		
+
 		default:
 			// Regular node
 			if inLoop {
@@ -228,45 +248,46 @@ func processLoops(nodes []ast.Node) []ast.Node {
 			}
 		}
 	}
-	
+
 	// Handle any unclosed loops (shouldn't happen in well-formed templates)
 	if inLoop && currentLoop != nil {
 		log.Printf("[processLoops] WARNING: Unclosed loop at end of template")
 		currentLoop.Content = append(currentLoop.Content, currentContent...)
 		result = append(result, currentLoop)
 	}
-	
+
 	log.Printf("[processLoops] Processed %d nodes into %d result nodes", len(nodes), len(result))
 	return result
 }
 
 // processNestedDirectives handles complex nesting of directives (conditionals in loops, loops in conditionals)
+// DEPRECATED: No longer used (see note above)
 func processNestedDirectives(nodes []ast.Node) []ast.Node {
 	var result []ast.Node
-	
+
 	for _, node := range nodes {
 		switch n := node.(type) {
 		case *ast.Conditional:
 			// Process nested directives in each branch of the conditional
 			n.IfContent = processDirectiveNodes(n.IfContent)
-			
+
 			for i := range n.ElseIfContent {
 				n.ElseIfContent[i] = processDirectiveNodes(n.ElseIfContent[i])
 			}
-			
+
 			n.ElseContent = processDirectiveNodes(n.ElseContent)
 			result = append(result, n)
-			
+
 		case *ast.Loop:
 			// Process nested directives in the loop content
 			n.Content = processDirectiveNodes(n.Content)
 			result = append(result, n)
-			
+
 		default:
 			// Regular node, add as is
 			result = append(result, node)
 		}
 	}
-	
+
 	return result
 }

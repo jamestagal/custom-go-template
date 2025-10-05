@@ -275,15 +275,18 @@ func parseChildren(input string, parentTag string) Result {
 				continue
 			}
 
-			// Found the matching closing tag - process directives before returning
-			log.Printf("[parseChildren] Processing %d children nodes for directives", len(children))
-			processedChildren := processDirectiveNodes(children)
-			log.Printf("[parseChildren] After directive processing: %d nodes", len(processedChildren))
-			return Result{processedChildren, remaining, true, "", false}
+			// Found the matching closing tag
+			// REMOVED: processDirectiveNodes call (Spec: 2025-10-06-parser-unification)
+			// Block parsers (BlockConditionalParser, BlockLoopParser) already handle directives correctly
+			// Post-processing causes content after {/if} and {/for} to be trapped incorrectly
+			log.Printf("[parseChildren] Returning %d children nodes (directive post-processing disabled)", len(children))
+			return Result{children, remaining, true, "", false}
 		}
 
-		// Parse a child node
-		childRes := parseChildNode(remaining)
+		// Parse a child node using AnyNodeParser (includes BlockConditionalParser, BlockLoopParser)
+		// CHANGED (Spec: 2025-10-06-parser-unification): Use AnyNodeParser instead of parseChildNode
+		// to ensure consistent use of BlockConditionalParser and BlockLoopParser
+		childRes := AnyNodeParser()(remaining)
 		if childRes.Successful {
 			if childNode, ok := childRes.Value.(ast.Node); ok {
 				children = append(children, childNode)
@@ -303,14 +306,15 @@ func parseChildren(input string, parentTag string) Result {
 	}
 
 	// Handle case where we exit loop without finding closing tag
-	// Still process directives before returning
-	log.Printf("[parseChildren] Processing %d children nodes for directives (no closing tag found)", len(children))
-	processedChildren := processDirectiveNodes(children)
-	log.Printf("[parseChildren] After directive processing: %d nodes", len(processedChildren))
-	return Result{processedChildren, remaining, true, "", false}
+	// REMOVED: processDirectiveNodes call (Spec: 2025-10-06-parser-unification)
+	// Block parsers (BlockConditionalParser, BlockLoopParser) already handle directives correctly
+	log.Printf("[parseChildren] Returning %d children nodes (no closing tag, directive post-processing disabled)", len(children))
+	return Result{children, remaining, true, "", false}
 }
 
-// parseChildNode attempts to parse a single child node
+// parseChildNode is DEPRECATED (Spec: 2025-10-06-parser-unification)
+// Use AnyNodeParser() instead to ensure consistent use of BlockConditionalParser and BlockLoopParser
+// This function is kept for reference but should not be called
 func parseChildNode(input string) Result {
 	// Try to parse as element
 	elemRes := ElementParser()(input)
@@ -329,6 +333,10 @@ func parseChildNode(input string) Result {
 	if commentRes.Successful {
 		return commentRes
 	}
+
+	// PROBLEM: These use old marker-based parsers (IfStartNode, ElseIfNode, etc)
+	// which require post-processing via processDirectiveNodes
+	// Should use BlockConditionalParser and BlockLoopParser instead via AnyNodeParser
 
 	// Try to parse as conditional
 	condRes := ConditionalParser()(input)

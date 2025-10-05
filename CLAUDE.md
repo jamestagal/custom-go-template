@@ -29,8 +29,17 @@ Template Source → Parser → AST → Transformer → Rendered HTML/CSS/JS
 
 2. **`parser/`** - Converts template syntax to AST
    - Uses parser combinators for composable parsing
-   - Handles expressions, conditionals, loops, components
-   - Key files: `parser.go`, `directives.go`, `components.go`, `expressions.go`
+   - **Unified Architecture (2025-10-06)**: Single parsing path using BlockConditionalParser and BlockLoopParser
+   - Key files: `parser.go`, `directives.go`, `components.go`, `expressions.go`, `html.go`
+
+   **Parser Architecture**:
+   - `AnyNodeParser` - Central entry point for parsing any node type
+   - `BlockConditionalParser` - Parses complete `{if}...{/if}` blocks with depth tracking
+   - `BlockLoopParser` - Parses complete `{for}...{/for}` blocks with depth tracking
+   - `ElementParser` → `parseChildren` → `AnyNodeParser` (consistent parsing path)
+   - **DEPRECATED**: `processDirectiveNodes`, `processConditionals`, `processLoops` (see `parser/process_directives.go`)
+
+   **Important**: The parser now uses a single, unified path. Do NOT use the old marker-based parsers or post-processing functions.
 
 3. **`transformer/`** - Transforms AST to Alpine.js compatible nodes
    - **Critical**: This is where template syntax becomes Alpine.js directives
@@ -129,6 +138,21 @@ go run cmd/test_component/main.go
 
 ## Critical Implementation Rules
 
+### Parser Architecture (Updated 2025-10-06)
+
+**IMPORTANT**: The parser now uses a unified, single-path architecture:
+
+1. **Always use BlockConditionalParser and BlockLoopParser** via `AnyNodeParser`
+2. **Never use** the old `processDirectiveNodes`, `processConditionals`, or `processLoops` functions
+3. **Element children parsing**: `parseChildren` calls `AnyNodeParser` directly, not `parseChildNode`
+
+**Why this matters**:
+- The old dual-path approach caused content after `{/if}` and `{/for}` to be incorrectly consumed into the directive
+- BlockConditionalParser and BlockLoopParser use depth tracking to correctly identify directive boundaries
+- Post-processing tried to re-organize already-parsed nodes, causing bugs
+
+**See**: `.agent-os/specs/2025-10-06-parser-unification/` for full details
+
 ### Data Scope Management
 - All variables referenced in templates MUST be in Alpine.js x-data scope
 - Track variables across fence sections, expressions, conditionals, loops
@@ -136,7 +160,7 @@ go run cmd/test_component/main.go
 - Component props must be extracted and passed correctly
 
 ### Transformation Order
-1. Parse template to AST
+1. Parse template to AST (using unified parser path)
 2. Extract fence data (props, variables, functions)
 3. Transform AST nodes to Alpine.js equivalents
 4. Build x-data scope from all discovered variables
@@ -147,6 +171,7 @@ go run cmd/test_component/main.go
 - Test edge cases: nested conditionals, nested loops, components in loops
 - Use the `tests/alpine/` and `tests/components/` directories
 - Key test files show patterns: `alpine_integration_test.go`, `components_test.go`
+- Regression tests: `parser/conditional_bug_test.go`, `parser/nested_conditional_loop_test.go`
 
 ### Error Handling
 - Provide detailed, actionable error messages
@@ -178,6 +203,12 @@ The engine targets Alpine.js 3.x. Key integration points:
 
 ## Known Issues & Patterns
 
+### Parser Unification (Fixed 2025-10-06)
+The "two-parsing-paths" bug has been FIXED. See `.agent-os/specs/2025-10-06-parser-unification/COMPLETION_SUMMARY.md` for details.
+
+**Before**: Dual parsing paths caused content after `{/if}` and `{/for}` to be trapped incorrectly
+**After**: Single unified path using BlockConditionalParser and BlockLoopParser
+
 ### Recursive Component Transformation
 See `docs/RecursiveComponentTranformationChecklist.md` for handling deeply nested components.
 
@@ -196,6 +227,7 @@ Components need proper x-data initialization. The transformer determines when to
   - `alpine/` - Alpine.js integration tests
   - `components/` - Component tests
 - `docs/` - Design docs and specifications
+- `.agent-os/specs/` - Formal specifications for major changes
 - `cmd/` - Executables
   - `server/` - Development server
   - `test_*/` - Testing utilities
@@ -207,3 +239,4 @@ Components need proper x-data initialization. The transformer determines when to
 - The fence section uses JavaScript syntax for variables and functions
 - Components must be registered before use
 - Alpine.js directives are generated automatically; don't write them manually in templates
+- **Parser Rule**: Always use `AnyNodeParser` for parsing child nodes to ensure unified parsing path
