@@ -74,8 +74,49 @@ func transformLoop(node *ast.Loop, dataScope map[string]any) []ast.Node {
 	return createLoopTemplate(loopExpr, node.Content, loopBodyScope)
 }
 
+// needsWrapper determines if the loop content needs a wrapper div
+// Alpine.js x-for requires exactly ONE child element
+func needsWrapper(content []ast.Node) bool {
+	// If there's more than one node, we need a wrapper
+	if len(content) > 1 {
+		return true
+	}
+
+	// If there's exactly one node, check if it's a template element
+	if len(content) == 1 {
+		if elem, ok := content[0].(*ast.Element); ok {
+			// If the single element is a template (x-if, etc), we need a wrapper
+			// because the template itself isn't rendered
+			if elem.TagName == "template" {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // createLoopTemplate creates a template element with the x-for directive
 func createLoopTemplate(loopExpr string, content []ast.Node, dataScope map[string]any) []ast.Node {
+	// Transform the content first
+	transformedContent := transformNodes(content, dataScope, false)
+
+	// Alpine.js x-for requires exactly ONE child element
+	// If we have multiple children OR the child is a template element, wrap in a div
+	var finalChildren []ast.Node
+
+	if needsWrapper(transformedContent) {
+		log.Printf("createLoopTemplate: wrapping %d nodes in container div", len(transformedContent))
+		// Create a wrapper div to hold all the content
+		wrapperDiv := &ast.Element{
+			TagName:  "div",
+			Children: transformedContent,
+		}
+		finalChildren = []ast.Node{wrapperDiv}
+	} else {
+		finalChildren = transformedContent
+	}
+
 	// Create a template element with x-for directive
 	templateElement := &ast.Element{
 		TagName: "template",
@@ -85,12 +126,8 @@ func createLoopTemplate(loopExpr string, content []ast.Node, dataScope map[strin
 				Value: loopExpr,
 			},
 		},
-		Children: []ast.Node{},
+		Children: finalChildren,
 	}
-
-	// Transform the content
-	transformedContent := transformNodes(content, dataScope, false)
-	templateElement.Children = transformedContent
 
 	return []ast.Node{templateElement}
 }
