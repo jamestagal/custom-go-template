@@ -204,7 +204,7 @@ function getTagClass(tag) {
       <h3>Product List</h3>
       <ul>
         {for product in filteredProducts}
-          <li>{product.name } - {formatPrice(product.price) }
+          <li>{product.name} - {formatPrice(product.price) }
             {if !product.inStock}
               <span style="color: red;"> (Out of Stock)</span>
             {/if}
@@ -219,7 +219,7 @@ function getTagClass(tag) {
       <ol>
         {for product, index in filteredProducts}
           <li value="{index + 1 }">
-            {product.name } - {formatPrice(product.price) }
+            {product.name} - {formatPrice(product.price)}
             {if product.featured}
               <span style="color: gold;"> ★ Featured</span>
             {/if}
@@ -238,13 +238,13 @@ function getTagClass(tag) {
             <dd>
               <dl>
                 {for subKey, subValue of value}
-                  <dt>{subKey }:</dt>
-                  <dd>{subValue }</dd>
+                  <dt>{subKey}:</dt>
+                  <dd>{subValue}</dd>
                 {/for}
               </dl>
             </dd>
           {else}
-            <dd>{value }</dd>
+            <dd>{value}</dd>
           {/if}
         {/for}
       </dl>
@@ -255,16 +255,16 @@ function getTagClass(tag) {
       <h3>Categories and Products</h3>
       {for category in categories}
         <div style="margin-bottom: 1rem;">
-          <h4>{category.name } ({category.items.length } items)</h4>
+          <h4>{category.name} ({category.items.length} items)</h4>
           {if category.items.length > 0}
             <ul>
               {for item in category.items}
                 <li>
-                  {item.name } - {formatPrice(item.price) }
+                  {item.name} - {formatPrice(item.price)}
                   <div>
                     Tags:
                     {for tag in item.tags}
-                      <span class="tag {getTagClass(tag) }">{tag }</span>
+                      <span class="tag {getTagClass(tag) }">{tag}</span>
                     {/for}
                   </div>
                 </li>
@@ -319,9 +319,9 @@ function getTagClass(tag) {
     <div class="card">
       <h3>Dynamic Component Example</h3>
       {if user.role === "admin"}
-        <={`./components/AdminPanel.html`} user={user} />
+        <="./components/AdminPanel.html" user={user} />
       {else}
-        <={`./components/UserDashboard.html`} user={user} />
+        <="./components/UserDashboard.html" user={user} />
       {/if}
     </div>
   </div>
@@ -333,10 +333,10 @@ function getTagClass(tag) {
     <!-- Computed values and functions -->
     <div class="card">
       <h3>Filtered Products (Computed)</h3>
-      <p>Products between {settings.filters.minPrice } and {settings.filters.maxPrice }:</p>
+      <p>Products between {settings.filters.minPrice } and {settings.filters.maxPrice}:</p>
       <ul>
         {for product in filteredProducts}
-          <li>{product.name } - {formatPrice(product.price) }</li>
+          <li>{product.name} - {formatPrice(product.price)}</li>
         {/for}
       </ul>
     </div>
@@ -344,10 +344,10 @@ function getTagClass(tag) {
     <!-- Complex expressions -->
     <div class="card">
       <h3>Complex Expressions</h3>
-      <p>Average product price: {formatPrice(products.reduce((sum, p) => sum + p.price, 0) / products.length) }</p>
-      <p>Featured products: {products.filter(p => p.featured).length }</p>
-      <p>In-stock products: {products.filter(p => p.inStock).length }</p>
-      <p>Total inventory value: {formatPrice(products.filter(p => p.inStock).reduce((sum, p) => sum + p.price, 0)) }</p>
+      <p>Average product price: {formatPrice(products.reduce((sum, p) => sum + p.price, 0) / products.length)}</p>
+      <p>Featured products: {products.filter(p => p.featured).length}</p>
+      <p>In-stock products: {products.filter(p => p.inStock).length}</p>
+      <p>Total inventory value: {formatPrice(products.filter(p => p.inStock).reduce((sum, p) => sum + p.price, 0))}</p>
     </div>
 
     <!-- Combining features -->
@@ -355,12 +355,12 @@ function getTagClass(tag) {
       <h3>Combined Features Example</h3>
       {if filteredProducts.length > 0}
         <div>
-          <p>Top {Math.min(3, filteredProducts.length) } products:</p>
+          <p>Top {Math.min(3, filteredProducts.length)} products:</p>
           <div class="product-grid">
             {for product, index in filteredProducts.slice(0, 3)}
               <div class="card">
-                <h4>{index + 1 }. {product.name }</h4>
-                <p>Price: {formatPrice(product.price) }</p>
+                <h4>{index + 1}. {product.name}</h4>
+                <p>Price: {formatPrice(product.price)}</p>
                 <div>
                   {if product.inStock}
                     <span style="color: green;">In Stock</span>
@@ -371,7 +371,7 @@ function getTagClass(tag) {
                 <div>
                   Tags:
                   {for tag in product.tags}
-                    <span class="tag {getTagClass(tag) }">{tag }</span>
+                    <span class="tag {getTagClass(tag) }">{tag}</span>
                   {/for}
                 </div>
               </div>
