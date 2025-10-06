@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
@@ -127,6 +128,45 @@ func resolvePropValue(prop ast.ComponentProp, parentDataScope map[string]any) an
 	return extractPropValue(prop, parentDataScope)
 }
 
+// isSimpleVariableReference checks if a string is a simple variable reference
+//
+// Pattern: Helper Function [Load: 6]
+// Cognitive Load: 6 (validation checks: 4, regex: 2)
+//
+// Returns true for simple identifiers like: user1, myVar, data
+// Returns false for: "string", 123, user.name, true, null, function calls, etc.
+//
+// This is used to determine if a prop value should be output as an Alpine.js
+// expression (user: user1) vs a literal value (user: "string").
+func isSimpleVariableReference(s string) bool {
+	s = strings.TrimSpace(s)
+
+	// Empty or special literals
+	if s == "" || s == "null" || s == "true" || s == "false" {
+		return false
+	}
+
+	// Quoted strings
+	if (strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"")) ||
+		(strings.HasPrefix(s, "'") && strings.HasSuffix(s, "'")) {
+		return false
+	}
+
+	// Numbers
+	if _, err := strconv.ParseFloat(s, 64); err == nil {
+		return false
+	}
+
+	// Property access or function calls
+	if strings.Contains(s, ".") || strings.Contains(s, "(") {
+		return false
+	}
+
+	// Must be a valid JavaScript identifier
+	matched, _ := regexp.MatchString(`^[a-zA-Z_$][a-zA-Z0-9_$]*$`, s)
+	return matched
+}
+
 // addComponentDataWrapper wraps component nodes with an x-data attribute
 //
 // Pattern: Helper Function [Load: 10]
@@ -175,14 +215,40 @@ func formatComponentData(dataScope map[string]any) string {
 		// Add value based on type
 		switch v := value.(type) {
 		case string:
-			// SPECIAL CASE: If the string starts and ends with quotes, it means the parser
-			// stored it AS-IS from the fence section. We need to strip those quotes first.
+			// SPECIAL CASE: If the string starts and ends with quotes, it may be:
+			// 1. Fence section value like `prop x = "value"` - quotes should be stripped
+			// 2. Component prop expression like `name={"Bo"}` - quotes are part of JS, keep them
+			//
+			// We detect #2 by checking if this looks like a complete JavaScript string literal
+			// (has quotes AND the content is a valid string). For #1, we strip the quotes.
 			cleanValue := v
+
+			// Check if this is a JavaScript string literal expression (from component props)
+			// These will be like: "Bo", 'Bo', etc. - they should be kept with quotes and
+			// output as-is in the x-data (single quotes for HTML attribute safety)
+			isJSStringLiteral := false
 			if len(v) >= 2 {
+				if (strings.HasPrefix(v, "\"") && strings.HasSuffix(v, "\"")) ||
+					(strings.HasPrefix(v, "'") && strings.HasSuffix(v, "'")) {
+					// This looks like a quoted string
+					// If it came from extractPropValue as a string literal expression,
+					// we should NOT strip the quotes
+					// For now, we'll assume if it's ONLY a quoted string (no other content),
+					// it's a JS string literal from a component prop
+					innerContent := v[1 : len(v)-1]
+					// If the inner content doesn't contain special chars that would indicate
+					// it's a fence value, treat it as a JS string literal
+					if !strings.Contains(innerContent, "\n") {
+						isJSStringLiteral = true
+					}
+				}
+			}
+
+			if !isJSStringLiteral && len(v) >= 2 {
 				if (strings.HasPrefix(v, "\"") && strings.HasSuffix(v, "\"")) ||
 					(strings.HasPrefix(v, "'") && strings.HasSuffix(v, "'")) ||
 					(strings.HasPrefix(v, "`") && strings.HasSuffix(v, "`")) {
-					// Strip the outer quotes
+					// Strip the outer quotes (fence section value)
 					cleanValue = v[1 : len(v)-1]
 				}
 			}
@@ -202,6 +268,32 @@ func formatComponentData(dataScope map[string]any) string {
 				}
 
 				result.WriteString(functionDef)
+				continue
+			}
+
+			// CRITICAL: Check if this value has the variable reference marker
+			// Values marked with __VAR_REF__ prefix came from dynamic props that reference parent scope
+			if strings.HasPrefix(cleanValue, "__VAR_REF__") {
+				// Strip the marker and output as Alpine expression without quotes
+				varName := strings.TrimPrefix(cleanValue, "__VAR_REF__")
+				result.WriteString(key)
+				result.WriteString(": ")
+				result.WriteString(varName)
+				continue
+			}
+
+			// CRITICAL: Check if cleanValue is a quoted string literal (from component props)
+			// Like: "Bo" or 'Bo' - these should be output with single quotes
+			if (strings.HasPrefix(cleanValue, "\"") && strings.HasSuffix(cleanValue, "\"")) ||
+				(strings.HasPrefix(cleanValue, "'") && strings.HasSuffix(cleanValue, "'")) {
+				// This is a JavaScript string literal - output with single quotes
+				result.WriteString(key)
+				result.WriteString(": ")
+				// Convert to single quotes for HTML safety
+				innerValue := cleanValue[1 : len(cleanValue)-1]
+				result.WriteString("'")
+				result.WriteString(innerValue)
+				result.WriteString("'")
 				continue
 			}
 
@@ -434,19 +526,56 @@ func isDynamicExpression(value string, dataScope map[string]any) bool {
 }
 
 // extractPropValue extracts the value from a component prop, handling dynamic vs static values
+//
+// CRITICAL FIX (2025-10-06): Return variable references as strings, not resolved values
+//
+// For component props that reference parent variables (e.g., user={user1}), we need to
+// pass the variable NAME as a string so Alpine.js can resolve it at runtime, NOT the
+// actual value from the parent scope.
+//
+// Example:
+//   Parent has: user1 = {name: "Alice"}
+//   Template: <UserProfile user={user1} />
+//
+//   BEFORE (wrong): componentDataScope["user"] = {name: "Alice"}
+//                   Output: user: { name: 'Alice' } (static object)
+//
+//   AFTER (correct): componentDataScope["user"] = "user1"
+//                    Output: user: user1 (Alpine expression)
 func extractPropValue(prop ast.ComponentProp, parentDataScope map[string]any) any {
 	if prop.IsDynamic {
-		// For dynamic props ({var}), resolve from parent scope
+		// For dynamic props ({var}), extract the variable name or expression
 		// Remove curly braces and whitespace
 		varName := strings.TrimSpace(strings.Trim(prop.Value, "{}"))
 
-		// Check if it's a variable reference or expression
-		if val, exists := parentDataScope[varName]; exists {
-			// Direct variable reference - return the value
-			return val
+
+		// CRITICAL: Check if this is a quoted string literal like {"Bo"}
+		// These should be output with quotes in the x-data
+		if (strings.HasPrefix(varName, "\"") && strings.HasSuffix(varName, "\"")) ||
+			(strings.HasPrefix(varName, "'") && strings.HasSuffix(varName, "'")) {
+			// This is a string literal expression - return as-is with quotes
+			// The quotes are part of the JavaScript expression, not fence-section quotes
+			log.Printf("extractPropValue: String literal expression '%s'", varName)
+			return varName
 		}
 
-		// It's an expression (e.g., age + 10) - return as-is for Alpine.js to evaluate
+		// CRITICAL FIX: Check if this is a simple variable reference
+		// If so, return the variable NAME (as string) for Alpine to resolve
+		// Use a special prefix to mark it as a variable reference (not a string literal)
+		if isSimpleVariableReference(varName) {
+			// Check if the variable exists in parent scope
+			if _, exists := parentDataScope[varName]; exists {
+				// Return with special prefix to mark as variable reference
+				// This will be stripped in formatComponentData
+				log.Printf("extractPropValue: Passing variable reference '%s' (not resolved value)", varName)
+				return "__VAR_REF__" + varName
+			} else {
+				log.Printf("extractPropValue: Variable '%s' NOT FOUND in parent scope!", varName)
+			}
+		}
+
+		// For expressions (age + 10, user.name), return as-is for Alpine.js to evaluate
+		log.Printf("extractPropValue: Passing expression '%s'", varName)
 		return varName
 	}
 
