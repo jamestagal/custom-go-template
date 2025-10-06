@@ -72,12 +72,12 @@ let user3 = {
         <Age name="Baggins" age={201} />
       </div>
 
-      <!-- Dynamic components (Jim's innovative <= syntax) -->
+      <!-- Dynamic components (Jim's innovative <= syntax) with object props -->
       <div style="margin: 2rem 0;">
-        <h2>Dynamic Component Examples</h2>
-        <="./components/UserProfile.html" showRole={true} />
-        <='{path}' showRole={true} />
-        <="./components/{comp}.html" showRole={true} />
+        <h2>User Profile Examples with Object Props</h2>
+        <="./components/UserProfile.html" user={user1} showRole={true} />
+        <='{path}' user={user2} showRole={true} />
+        <="./components/{comp}.html" user={user3} showRole={true} />
       </div>
 
       <!-- Loops with nested conditionals -->

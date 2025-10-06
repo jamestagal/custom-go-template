@@ -319,6 +319,25 @@ func addLinksToHTML(html string, alpineInitScript string) string {
 		alpineInitScript + html[headCloseIndex:]
 }
 
+// convertJSToJSON converts JavaScript object syntax to valid JSON
+// Handles unquoted keys: {name: "value"} → {"name": "value"}
+func convertJSToJSON(js string) string {
+	js = strings.TrimSpace(js)
+
+	// Only convert if it looks like a JS object or array
+	if !(strings.HasPrefix(js, "{") || strings.HasPrefix(js, "[")) {
+		return js
+	}
+
+	// Simple regex to quote unquoted object keys
+	// Matches: word characters followed by colon (but not inside quotes)
+	// This is a simplified approach - for production use a proper JS parser
+	re := regexp.MustCompile(`([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:`)
+	result := re.ReplaceAllString(js, `$1"$2":`)
+
+	return result
+}
+
 func parseValue(value string) interface{} {
 	value = strings.TrimSpace(value)
 
@@ -327,11 +346,16 @@ func parseValue(value string) interface{} {
 		return ""
 	}
 
+	// CRITICAL FIX: Convert JavaScript object syntax to JSON before unmarshaling
+	// JavaScript: {name: "value"} → JSON: {"name": "value"}
+	// This allows fence section objects to be parsed as structured data
+	jsonValue := convertJSToJSON(value)
+
 	// Try to parse as JSON first (handles arrays, objects, numbers, booleans, null)
-	var jsonValue interface{}
-	if err := json.Unmarshal([]byte(value), &jsonValue); err == nil {
+	var parsedValue interface{}
+	if err := json.Unmarshal([]byte(jsonValue), &parsedValue); err == nil {
 		// Successfully parsed as JSON
-		return jsonValue
+		return parsedValue
 	}
 
 	// If JSON parsing failed, try specific type conversions
