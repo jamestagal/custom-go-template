@@ -222,20 +222,13 @@ func GenerateAlpineDirectives(attributes []ast.Attribute) []string {
 
 		// Special case handling for test scenarios
 		// Check if this is a specific test case that needs special handling
-		if combinedData == "{ message: 'Hello' }" {
-			// This is the component_with_expressions test case
-			directives = append(directives, `x-data="{ message: &quot;Hello&quot; }"`)
-		} else if strings.Contains(combinedData, "parentState: 'active'") {
-			// This is the nested_components_with_alpine_directives test case
-			directives = append(directives, `x-data="{ parentState: &quot;active&quot;, items: [&quot;item1&quot;, &quot;item2&quot;, &quot;item3&quot;] }"`)
-		} else if strings.Contains(combinedData, "childState: 'pending'") {
-			// This is the nested_components_with_alpine_directives test case (child component)
-			directives = append(directives, `x-data="{ childState: &quot;pending&quot;, toggle() { this.childState = this.childState === &quot;active&quot; ? &quot;pending&quot; : &quot;active&quot; } }"`)
-		} else {
-			// Default handling: Use double quotes for the attribute, no escaping needed for JS object
-			// The combinedData already contains proper JavaScript syntax from transformer
-			directives = append(directives, fmt.Sprintf(`x-data="%s"`, combinedData))
-		}
+		// except for special characters (<, >, &)
+		// 
+		// The transformer now uses SINGLE quotes for string values inside object literals,
+		// so we can safely use DOUBLE quotes for the HTML attribute without escaping.
+		// Example: x-data="{ name: 'John', role: 'admin' }"
+		//                       ↑ single quotes don't break the attribute ↑
+		directives = append(directives, fmt.Sprintf(`x-data="%s"`, combinedData))
 	}
 
 	// Second pass: add all non-data attributes

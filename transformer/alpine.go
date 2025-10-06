@@ -277,7 +277,7 @@ func isQuotedString(s string) bool {
 //   - Function strings → returned as-is (no quotes)
 //   - JavaScript literals (arrays/objects) → returned as-is (no quotes)
 //   - Already quoted strings → returned as-is (no double-quoting)
-//   - Regular strings → quoted and escaped with double quotes
+//   - Regular strings → quoted and escaped with SINGLE quotes (for x-data attribute safety)
 //   - Booleans → "true" or "false"
 //   - Numbers → formatted as number string
 //   - Arrays → recursively formatted
@@ -286,6 +286,9 @@ func isQuotedString(s string) bool {
 // CRITICAL: JavaScript literals are returned AS-IS without modification.
 // Alpine.js accepts BOTH JavaScript object syntax {key: value} and JSON {"key": "value"}
 // We preserve the original JavaScript syntax to maintain expressions like ternaries.
+//
+// CRITICAL FIX: String values are quoted with SINGLE quotes (') instead of double quotes (")
+// to prevent breaking HTML attributes when object literals are embedded in x-data="..."
 //
 // Cognitive Load: 16
 func FormatGoValueToJS(value any) string {
@@ -333,11 +336,13 @@ func FormatGoValueToJS(value any) string {
 			return v
 		}
 
-		// Regular string - add double quotes and escape (COGNITIVE LOAD RULE: proper escaping)
+		// CRITICAL FIX: Use SINGLE quotes instead of double quotes
+		// This prevents breaking HTML attributes when embedded in x-data="{ ... }"
+		// Regular string - add single quotes and escape (COGNITIVE LOAD RULE: proper escaping)
 		escaped := strings.ReplaceAll(v, `\`, `\\`)
-		escaped = strings.ReplaceAll(escaped, `"`, `\"`)
-		result := fmt.Sprintf(`"%s"`, escaped)
-		log.Printf("formatGoValueToJS: Regular string, quoting: %s → %s", v, result)
+		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+		result := fmt.Sprintf(`'%s'`, escaped)
+		log.Printf("formatGoValueToJS: Regular string, quoting with single quotes: %s → %s", v, result)
 		return result
 
 	case bool:
@@ -409,12 +414,12 @@ func FormatGoValueToJS(value any) string {
 		return "{" + strings.Join(pairs, ",") + "}"
 
 	default:
-		// Fallback for unknown types - convert to string and quote
+		// Fallback for unknown types - convert to string and quote with SINGLE quotes
 		// This should rarely be hit in normal operation
 		str := fmt.Sprintf("%v", value)
 		escaped := strings.ReplaceAll(str, `\`, `\\`)
-		escaped = strings.ReplaceAll(escaped, `"`, `\"`)
-		return fmt.Sprintf(`"%s"`, escaped)
+		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+		return fmt.Sprintf(`'%s'`, escaped)
 	}
 }
 
@@ -677,7 +682,7 @@ func hasSelfReferences(dataScope map[string]any) bool {
 //     "age": 30,
 //   }
 //   alpineDataFormatter(dataScope)
-//   // Returns: {age:30,name:"John"}
+//   // Returns: {age:30,name:'John'}
 //
 // Example with self-reference:
 //   dataScope := map[string]any{

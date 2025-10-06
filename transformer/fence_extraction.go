@@ -20,6 +20,8 @@ import (
 //   - const/let/var name = function() {} - Function expressions
 //   - const/let/var name = () => {} - Arrow functions
 //   - name() {} - Method shorthand
+//   - get name() {} - Getter methods
+//   - set name(value) {} - Setter methods
 //   - async variants of all above
 //
 // The function modifies the provided scope map in-place.
@@ -71,28 +73,34 @@ func extractFunctions(rawContent string, scope map[string]any) {
 		pattern *regexp.Regexp
 		nameIdx int // Index of the capture group containing the function name
 	}{
-		// Pattern 1: async function name() {}
+		// Pattern 1: get name() {} - GETTER (NEW)
+		{regexp.MustCompile(`(?m)^get\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`), 1},
+
+		// Pattern 2: set name(value) {} - SETTER (NEW)
+		{regexp.MustCompile(`(?m)^set\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`), 1},
+
+		// Pattern 3: async function name() {}
 		{regexp.MustCompile(`(?m)^async function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`), 1},
 
-		// Pattern 2: function name() {} and function* name() {} (generator)
+		// Pattern 4: function name() {} and function* name() {} (generator)
 		{regexp.MustCompile(`(?m)^function\s*\*?\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`), 1},
 
-		// Pattern 3: const/let/var name = async function() {}
+		// Pattern 5: const/let/var name = async function() {}
 		{regexp.MustCompile(`(?m)^(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*async\s+function\s*\(`), 1},
 
-		// Pattern 4: const/let/var name = function() {}
+		// Pattern 6: const/let/var name = function() {}
 		{regexp.MustCompile(`(?m)^(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*function\s*\(`), 1},
 
-		// Pattern 5: const/let/var name = async (...) => {}
+		// Pattern 7: const/let/var name = async (...) => {}
 		{regexp.MustCompile(`(?m)^(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*async\s+`), 1},
 
-		// Pattern 6: const/let/var name = () => {} or const/let/var name = x => {}
+		// Pattern 8: const/let/var name = () => {} or const/let/var name = x => {}
 		{regexp.MustCompile(`(?m)^(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*`), 1},
 
-		// Pattern 7: async name() {} (method shorthand)
+		// Pattern 9: async name() {} (method shorthand)
 		{regexp.MustCompile(`(?m)^async ([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`), 1},
 
-		// Pattern 8: name() {} (method shorthand) - will be filtered by keyword check
+		// Pattern 10: name() {} (method shorthand) - will be filtered by keyword check
 		{regexp.MustCompile(`(?m)^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`), 1},
 	}
 
@@ -150,6 +158,12 @@ func isFunctionAssignment(content string, start int) bool {
 		firstLine = remaining[:nlIdx]
 	}
 
+	// Check for getter/setter syntax (CRITICAL FIX FOR GETTERS)
+	if strings.HasPrefix(strings.TrimSpace(remaining), "get ") ||
+		strings.HasPrefix(strings.TrimSpace(remaining), "set ") {
+		return true
+	}
+
 	// Check for arrow function on the first line
 	if strings.Contains(firstLine, "=>") {
 		return true
@@ -160,18 +174,18 @@ func isFunctionAssignment(content string, start int) bool {
 	if len(remaining) > 200 {
 		checkRange = remaining[:200] // Look ahead a bit for function keyword
 	}
-	
+
 	// Check for "function" keyword appearing soon (not way later in a different function)
 	if strings.Contains(checkRange, "function") {
 		// Make sure it's not finding a function that appears later
 		funcIdx := strings.Index(checkRange, "function")
 		beforeFunc := checkRange[:funcIdx]
-		
+
 		// If there's a blank line (double newline) before "function", it's a different statement
 		if strings.Contains(beforeFunc, "\n\n") || strings.Contains(beforeFunc, "\n\r\n") {
 			return false
 		}
-		
+
 		// If "function" appears after a newline that's not indented (start of new statement), skip it
 		lines := strings.Split(beforeFunc, "\n")
 		if len(lines) > 1 {
