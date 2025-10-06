@@ -1,1 +1,11 @@
 public*
+
+# Build artifacts
+bin/
+
+# Backup files
+*.bak
+*.bak2
+
+# Log files
+*.log
