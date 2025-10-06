@@ -52,6 +52,104 @@ func GetAllRegisteredKeys() []string {
 	return keys
 }
 
+// normalizeComponentPath generates all possible lookup keys for a component path
+//
+// Pattern: Helper Function [Load: 8]
+// Cognitive Load: 8 (path parsing: 5, key generation: 3)
+//
+// This function addresses the component lookup problem where components might be
+// registered with different path variants (e.g., "./components/Header.html" vs "Header")
+//
+// Example:
+//   normalizeComponentPath("./components/UserProfile.html")
+//   Returns: ["./components/UserProfile.html", "UserProfile.html", "UserProfile", "./components/UserProfile"]
+//
+//   normalizeComponentPath("Header")
+//   Returns: ["Header"]
+func normalizeComponentPath(path string) []string {
+	keys := []string{path} // Always include the original path
+
+	// If path contains a directory separator, generate additional keys
+	if strings.Contains(path, "/") {
+		// Extract filename (everything after last /)
+		parts := strings.Split(path, "/")
+		filename := parts[len(parts)-1]
+
+		// Add filename as a key
+		keys = append(keys, filename)
+
+		// If filename has extension, add version without extension
+		if strings.Contains(filename, ".") {
+			nameParts := strings.Split(filename, ".")
+			nameWithoutExt := strings.Join(nameParts[:len(nameParts)-1], ".")
+			keys = append(keys, nameWithoutExt)
+		}
+
+		// Add path without extension
+		if strings.Contains(path, ".") {
+			pathParts := strings.Split(path, ".")
+			pathWithoutExt := strings.Join(pathParts[:len(pathParts)-1], ".")
+			keys = append(keys, pathWithoutExt)
+		}
+	} else if strings.Contains(path, ".") {
+		// Path is just a filename with extension (e.g., "Header.html")
+		nameParts := strings.Split(path, ".")
+		nameWithoutExt := strings.Join(nameParts[:len(nameParts)-1], ".")
+		keys = append(keys, nameWithoutExt)
+	}
+
+	return keys
+}
+
+// resolvePropValue resolves a component prop value against the parent data scope
+//
+// Pattern: Helper Function [Load: 8]
+// Cognitive Load: 8 (type checking: 3, scope lookup: 3, value extraction: 2)
+//
+// This is the public version of extractPropValue, exported for use in tests.
+// It handles three types of props:
+// 1. Dynamic props (prop={expression}) - resolve against parent scope
+// 2. Shorthand props ({prop}) - resolve from parent scope
+// 3. Static props (prop="value") - return as string literal
+//
+// Example:
+//   parentScope := map[string]any{"user": "Alice", "count": 42}
+//
+//   resolvePropValue(ComponentProp{Name: "name", Value: "{user}", IsDynamic: true}, parentScope)
+//   // Returns: "Alice"
+//
+//   resolvePropValue(ComponentProp{Name: "total", Value: "{count}", IsDynamic: true}, parentScope)
+//   // Returns: 42
+//
+//   resolvePropValue(ComponentProp{Name: "label", Value: "Submit", IsDynamic: false}, parentScope)
+//   // Returns: "Submit"
+func resolvePropValue(prop ast.ComponentProp, parentDataScope map[string]any) any {
+	return extractPropValue(prop, parentDataScope)
+}
+
+// addComponentDataWrapper wraps component nodes with an x-data attribute
+//
+// Pattern: Helper Function [Load: 10]
+// Cognitive Load: 10 (element type checking: 4, attribute manipulation: 6)
+//
+// This is an alias for wrapWithXData, provided for backward compatibility with tests.
+// It ensures the component output has an x-data attribute containing the data scope.
+//
+// Requirements:
+// 1. Format data scope as Alpine.js object
+// 2. Add x-data to single root element if it exists
+// 3. Wrap multiple nodes in div with x-data
+//
+// Example:
+//   Single element: <div class="card">content</div>
+//     → <div x-data='{ count: 0 }' class="card">content</div>
+//
+//   Multiple nodes: [<h1>Title</h1>, <p>Content</p>]
+//     → <div x-data='{ count: 0 }'><h1>Title</h1><p>Content</p></div>
+func addComponentDataWrapper(nodes []ast.Node, dataScope map[string]any) []ast.Node {
+	return wrapWithXData(nodes, dataScope)
+}
+
 // formatComponentData formats the component data scope for the x-data attribute
 // This is a special formatter for components to match the expected output format
 func formatComponentData(dataScope map[string]any) string {
@@ -488,8 +586,11 @@ func wrapWithXData(nodes []ast.Node, dataScope map[string]any) []ast.Node {
 	// REQUIREMENT 1: Format data scope (COGNITIVE LOAD: 2)
 	xDataValue := formatComponentData(dataScope)
 	xDataAttr := ast.Attribute{
-		Name:  "x-data",
-		Value: xDataValue,
+		Name:       "x-data",
+		Value:      xDataValue,
+		Dynamic:    true,
+		IsAlpine:   true,
+		AlpineType: "data",
 	}
 
 	// REQUIREMENT 2: Check for single root element (COGNITIVE LOAD: 4)
