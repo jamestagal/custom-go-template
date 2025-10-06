@@ -196,8 +196,8 @@ const totalOrdersValue = user.orders.reduce((sum, order) => sum + order.total, 0
 
 <div class="dashboard">
   <div class="dashboard-header">
-    <div class="welcome-message">Welcome back, {user.name }!</div>
-    <div>{user.email }</div>
+    <div class="welcome-message">Welcome back, {user.name}!</div>
+    <div>{user.email}</div>
   </div>
   
   <div class="dashboard-content">
@@ -209,7 +209,7 @@ const totalOrdersValue = user.orders.reduce((sum, order) => sum + order.total, 0
             <a href="#" class="section-link">View All Orders</a>
           </div>
           
-          {#if user.orders && user.orders.length > 0}
+          {if user.orders && user.orders.length > 0}
             <table class="order-table">
               <thead>
                 <tr>
@@ -220,16 +220,16 @@ const totalOrdersValue = user.orders.reduce((sum, order) => sum + order.total, 0
                 </tr>
               </thead>
               <tbody>
-                {#for order in user.orders}
+                {for order in user.orders}
                   <tr>
                     <td>{order.id }</td>
-                    <td>{formatDate(order.date) }</td>
+                    <td>{formatDate(order.date)}</td>
                     <td>
                       <span class="status-badge {getStatusColor(order.status) }">
                         {order.status }
                       </span>
                     </td>
-                    <td>{formatCurrency(order.total) }</td>
+                    <td>{formatCurrency(order.total)}</td>
                   </tr>
                 {/for}
               </tbody>
@@ -238,14 +238,14 @@ const totalOrdersValue = user.orders.reduce((sum, order) => sum + order.total, 0
             <div class="summary-card">
               <div class="summary-row">
                 <span class="summary-label">Total Orders</span>
-                <span>{user.orders.length }</span>
+                <span>{user.orders.length}</span>
               </div>
               <div class="summary-total">
                 <span>Total Spent</span>
-                <span>{formatCurrency(totalOrdersValue) }</span>
+                <span>{formatCurrency(totalOrdersValue)}</span>
               </div>
             </div>
-          {:else}
+          {else}
             <p>You haven't placed any orders yet.</p>
           {/if}
         </div>
@@ -263,16 +263,16 @@ const totalOrdersValue = user.orders.reduce((sum, order) => sum + order.total, 0
             <a href="#" class="section-link">View All</a>
           </div>
           
-          {#if user.wishlist && user.wishlist.length > 0}
+          {if user.wishlist && user.wishlist.length > 0}
             <div>
-              {#for item in user.wishlist}
+              {for item in user.wishlist}
                 <div class="wishlist-item">
-                  <div class="wishlist-name">{item.name }</div>
-                  <div class="wishlist-price">{formatCurrency(item.price) }</div>
+                  <div class="wishlist-name">{item.name}</div>
+                  <div class="wishlist-price">{formatCurrency(item.price)}</div>
                 </div>
               {/for}
             </div>
-          {:else}
+          {else}
             <p>Your wishlist is empty.</p>
           {/if}
         </div>

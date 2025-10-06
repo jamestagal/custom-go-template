@@ -4,7 +4,6 @@ prop price = 0
 prop inStock = true
 prop featured = false
 prop tags = []
-prop formatPrice = price => `$${price.toFixed(2)}`
 ---
 
 <style>
@@ -101,34 +100,34 @@ prop formatPrice = price => `$${price.toFixed(2)}`
   }
 </style>
 
-<div class="product-card {featured ? 'featured' : '' }">
+<div class="product-card {featured ? 'featured' : ''}">
   <div class="product-name">
-    {name }
-    {#if featured}
+    {name}
+    {if featured}
       <span class="featured-badge">Featured</span>
     {/if}
   </div>
-  
-  <div class="product-price">{formatPrice(price) }</div>
-  
-  {#if inStock}
+
+  <div class="product-price">${price}</div>
+
+  {if inStock}
     <div class="product-status in-stock">In Stock</div>
-  {:else}
+  {else}
     <div class="product-status out-of-stock">Out of Stock</div>
   {/if}
-  
-  {#if tags && tags.length > 0}
+
+  {if tags && tags.length > 0}
     <div class="product-tags">
-      {#for tag in tags}
-        <span class="product-tag">{tag }</span>
+      {for tag in tags}
+        <span class="product-tag">{tag}</span>
       {/for}
     </div>
   {/if}
-  
-  <button class="add-to-cart" {!inStock ? 'disabled' : '' }>
-    {#if inStock}
+
+  <button class="add-to-cart" {!inStock ? 'disabled' : ''}>
+    {if inStock}
       Add to Cart
-    {:else}
+    {else}
       Sold Out
     {/if}
   </button>

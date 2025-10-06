@@ -1,41 +1,7 @@
 ---
-prop type = "info" // info, success, warning, error
+prop type = "info"
 prop message = "Notification message"
 prop dismissable = true
-
-// Determine styles based on notification type
-const getTypeStyles = () => {
-  const styles = {
-    info: {
-      bgColor: "bg-blue-50",
-      borderColor: "border-blue-400",
-      textColor: "text-blue-700",
-      icon: "ℹ️"
-    },
-    success: {
-      bgColor: "bg-green-50",
-      borderColor: "border-green-400",
-      textColor: "text-green-700",
-      icon: "✓"
-    },
-    warning: {
-      bgColor: "bg-yellow-50",
-      borderColor: "border-yellow-400",
-      textColor: "text-yellow-700",
-      icon: "⚠️"
-    },
-    error: {
-      bgColor: "bg-red-50",
-      borderColor: "border-red-400",
-      textColor: "text-red-700",
-      icon: "✕"
-    }
-  };
-  
-  return styles[type] || styles.info;
-};
-
-const typeStyles = getTypeStyles();
 ---
 
 <style>
@@ -91,10 +57,18 @@ const typeStyles = getTypeStyles();
   }
 </style>
 
-<div class="notification notification-{type }">
-  <div class="notification-icon">{typeStyles.icon }</div>
-  <div class="notification-message">{message }</div>
-  {#if dismissable}
-    <button class="notification-dismiss">×</button>
+<div class="notification notification-{type}">
+  {if type == "info"}
+    <div class="notification-icon">ℹ️</div>
+  {else if type == "success"}
+    <div class="notification-icon">✓</div>
+  {else if type == "warning"}
+    <div class="notification-icon">⚠️</div>
+  {else}
+    <div class="notification-icon">✕</div>
+  {/if}
+  <div class="notification-message">{message}</div>
+  {if dismissable}
+    <button class="notification-dismiss" @click="currentNotification = null">×</button>
   {/if}
 </div>

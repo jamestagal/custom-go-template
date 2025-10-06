@@ -1,0 +1,52 @@
+---
+import Header from "./components/Header.html";
+import Footer from "./components/Footer.html";
+import AdminPanel from "./components/AdminPanel.html";
+
+prop pageTitle = "Admin Dashboard"
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{pageTitle} - Custom Go Template</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body>
+  <Header title={pageTitle} />
+
+  <main style="padding: 2rem;">
+    <div style="background-color: #f0f0f0; padding: 0.5rem 1rem; border-radius: 0.25rem; margin-bottom: 1rem; font-size: 0.875rem; color: #666;">
+      ⚡ Build time: <strong>{buildTime}</strong>
+    </div>
+
+    <h1 style="color: #333; margin-bottom: 1rem;">Admin Dashboard</h1>
+    <p style="margin-bottom: 2rem; color: #666;">Welcome to the admin control panel. Monitor site statistics and recent activity.</p>
+
+    <AdminPanel />
+
+    <div style="margin-top: 2rem; padding: 1rem; background-color: #f8f9fa; border-radius: 0.5rem;">
+      <p style="margin: 0; color: #666;">
+        <a href="/" style="color: #007bff; text-decoration: none;">← Back to Home</a> |
+        <a href="/user-dashboard" style="color: #007bff; text-decoration: none;">View User Dashboard →</a>
+      </p>
+    </div>
+  </main>
+
+  <Footer />
+</body>
+</html>
+
+<style>
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #f5f5f5;
+  }
+
+  a:hover {
+    text-decoration: underline !important;
+  }
+</style>

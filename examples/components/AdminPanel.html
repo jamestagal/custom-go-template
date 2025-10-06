@@ -172,43 +172,43 @@ function formatTimestamp(ts) {
   <div class="admin-header">
     <div class="admin-title">Admin Dashboard</div>
     <div class="admin-user">
-      <span>{user.name }</span>
-      <span class="admin-badge">{user.role }</span>
+      <span>{user.name}</span>
+      <span class="admin-badge">{user.role}</span>
     </div>
   </div>
   
   <div class="admin-content">
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-value">{stats.users }</div>
+        <div class="stat-value">{stats.users}</div>
         <div class="stat-label">Registered Users</div>
       </div>
       
       <div class="stat-card">
-        <div class="stat-value">{stats.products }</div>
+        <div class="stat-value">{stats.products}</div>
         <div class="stat-label">Products</div>
       </div>
       
       <div class="stat-card">
-        <div class="stat-value">{stats.orders }</div>
+        <div class="stat-value">{stats.orders}</div>
         <div class="stat-label">Orders</div>
       </div>
       
       <div class="stat-card">
-        <div class="stat-value">{formatCurrency(stats.revenue) }</div>
+        <div class="stat-value">{formatCurrency(stats.revenue)}</div>
         <div class="stat-label">Total Revenue</div>
       </div>
     </div>
     
     <h3 class="section-title">Recent Activity</h3>
     <ul class="action-list">
-      {#for action in recentActions}
+      {for action in recentActions}
         <li class="action-item">
           <div class="action-info">
-            <span class="action-desc">{action.action }</span>
-            <span class="action-user">by {action.user }</span>
+            <span class="action-desc">{action.action}</span>
+            <span class="action-user">by {action.user}</span>
           </div>
-          <div class="action-time">{formatTimestamp(action.timestamp) }</div>
+          <div class="action-time">{formatTimestamp(action.timestamp)}</div>
         </li>
       {/for}
     </ul>

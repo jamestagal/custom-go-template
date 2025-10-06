@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	// Import the new renderer package
 	"github.com/jimafisk/custom_go_template/ast"
@@ -37,6 +38,9 @@ func main() {
 			http.ServeFile(w, r, publicDir+r.URL.Path)
 			return
 		}
+
+		// Start timing the template processing
+		startTime := time.Now()
 
 		// Render the template - use test-basic.html for testing
 		entrypoint := "examples/pages/home.html"
@@ -115,7 +119,13 @@ func main() {
 			}
 		}
 
-		// Render the template with the extracted props
+		// Calculate build time up to this point (we'll update it later with total time)
+		buildTime := time.Since(startTime)
+		// Format to 2 decimal places in milliseconds
+		buildTimeMs := float64(buildTime.Microseconds()) / 1000.0
+		props["buildTime"] = fmt.Sprintf("%.2fms", buildTimeMs)
+
+		// Render the template with the extracted props (including buildTime)
 		markup, script, style := renderer.Render(entrypoint, props)
 
 		// If the style is empty, try to extract it directly from the template file
@@ -187,7 +197,14 @@ func main() {
 			log.Fatalf("Failed to write style.css: %v", err)
 		}
 
-		err = os.WriteFile(publicDir+"/index.html", []byte(htmlWithLinks), 0644)
+		// Update build time with total time
+		buildTime = time.Since(startTime)
+		log.Printf("Template build completed in %v", buildTime)
+
+		// Add build time comment to HTML
+		htmlWithBuildTime := fmt.Sprintf("<!-- Build time: %v -->\n%s", buildTime, htmlWithLinks)
+
+		err = os.WriteFile(publicDir+"/index.html", []byte(htmlWithBuildTime), 0644)
 		if err != nil {
 			log.Fatalf("Failed to write index.html: %v", err)
 		}
