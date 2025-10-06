@@ -10,6 +10,31 @@ prop animals = ["dog", "cat", "bird"]
 let salutation = "Hello"
 let path = "./components/UserProfile.html"
 let comp = "UserProfile"
+
+// Define user objects for dynamic component testing
+let user1 = {
+  name: "Benjamin",
+  email: "benjamin@example.com",
+  role: "admin",
+  avatar: null,
+  joinDate: "2024-10-06"
+}
+
+let user2 = {
+  name: "Dynamic User",
+  email: "dynamic@example.com",
+  role: "user",
+  avatar: null,
+  joinDate: "2024-05-15"
+}
+
+let user3 = {
+  name: "Variable Path User",
+  email: "variable@example.com",
+  role: "editor",
+  avatar: null,
+  joinDate: "2024-03-20"
+}
 ---
 
 <!DOCTYPE html>
@@ -50,9 +75,9 @@ let comp = "UserProfile"
       <!-- Dynamic components (Jim's innovative <= syntax) -->
       <div style="margin: 2rem 0;">
         <h2>Dynamic Component Examples</h2>
-        <={`./components/UserProfile.html`} name={name} age={age} />
-        <='{path}' name="Dynamic User" age={25} />
-        <={`./components/{comp}.html`} name="Variable Path User" age={30} />
+        <="./components/UserProfile.html" showRole={true} />
+        <='{path}' showRole={true} />
+        <="./components/{comp}.html" showRole={true} />
       </div>
 
       <!-- Loops with nested conditionals -->
