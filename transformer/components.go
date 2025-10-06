@@ -187,6 +187,24 @@ func formatComponentData(dataScope map[string]any) string {
 				}
 			}
 
+			// CRITICAL FIX: Check if this is already a function/getter/setter definition
+			// If so, output it in method shorthand format (valid for object literals)
+			trimmedValue := strings.TrimSpace(cleanValue)
+			if isFunctionDefinition(trimmedValue) {
+				// Convert function declarations to method shorthand
+				// "function name() {}" -> "name() {}"
+				// "get name() {}" and "set name() {}" stay as-is
+				functionDef := strings.ReplaceAll(cleanValue, `"`, `'`)
+
+				// Remove "function " prefix if present (not for get/set)
+				if strings.HasPrefix(trimmedValue, "function ") {
+					functionDef = strings.Replace(functionDef, "function ", "", 1)
+				}
+
+				result.WriteString(functionDef)
+				continue
+			}
+
 			// Check if this is a dynamic expression (no quotes)
 			// We need to handle variable references without quotes
 			isDynamic := isDynamicExpression(cleanValue, dataScope)
@@ -206,6 +224,13 @@ func formatComponentData(dataScope map[string]any) string {
 					// This is a variable reference or expression, don't quote it
 					result.WriteString(key)
 					result.WriteString(": ")
+					// CRITICAL FIX: For object literals and arrays, convert double quotes to single quotes
+					// to prevent breaking HTML attributes like x-data="{ user: { name: "value" } }"
+					trimmedValue := strings.TrimSpace(cleanValue)
+					if strings.HasPrefix(trimmedValue, "{") || strings.HasPrefix(trimmedValue, "[") {
+						// Replace double quotes with single quotes in object literals and arrays
+						cleanValue = strings.ReplaceAll(cleanValue, `"`, `'`)
+					}
 					result.WriteString(cleanValue)
 				}
 			} else {
@@ -226,6 +251,37 @@ func formatComponentData(dataScope map[string]any) string {
 
 	result.WriteString(" }")
 	return result.String()
+}
+
+// isFunctionDefinition checks if a string is a function, getter, or setter definition
+// Returns true for patterns like:
+//   - function name() { ... }
+//   - get name() { ... }
+//   - set name(value) { ... }
+//   - async function name() { ... }
+//   - name() { ... } (method shorthand)
+func isFunctionDefinition(value string) bool {
+	trimmed := strings.TrimSpace(value)
+
+	// Check for getter: get name() { ... }
+	if strings.HasPrefix(trimmed, "get ") {
+		return true
+	}
+
+	// Check for setter: set name(value) { ... }
+	if strings.HasPrefix(trimmed, "set ") {
+		return true
+	}
+
+	// Check for function keyword: function name() { ... } or async function name() { ... }
+	if strings.HasPrefix(trimmed, "function ") || strings.HasPrefix(trimmed, "async function ") {
+		return true
+	}
+
+	// Check for method shorthand: name() { ... } or async name() { ... }
+	// This pattern: word followed by parentheses and a brace
+	methodPattern := regexp.MustCompile(`^(?:async\s+)?[a-zA-Z_$][a-zA-Z0-9_$]*\s*\([^)]*\)\s*\{`)
+	return methodPattern.MatchString(trimmed)
 }
 
 // isValidVariableName checks if a string is a valid JavaScript variable name
@@ -267,12 +323,21 @@ func referencesOtherScopeVars(expr string, currentVar string, dataScope map[stri
 			continue
 		}
 
-		// Check if this variable name appears in the expression
+		// Check if this variable name appears in the expression as a reference (not a property key)
 		// Use word boundaries to avoid false positives (e.g., "user" in "username")
 		varPattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(varName) + `\b`)
-		if varPattern.MatchString(expr) {
-			log.Printf("referencesOtherScopeVars: Expression '%s' references scope var '%s'", expr, varName)
-			return true
+		matches := varPattern.FindAllStringIndex(expr, -1)
+
+		// Check each match to see if it's a variable reference (not a property key)
+		for _, match := range matches {
+			endIdx := match[1]
+			afterMatch := expr[endIdx:]
+			trimmedAfter := strings.TrimSpace(afterMatch)
+			// If NOT followed by a colon, it's a variable reference
+			if !strings.HasPrefix(trimmedAfter, ":") {
+				log.Printf("referencesOtherScopeVars: Expression '%s' references scope var '%s'", expr, varName)
+				return true
+			}
 		}
 	}
 	return false
@@ -290,14 +355,30 @@ func replaceVarRefsWithThis(expr string, dataScope map[string]any) string {
 		}
 
 		// Replace word-boundary matches: varName -> this.varName
-		// But avoid replacing if already prefixed with this.
+		// But we need to be careful NOT to replace property keys in object literals
+		// Since Go's regexp doesn't support lookahead, we'll use FindAllStringIndex and process manually
 		varPattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(varName) + `\b`)
-		result = varPattern.ReplaceAllStringFunc(result, func(match string) string {
-			// Check if already prefixed with "this."
-			// This is a simple check - in production you'd want more robust parsing
-			return "this." + match
-		})
+		matches := varPattern.FindAllStringIndex(result, -1)
+
+		// Process matches in reverse order to preserve indices
+		for i := len(matches) - 1; i >= 0; i-- {
+			match := matches[i]
+			startIdx := match[0]
+			endIdx := match[1]
+
+			// Check if it's followed by a colon (property key pattern)
+			afterMatch := result[endIdx:]
+			trimmedAfter := strings.TrimSpace(afterMatch)
+			if !strings.HasPrefix(trimmedAfter, ":") {
+				// Not a property key, replace it
+				result = result[:startIdx] + "this." + result[startIdx:endIdx] + result[endIdx:]
+			}
+		}
 	}
+
+	// CRITICAL FIX: Also convert double quotes to single quotes in the result
+	// to prevent breaking HTML attributes when this is used in getters
+	result = strings.ReplaceAll(result, `"`, `'`)
 
 	log.Printf("replaceVarRefsWithThis: '%s' -> '%s'", expr, result)
 	return result
@@ -310,6 +391,11 @@ func isDynamicExpression(value string, dataScope map[string]any) bool {
 
 	// STEP 1: Check for obvious operators/syntax that indicate expressions
 	// These are ALWAYS dynamic regardless of scope
+
+	// Object literals: { name: "value", key: value }
+	if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
+		return true
+	}
 
 	// Arithmetic operators: age + 50, count * 2
 	if strings.Contains(trimmed, "+") ||
@@ -515,25 +601,17 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 
 	// PHASE 2: Process component fence and resolve props (Task 2.5) ✓
 
-	// Step 1: Extract component's fence props and defaults
+	// Step 1: Extract component's fence data (props, variables, AND functions including getters/setters)
 	// Look for fence section in the component template
 	for _, rootNode := range componentTemplate.Template.RootNodes {
 		if fence, ok := rootNode.(*ast.FenceSection); ok {
 			log.Printf("DEBUG: Found fence section with %d props and %d variables", len(fence.Props), len(fence.Variables))
 
-			// Add fence props with their default values
-			// CRITICAL FIX: Parse the string value to get the proper type (bool, int, etc.)
-			for _, fenceProp := range fence.Props {
-				parsedValue := parseValue(fenceProp.DefaultValue)
-				componentDataScope[fenceProp.Name] = parsedValue
-				log.Printf("DEBUG: Added fence prop '%s' with default value: %v (type: %T)", fenceProp.Name, parsedValue, parsedValue)
-			}
+			// CRITICAL FIX: Use collectComponentFenceData to extract ALL fence data including functions
+			// This was the bug - we were manually extracting props and variables but missing functions!
+			collectComponentFenceData(fence, componentDataScope)
 
-			// Add fence variables
-			for _, fenceVar := range fence.Variables {
-				componentDataScope[fenceVar.Name] = fenceVar.Value
-				log.Printf("DEBUG: Added fence variable '%s' with value: %v", fenceVar.Name, fenceVar.Value)
-			}
+			log.Printf("DEBUG: After collectComponentFenceData, scope has %d entries", len(componentDataScope))
 		}
 	}
 
@@ -635,42 +713,6 @@ func wrapWithXData(nodes []ast.Node, dataScope map[string]any) []ast.Node {
 	}
 
 	return []ast.Node{wrapper}
-}
-
-// isFunctionExpr checks if a string appears to be a JavaScript function expression
-func isFunctionExpr(expr string) bool {
-	expr = strings.TrimSpace(expr)
-	return strings.HasPrefix(expr, "function") ||
-		strings.Contains(expr, "=>") ||
-		strings.Contains(expr, "function(") ||
-		(strings.Contains(expr, "(") && strings.Contains(expr, ")") && strings.Contains(expr, "{") && strings.Contains(expr, "}"))
-}
-
-// getAlpineComponentName converts a component name to an Alpine.js component name
-func getAlpineComponentName(componentName string) string {
-	// Convert component name to Alpine.js component name
-	// e.g., "Header" -> "HeaderComponent"
-	// e.g., "./components/Header.html" -> "HeaderComponent"
-
-	// Extract the base name from the path if needed
-	baseName := componentName
-	if strings.Contains(componentName, "/") {
-		parts := strings.Split(componentName, "/")
-		baseName = parts[len(parts)-1]
-	}
-
-	// Remove file extension if present
-	if strings.Contains(baseName, ".") {
-		parts := strings.Split(baseName, ".")
-		baseName = parts[0]
-	}
-
-	// Ensure first letter is capitalized
-	if len(baseName) > 0 {
-		baseName = strings.ToUpper(string(baseName[0])) + baseName[1:]
-	}
-
-	return baseName + "Component"
 }
 
 // TransformDynamicComponent is the public entry point for dynamic component transformation
@@ -794,11 +836,13 @@ func extractVariablesFromPath(pathExpr string, dataScope map[string]any) {
 //   resolveDynamicPath("./views/{comp}.html", dataScope)
 //   // Returns: "./views/{comp}.html" (unchanged - variable not resolved)
 func resolveDynamicPath(pathExpr string, dataScope map[string]any) string {
-	resolved := pathExpr
+	// QUICK FIX: Strip surrounding backticks, single quotes, and double quotes
+	resolved := strings.Trim(pathExpr, "`'\"")
+	log.Printf("resolveDynamicPath: Cleaned path from '%s' to '%s'", pathExpr, resolved)
 
 	// Find all {variable} patterns (COGNITIVE LOAD: 3)
 	varPattern := regexp.MustCompile(`\{([a-zA-Z_$][a-zA-Z0-9_$]*)\}`)
-	matches := varPattern.FindAllStringSubmatch(pathExpr, -1)
+	matches := varPattern.FindAllStringSubmatch(resolved, -1)
 
 	// Substitute variables with their values (COGNITIVE LOAD: 5)
 	for _, match := range matches {
@@ -881,7 +925,7 @@ func createDynamicComponentPlaceholder(node *ast.DynamicComponentNode, path stri
 //
 // For dynamic props ({var}), extracts the variable name.
 // For static props, returns the value as-is.
-func resolvePropValueForPlaceholder(prop ast.ComponentProp, dataScope map[string]any) string {
+func resolvePropValueForPlaceholder(prop ast.ComponentProp, _ map[string]any) string {
 	if prop.IsDynamic {
 		// For dynamic props ({var}), extract the variable name
 		return strings.TrimSpace(strings.Trim(prop.Value, "{}"))

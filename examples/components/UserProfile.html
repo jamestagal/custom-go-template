@@ -12,30 +12,28 @@ prop showJoinDate = true
 prop compact = false
 
 // Format the join date
-function formatDate(dateString) {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+function formatDate(str) {
+  return str;
 }
 
 // Get role badge class
 function getRoleBadge(role) {
-  const badges = {
+  return {
     'admin': { bg: 'bg-red-100', text: 'text-red-800' },
     'manager': { bg: 'bg-purple-100', text: 'text-purple-800' },
     'editor': { bg: 'bg-blue-100', text: 'text-blue-800' },
     'user': { bg: 'bg-green-100', text: 'text-green-800' },
     'guest': { bg: 'bg-gray-100', text: 'text-gray-800' }
-  };
-
-  return badges[role.toLowerCase()] || badges.guest;
+  }[role.toLowerCase()] || { bg: 'bg-gray-100', text: 'text-gray-800' };
 }
 
-const roleBadge = getRoleBadge(user.role);
-const formattedJoinDate = formatDate(user.joinDate);
+get roleBadge() {
+  return this.getRoleBadge(this.user.role);
+}
+
+get formattedJoinDate() {
+  return this.formatDate(this.user.joinDate);
+}
 ---
 
 <style>

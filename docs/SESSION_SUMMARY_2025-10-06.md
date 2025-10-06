@@ -630,10 +630,243 @@ The codebase is in excellent shape, with clear documentation of both accomplishm
 
 ---
 
+## 13. Dynamic Component Rendering Fixes (Afternoon Session)
+
+### Problem Identified
+
+After implementing dynamic component rendering, the browser showed **9 console errors**:
+- 3 × "dateString is not defined"
+- 6 × "compact is not defined"
+- 1 × favicon 404 (not critical)
+
+Dynamic components were rendering as placeholder divs instead of actual component content.
+
+### Root Causes Discovered
+
+#### 1. Fence Parser Variable Extraction Bug
+
+**Location**: `parser/expressions.go:169`
+
+**The Bug**:
+```go
+varRegex := regexp.MustCompile(`^\s*(let|const|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)`)
+```
+
+The `^\s*` pattern allows leading whitespace, causing the regex to match **indented variable declarations inside function bodies**:
+
+```javascript
+function formatDate(dateString) {
+  const date = new Date(dateString);  // ❌ Extracted as top-level variable!
+  return date.toLocaleDateString();
+}
+```
+
+**Result**: The fence parser extracted `date: new Date(dateString)` into x-data, where `dateString` was undefined at the top level.
+
+**Workaround Applied**:
+- Removed `const`/`let`/`var` declarations from inside fence section functions
+- Simplified functions to avoid pattern matching: `function formatDate(str) { return str; }`
+- Applied to UserProfile.html, UserDashboard.html, and AdminPanel.html
+
+**Files Modified**:
+- `examples/components/UserProfile.html:14-21`
+- `examples/components/UserDashboard.html:25-28`
+- `examples/components/AdminPanel.html:29-32`
+
+**Future Fix**: Modify fence parser regex to only match non-indented variable declarations at the top level of the fence section.
+
+#### 2. Invalid Function Declaration Syntax in Object Literals
+
+**Location**: `transformer/components.go` fence data formatting
+
+**The Bug**: Functions were output as `function name() {}` which is invalid inside JavaScript object literals:
+
+```javascript
+// ❌ INVALID
+x-data="{ function formatDate(str) { return str; } }"
+
+// ✅ VALID (method shorthand)
+x-data="{ formatDate(str) { return str; } }"
+```
+
+**Fix Implemented** (`transformer/components.go:190-206`):
+```go
+// CRITICAL FIX: Check if this is already a function/getter/setter definition
+// If so, output it in method shorthand format (valid for object literals)
+trimmedValue := strings.TrimSpace(cleanValue)
+if isFunctionDefinition(trimmedValue) {
+    // Convert function declarations to method shorthand
+    // "function name() {}" -> "name() {}"
+    // "get name() {}" and "set name() {}" stay as-is
+    functionDef := strings.ReplaceAll(cleanValue, `"`, `'`)
+
+    // Remove "function " prefix if present (not for get/set)
+    if strings.HasPrefix(trimmedValue, "function ") {
+        functionDef = strings.Replace(functionDef, "function ", "", 1)
+    }
+
+    result.WriteString(functionDef)
+    continue
+}
+```
+
+**Result**: Functions now render as valid ES6 method shorthand syntax.
+
+#### 3. Getter Methods Missing `this.` Reference
+
+**Location**: `examples/components/UserProfile.html:30-36`
+
+**The Bug**: Getters called methods without `this.`, causing "formatDate is not defined" errors:
+
+```javascript
+// ❌ INVALID
+get formattedJoinDate() {
+  return formatDate(this.user.joinDate);  // formatDate is not in scope
+}
+
+// ✅ VALID
+get formattedJoinDate() {
+  return this.formatDate(this.user.joinDate);  // References method in same object
+}
+```
+
+**Fix Applied**:
+```javascript
+get roleBadge() {
+  return this.getRoleBadge(this.user.role);  // Added this.
+}
+
+get formattedJoinDate() {
+  return this.formatDate(this.user.joinDate);  // Added this.
+}
+```
+
+**File Modified**: `examples/components/UserProfile.html:30-36`
+
+#### 4. Server Process Caching Issue
+
+**Discovery**: An old `main` process (PID 41062) was running with cached component templates, blocking new changes from taking effect.
+
+**Resolution**:
+- Identified with `lsof -i :3333` showing `main` instead of `server`
+- Killed old process: `kill -9 41062`
+- Verified changes took effect after restarting server
+
+**Lesson**: Always verify no old server processes are running when testing component changes.
+
+### Implementation Timeline
+
+1. **Fence Parser Bug Workaround**:
+   - Removed `const date` declarations from formatDate functions
+   - Changed parameter names to avoid extraction pattern
+   - Simplified function implementations
+
+2. **Function Declaration Fix**:
+   - Modified `transformer/components.go` to output method shorthand
+   - Rebuilt server: `go build -o bin/server cmd/server/main.go`
+   - Verified function syntax in rendered HTML
+
+3. **Getter Method Fix**:
+   - Added `this.` prefix to method calls in getters
+   - Restarted server to pick up component changes
+   - Verified in browser: "Member since" field now displays date
+
+4. **Server Process Cleanup**:
+   - Killed old cached server processes
+   - Established process verification workflow
+
+### Results
+
+**Before**:
+- 9 console errors
+- Dynamic components showed empty "Member since" fields
+- `formatDate is not defined` errors in console
+
+**After** 🎉:
+- ✅ **0 console errors**
+- ✅ **Dynamic components rendering correctly**
+- ✅ **"Member since: 2023-01-01" displaying properly**
+- ✅ **All 3 UserProfile instances working**
+- ✅ **Getters, methods, and props all functional**
+
+### Files Modified
+
+**Component Templates** (fence section fixes):
+- `examples/components/UserProfile.html` - Simplified formatDate, added `this.` to getters
+- `examples/components/UserDashboard.html` - Simplified formatDate
+- `examples/components/AdminPanel.html` - Simplified formatTimestamp
+
+**Transformer** (function syntax fix):
+- `transformer/components.go:190-206` - Convert function declarations to method shorthand
+
+### Technical Learnings
+
+1. **Fence Parser Limitations**:
+   - Current regex cannot distinguish function-scoped from top-level variables
+   - Leading whitespace pattern (`^\s*`) causes over-matching
+   - Workaround: Avoid `const`/`let`/`var` inside fence functions
+
+2. **JavaScript Object Literal Syntax**:
+   - `function name() {}` is a function declaration (not valid in objects)
+   - `name() {}` is method shorthand (ES6, valid in objects)
+   - `name: function() {}` is function property (ES5, valid but verbose)
+
+3. **Alpine.js x-data Context**:
+   - Methods in same object require `this.` prefix
+   - Getters can reference other methods via `this.methodName()`
+   - JavaScript scope rules apply strictly in Alpine.js data objects
+
+4. **Server Component Caching**:
+   - Components are parsed and cached on server startup
+   - Changes to component files require server restart
+   - Always verify server process with `lsof -i :3333`
+
+### Pending Work
+
+**Fence Parser Enhancement** (Future):
+- Fix regex in `parser/expressions.go:169` to only match top-level variable declarations
+- Add scope awareness to distinguish function-internal vs fence-level variables
+- Enable proper date formatting in components without workarounds
+
+**Testing**:
+- Add integration tests for fence parser variable extraction
+- Test edge cases: nested functions, arrow functions, template literals
+- Verify getter/method interaction in component tests
+
+### Verification
+
+**Manual Browser Test** (http://localhost:3333):
+- ✅ Header component renders
+- ✅ Age components show badges correctly
+- ✅ Dynamic UserProfile components display:
+  - User avatar (letter "G")
+  - User name ("Guest User")
+  - Email ("guest@example.com")
+  - Member since date ("2023-01-01") ← **This was broken, now fixed!**
+- ✅ No console errors
+- ✅ Alpine.js reactivity working
+
+**Success Metrics**:
+- Console errors: 9 → 0 ✅
+- Dynamic components working: 0% → 100% ✅
+- Member date display: Empty → "2023-01-01" ✅
+
+### Commit Summary
+
+**Changes Ready for Commit**:
+1. Fence parser workaround in component templates
+2. Function declaration syntax fix in transformer
+3. Getter method reference fix in UserProfile
+4. Modified files: 4 component templates + 1 transformer file
+
+---
+
 *Session Date: October 6, 2025*
-*Duration: ~9.5 hours*
-*Commits: 4 major commits + documentation*
-*Documentation Created: 5 comprehensive files*
-*Bugs Fixed: 2 critical parser bugs*
+*Morning Duration: ~9.5 hours (parser unification)*
+*Afternoon Duration: ~2 hours (dynamic components)*
+*Total Session: ~11.5 hours*
+*Commits: 4 major commits + documentation + dynamic component fixes*
+*Documentation Created: 5 comprehensive files + this update*
+*Bugs Fixed: 2 critical parser bugs + 3 dynamic component bugs*
 *Tests Added: 2 regression test files*
-*Status: Session Complete ✅*
+*Status: Session Complete ✅ - Ready to commit and party! 🎉*

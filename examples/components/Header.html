@@ -88,22 +88,22 @@ const navItems = isLoggedIn ? [
 <header class="header">
   <div class="header-container">
     <div>
-      <a href="/" class="brand">{title }</a>
+      <a href="/" class="brand">{title}</a>
     </div>
     
     <nav class="nav">
       {for item in navItems}
-        <a href="{item.url }" class="nav-item">{item.label }</a>
+        <a href="{item.url}" class="nav-item">{item.label}</a>
       {/for}
     </nav>
 
     {if isLoggedIn}
       <div class="user-info">
-        <span>Welcome, {user.name }</span>
+        <span>Welcome, {user.name}</span>
         {if user.role === "admin"}
           <span class="user-badge admin-badge">Admin</span>
         {else}
-          <span class="user-badge">{user.role }</span>
+          <span class="user-badge">{user.role}</span>
         {/if}
         <button class="logout-button">Logout</button>
       </div>

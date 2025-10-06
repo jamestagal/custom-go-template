@@ -108,14 +108,14 @@ prop socialLinks = [
   <div class="footer-container">
     <div class="footer-grid">
       <div>
-        <div class="footer-brand">{companyName }</div>
+        <div class="footer-brand">{companyName}</div>
         <p class="footer-description">
           Our custom template engine makes building reactive web applications simple and efficient.
           We focus on developer experience without sacrificing performance.
         </p>
         <div class="social-links">
           {for social in socialLinks}
-            <a href="{social.url }" class="social-link" title="{social.label }">
+            <a href="{social.url}" class="social-link" title="{social.label}">
               {social.icon }
             </a>
           {/for}
@@ -127,7 +127,7 @@ prop socialLinks = [
         <ul class="footer-links">
           {for link, index in links.slice(0, 3)}
             <li class="footer-link">
-              <a href="{link.url }">{link.label }</a>
+              <a href="{link.url}">{link.label}</a>
             </li>
           {/for}
         </ul>
@@ -138,7 +138,7 @@ prop socialLinks = [
         <ul class="footer-links">
           {for link, index in links.slice(3)}
             <li class="footer-link">
-              <a href="{link.url }">{link.label }</a>
+              <a href="{link.url}">{link.label}</a>
             </li>
           {/for}
         </ul>
@@ -146,7 +146,7 @@ prop socialLinks = [
     </div>
     
     <div class="copyright">
-      &copy; {year } {companyName }. All rights reserved.
+      &copy; {year} {companyName}. All rights reserved.
     </div>
   </div>
 </footer>
