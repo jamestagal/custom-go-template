@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"fmt"
 	"log"
 	"regexp"
 	"strings"
@@ -351,26 +352,61 @@ func transformAttributes(attributes []ast.Attribute, dataScope map[string]any) [
 			continue
 		}
 
-		// Check if the attribute value contains {expression} pattern
-		if matches := dynamicAttrPattern.FindStringSubmatch(attr.Value); len(matches) > 0 {
-			// Extract the expression from {expression}
-			expression := strings.TrimSpace(matches[1])
+		// Check if the attribute value contains {expression} pattern(s)
+		allMatches := dynamicAttrPattern.FindAllStringSubmatchIndex(attr.Value, -1)
 
-			// Add the variable to data scope
-			extractVariablesFromExpr(expression, dataScope)
+		if len(allMatches) > 0 {
+			// Build a composite expression that concatenates static and dynamic parts
+			var expressionParts []string
+			lastEnd := 0
+
+			for _, match := range allMatches {
+				// match[0] is start of {expression}, match[1] is end of {expression}
+				// match[2] is start of expression (without braces), match[3] is end
+
+				// Add any static text before this expression
+				if match[0] > lastEnd {
+					staticPart := attr.Value[lastEnd:match[0]]
+					if staticPart != "" {
+						expressionParts = append(expressionParts, fmt.Sprintf("'%s'", staticPart))
+					}
+				}
+
+				// Extract the expression from {expression}
+				expression := strings.TrimSpace(attr.Value[match[2]:match[3]])
+
+				// Add the variable to data scope
+				extractVariablesFromExpr(expression, dataScope)
+
+				// Add the dynamic expression
+				expressionParts = append(expressionParts, expression)
+
+				lastEnd = match[1]
+			}
+
+			// Add any remaining static text after the last expression
+			if lastEnd < len(attr.Value) {
+				staticPart := attr.Value[lastEnd:]
+				if staticPart != "" {
+					expressionParts = append(expressionParts, fmt.Sprintf("'%s'", staticPart))
+				}
+			}
+
+			// Combine all parts with + operator
+			combinedExpression := strings.Join(expressionParts, " + ")
 
 			// Transform to Alpine.js bind syntax
 			transformedAttr := ast.Attribute{
-				Name:       attr.Name,      // Keep original attribute name
-				Value:      expression,     // Just the expression without braces
-				Dynamic:    true,           // Mark as dynamic so renderer uses :attribute
-				IsAlpine:   false,          // Not an Alpine directive itself
+				Name:       attr.Name,          // Keep original attribute name
+				Value:      combinedExpression, // Combined expression
+				Dynamic:    true,               // Mark as dynamic so renderer uses :attribute
+				IsAlpine:   false,              // Not an Alpine directive itself
 				AlpineType: "",
 				AlpineKey:  "",
 			}
 
 			log.Printf("transformAttributes: Transformed %s=\"%s\" to dynamic binding with value \"%s\"",
-				attr.Name, attr.Value, expression)
+				attr.Name, attr.Value, combinedExpression)
 
 			transformedAttributes = append(transformedAttributes, transformedAttr)
 		} else {
