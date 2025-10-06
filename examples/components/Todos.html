@@ -1,39 +1,43 @@
 ---
-prop number;
+prop number = 5
+prop start = 0
+prop todos = [
+  { id: 1, title: "Complete project documentation", completed: true },
+  { id: 2, title: "Review pull requests", completed: false },
+  { id: 3, title: "Update dependencies", completed: true },
+  { id: 4, title: "Write unit tests", completed: false },
+  { id: 5, title: "Deploy to production", completed: false },
+  { id: 6, title: "Fix bug in authentication", completed: true },
+  { id: 7, title: "Optimize database queries", completed: false },
+  { id: 8, title: "Update user documentation", completed: true },
+  { id: 9, title: "Refactor legacy code", completed: false },
+  { id: 10, title: "Set up CI/CD pipeline", completed: true },
+  { id: 11, title: "Code review session", completed: false },
+  { id: 12, title: "Team meeting", completed: true },
+  { id: 13, title: "Update README", completed: false },
+  { id: 14, title: "Security audit", completed: false }
+]
 ---
 
-<script>
-	let t = document.querySelector(".todos");
-    let num = t.dataset.number;
-	const fetchTodos = () => {
-		fetch('https://jsonplaceholder.typicode.com/todos')
-			.then(response => response.json())
-			.then(json => {
-				t.innerHTML = json.slice(0, num)
-					.map(todo => "<tr><td>" + todo.title + "</td><td>" + todo.completed + "</td></tr>")
-					.join('');
-			});
-	};
-	fetchTodos();
-
-	const observer = new MutationObserver(() => {
-		num = t.dataset.number;
-		fetchTodos();
-	});
-
-	observer.observe(t, {
-		attributes: true,
-		attributeFilter: ['data-number']
-	});
-</script>
-
-<table>
-	<thead>
-		<tr>
-			<th>Todo</th>
-			<th>Completed</th>
-		</tr>
-	</thead>
-	<tbody data-number="{number}" class="todos">
-	</tbody>
+<table class="todos-table">
+  <thead>
+    <tr>
+      <th style="width: 40px; text-align: center;">#</th>
+      <th>Task</th>
+      <th style="width: 120px; text-align: center;">Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {for todo, index in todos.slice(start, start + number)}
+      <tr>
+        <td style="text-align: center; color: #6b7280; font-weight: 500;">{(start * 1) + index + 1}</td>
+        <td style="{todo.completed ? 'text-decoration: line-through; color: #9ca3af;' : ''}">{todo.title}</td>
+        <td style="text-align: center;">
+          <span style="{todo.completed ? 'color: #16a34a; font-weight: 600;' : 'color: #dc2626; font-weight: 600;'}">
+            {todo.completed ? '✓ Done' : '○ Pending'}
+          </span>
+        </td>
+      </tr>
+    {/for}
+  </tbody>
 </table>

@@ -77,22 +77,75 @@ func transformLoop(node *ast.Loop, dataScope map[string]any) []ast.Node {
 // needsWrapper determines if the loop content needs a wrapper div
 // Alpine.js x-for requires exactly ONE child element
 func needsWrapper(content []ast.Node) bool {
-	// If there's more than one node, we need a wrapper
-	if len(content) > 1 {
+	// Filter out whitespace-only text nodes
+	var nonWhitespaceNodes []ast.Node
+	for _, node := range content {
+		if textNode, ok := node.(*ast.TextNode); ok {
+			// Skip whitespace-only text nodes
+			trimmed := strings.TrimSpace(textNode.Content)
+			if trimmed == "" {
+				continue
+			}
+		}
+		nonWhitespaceNodes = append(nonWhitespaceNodes, node)
+	}
+
+	// If there's more than one non-whitespace node, we need a wrapper
+	if len(nonWhitespaceNodes) > 1 {
 		return true
 	}
 
-	// If there's exactly one node, check if it's a template element
-	if len(content) == 1 {
-		if elem, ok := content[0].(*ast.Element); ok {
-			// If the single element is a template (x-if, etc), we need a wrapper
-			// because the template itself isn't rendered
+	// If there's exactly one non-whitespace node, check if it's a template element
+	if len(nonWhitespaceNodes) == 1 {
+		if elem, ok := nonWhitespaceNodes[0].(*ast.Element); ok {
+			// Special case: table rows, table cells, and other table elements
+			// must NOT be wrapped in divs as it breaks table structure
+			tableElements := map[string]bool{
+				"tr": true, "td": true, "th": true,
+				"thead": true, "tbody": true, "tfoot": true,
+			}
+			if tableElements[elem.TagName] {
+				log.Printf("needsWrapper: element is %s, no wrapper needed", elem.TagName)
+				return false
+			}
+
+			// If the single element is a template (x-if, etc), check its children
+			// If it contains table elements, don't wrap
 			if elem.TagName == "template" {
+				hasTableElems := containsTableElements(elem.Children)
+				log.Printf("needsWrapper: template element, containsTableElements=%v", hasTableElems)
+				if hasTableElems {
+					return false
+				}
 				return true
 			}
 		}
 	}
 
+	return false
+}
+
+// containsTableElements recursively checks if nodes contain table elements
+func containsTableElements(nodes []ast.Node) bool {
+	tableElements := map[string]bool{
+		"tr": true, "td": true, "th": true,
+		"thead": true, "tbody": true, "tfoot": true,
+	}
+
+	for _, node := range nodes {
+		if elem, ok := node.(*ast.Element); ok {
+			log.Printf("containsTableElements: checking element <%s>", elem.TagName)
+			// Check if this element is a table element
+			if tableElements[elem.TagName] {
+				log.Printf("containsTableElements: FOUND table element <%s>", elem.TagName)
+				return true
+			}
+			// Recursively check children
+			if containsTableElements(elem.Children) {
+				return true
+			}
+		}
+	}
 	return false
 }
 
@@ -117,7 +170,10 @@ func createLoopTemplate(loopExpr string, content []ast.Node, dataScope map[strin
 	// If we have multiple children OR the child is a template element, wrap in a div
 	var finalChildren []ast.Node
 
-	if needsWrapper(transformedContent) {
+	needsWrap := needsWrapper(transformedContent)
+	log.Printf("createLoopTemplate: needsWrapper returned %v for %d nodes", needsWrap, len(transformedContent))
+
+	if needsWrap {
 		log.Printf("createLoopTemplate: wrapping %d nodes in container div", len(transformedContent))
 		// Create a wrapper div to hold all the content
 		wrapperDiv := &ast.Element{
@@ -126,6 +182,7 @@ func createLoopTemplate(loopExpr string, content []ast.Node, dataScope map[strin
 		}
 		finalChildren = []ast.Node{wrapperDiv}
 	} else {
+		log.Printf("createLoopTemplate: NOT wrapping, using nodes directly")
 		finalChildren = transformedContent
 	}
 

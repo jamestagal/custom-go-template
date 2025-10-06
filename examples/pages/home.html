@@ -110,23 +110,11 @@ let user3 = {
 
       <!-- Dynamic Todos Component Examples -->
       <div style="margin: 2rem 0;">
-        <h2>Dynamic Todos Component</h2>
-        <p>Fetching todos from JSONPlaceholder API with different counts:</p>
+        <h2>Task List - First 5 Tasks</h2>
+        <Todos number={5} />
 
-        <div style="margin: 1rem 0;">
-          <h3>First 5 todos (age + 5 = {age + 5})</h3>
-          <Todos number={age + 5} />
-        </div>
-
-        <div style="margin: 1rem 0;">
-          <h3>First 14 todos</h3>
-          <Todos number={14} />
-        </div>
-
-        <div style="margin: 1rem 0;">
-          <h3>First 5 todos (7 - 2)</h3>
-          <Todos number={7 - 2} />
-        </div>
+        <h2 style="margin-top: 2rem;">Task List - Tasks 6-14</h2>
+        <Todos start={5} number={5} />
       </div>
     {/if}
   </main>
