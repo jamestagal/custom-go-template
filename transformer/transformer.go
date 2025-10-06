@@ -395,18 +395,30 @@ func transformAttributes(attributes []ast.Attribute, dataScope map[string]any) [
 			// Combine all parts with + operator
 			combinedExpression := strings.Join(expressionParts, " + ")
 
-			// Transform to Alpine.js bind syntax
+			// SPECIAL HANDLING: Convert onclick to Alpine.js @click
+			attrName := attr.Name
+			isAlpine := false
+			alpineType := ""
+
+			if attr.Name == "onclick" {
+				attrName = "@click"
+				isAlpine = true
+				alpineType = "click"
+				log.Printf("transformAttributes: Converting onclick to @click")
+			}
+
+			// Transform to Alpine.js bind syntax or Alpine event handler
 			transformedAttr := ast.Attribute{
-				Name:       attr.Name,          // Keep original attribute name
+				Name:       attrName,           // Use @click for onclick
 				Value:      combinedExpression, // Combined expression
-				Dynamic:    true,               // Mark as dynamic so renderer uses :attribute
-				IsAlpine:   false,              // Not an Alpine directive itself
-				AlpineType: "",
+				Dynamic:    !isAlpine,          // Not dynamic if it's an Alpine directive
+				IsAlpine:   isAlpine,           // Mark as Alpine for @click
+				AlpineType: alpineType,
 				AlpineKey:  "",
 			}
 
-			log.Printf("transformAttributes: Transformed %s=\"%s\" to dynamic binding with value \"%s\"",
-				attr.Name, attr.Value, combinedExpression)
+			log.Printf("transformAttributes: Transformed %s=\"%s\" to %s with value \"%s\"",
+				attr.Name, attr.Value, attrName, combinedExpression)
 
 			transformedAttributes = append(transformedAttributes, transformedAttr)
 		} else {

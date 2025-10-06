@@ -6,6 +6,7 @@ import Age from "./components/Age.html";
 prop name = "Benjamin"
 prop age = 55
 prop animals = ["dog", "cat", "bird"]
+prop newAnimal = ""
 
 let salutation = "Hello"
 let path = "./components/UserProfile.html"
@@ -90,8 +91,12 @@ let user3 = {
             <div>Bye {animal}.</div>
           {/if}
           <div class="type-{animal}">{name} likes: {animal}s</div>
+          <button onclick="{animals = animals.filter(a => a !== animal)}">Remove {animal}</button>
           <br>
         {/for}
+        <h3>Add new animal:</h3>
+        <input type="text" x-model="newAnimal" placeholder="animal name">
+        <button onclick="{animals = [newAnimal, ...animals]; newAnimal = ''}">Add Animal</button>
       </div>
 
       <!-- Advanced loop example -->
