@@ -78,7 +78,7 @@ store auth = { isLoggedIn: false }
 			storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 			// Step 4: Render with stores
-			markup, script, style := RenderWithStores(transformed, storeDefinitions)
+			markup, script, style := RenderWithStores(template, transformed, storeDefinitions, "test.html")
 
 			// Validate store script presence
 			if tt.wantStoreScript {
@@ -140,7 +140,7 @@ store auth = { isLoggedIn: false }
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := RenderWithStores(transformed, storeDefinitions)
+	markup, script, _ := RenderWithStores(parsedTemplate, transformed, storeDefinitions, "test.html")
 
 	// The script should contain store initialization
 	if !strings.Contains(script, "Alpine.store('auth'") {
@@ -165,7 +165,7 @@ func TestEmptyStoresNoScript(t *testing.T) {
 	transformed := transformer.TransformAST(parsedTemplate, map[string]any{})
 
 	// Render with empty stores
-	_, script, _ := RenderWithStores(transformed, map[string]string{})
+	_, script, _ := RenderWithStores(parsedTemplate, transformed, map[string]string{}, "test.html")
 
 	// Script should be empty or not contain store initialization
 	if strings.Contains(script, "Alpine.store") {
@@ -197,7 +197,7 @@ store auth = { isLoggedIn: false }
 	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
-	markup, script, _ := RenderWithStores(transformed, storeDefinitions)
+	markup, script, _ := RenderWithStores(parsedTemplate, transformed, storeDefinitions, "test.html")
 
 	// Build final HTML like the server does
 	finalHTML := markup
@@ -256,7 +256,7 @@ store auth = { isLoggedIn: false }
 	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
-	markup, script, _ := RenderWithStores(transformed, storeDefinitions)
+	markup, script, _ := RenderWithStores(parsedTemplate, transformed, storeDefinitions, "test.html")
 
 	// Check store script
 	if !strings.Contains(script, "Alpine.store('auth'") {
@@ -291,7 +291,7 @@ store cart = { items: [] }
 	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
-	markup, script, _ := RenderWithStores(transformed, storeDefinitions)
+	markup, script, _ := RenderWithStores(parsedTemplate, transformed, storeDefinitions, "test.html")
 
 	// Check store script
 	if !strings.Contains(script, "Alpine.store('cart'") {
