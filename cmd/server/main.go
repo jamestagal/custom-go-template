@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -39,389 +40,18 @@ func main() {
 			return
 		}
 
-		// Start timing the template processing
-		startTime := time.Now()
-
-		// Render the template - use test-basic.html for testing
-		entrypoint := "examples/pages/home.html"
-
-		// Read the template file to extract front matter data
-		templateContent, err := os.ReadFile(entrypoint)
-		if err != nil {
-			log.Fatalf("Failed to read template file: %v", err)
-		}
-
-		// Parse the template to extract front matter
-		template, err := parser.ParseTemplate(string(templateContent))
-		if err != nil {
-			log.Fatalf("Failed to parse template: %v", err)
-		}
-
-		// Extract variables from the fence section for Alpine.js data scope
-		props := make(map[string]interface{})
-		log.Printf("DEBUG: Extracting props from template with %d root nodes", len(template.RootNodes))
-		for _, node := range template.RootNodes {
-			if fence, ok := node.(*ast.FenceSection); ok {
-				log.Printf("DEBUG: Found fence section with %d props and %d variables", len(fence.Props), len(fence.Variables))
-
-				// Process variables
-				for _, variable := range fence.Variables {
-					props[variable.Name] = parseValue(variable.Value)
-					log.Printf("DEBUG: Added variable %s = %v (type: %T)", variable.Name, props[variable.Name], props[variable.Name])
-				}
-
-				// Process props with default values
-				for _, prop := range fence.Props {
-					if _, exists := props[prop.Name]; !exists && prop.DefaultValue != "" {
-						props[prop.Name] = parseValue(prop.DefaultValue)
-						log.Printf("DEBUG: Added prop %s = %v (type: %T)", prop.Name, props[prop.Name], props[prop.Name])
-					}
-				}
-
-				// Extract functions from the raw content
-				// Functions are typically defined as: function name() { ... }
-				functionRegex := regexp.MustCompile(`function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*{([^}]*)}`)
-				matches := functionRegex.FindAllStringSubmatch(fence.RawContent, -1)
-				for _, match := range matches {
-					if len(match) >= 3 {
-						fnName := match[1]
-						fnBody := match[0] // Use the full function definition
-						props[fnName] = fnBody
-					}
-				}
-
-				// Also look for arrow functions and method shorthand
-				arrowFnRegex := regexp.MustCompile(`(const\s+)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(\([^)]*\)|[a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>\s*{([^}]*)}`)
-				arrowMatches := arrowFnRegex.FindAllStringSubmatch(fence.RawContent, -1)
-				for _, match := range arrowMatches {
-					if len(match) >= 3 {
-						fnName := match[2]
-						fnBody := match[0] // Use the full function definition
-						props[fnName] = fnBody
-					}
-				}
-
-				// Method shorthand: methodName() { ... }
-				methodRegex := regexp.MustCompile(`([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*{([^}]*)}`)
-				methodMatches := methodRegex.FindAllStringSubmatch(fence.RawContent, -1)
-				for _, match := range methodMatches {
-					if len(match) >= 3 {
-						fnName := match[1]
-						// Skip if it's already captured by the function regex
-						if _, exists := props[fnName]; !exists {
-							fnBody := "function " + match[0] // Convert to function syntax
-							props[fnName] = fnBody
-						}
-					}
-				}
-
-				break
-			}
-		}
-
-		// Calculate build time up to this point (we'll update it later with total time)
-		buildTime := time.Since(startTime)
-		// Format to 2 decimal places in milliseconds
-		buildTimeMs := float64(buildTime.Microseconds()) / 1000.0
-		props["buildTime"] = fmt.Sprintf("%.2fms", buildTimeMs)
-
-		// Render the template with the extracted props (including buildTime)
-		markup, script, style := renderer.Render(entrypoint, props)
-
-		// If the style is empty, try to extract it directly from the template file
-		if style == "" {
-			log.Println("Style is empty, extracting directly from template file")
-			templateContent, err := os.ReadFile(entrypoint)
-			if err == nil {
-				// Extract style content between <style> tags
-				styleRegex := regexp.MustCompile(`(?s)<style>(.*?)</style>`)
-				styleMatches := styleRegex.FindAllStringSubmatch(string(templateContent), -1)
-				if len(styleMatches) > 0 {
-					for _, match := range styleMatches {
-						if len(match) > 1 {
-							style += match[1]
-						}
-					}
-					log.Println("Extracted style from template file")
-				}
-			}
-		}
-
-		// Convert props to JSON for inline x-data
-		propsJSON, err := json.Marshal(props)
-		if err != nil {
-			log.Printf("Warning: Failed to convert props to JSON: %v", err)
-			propsJSON = []byte("{}")
-		}
-
-		// Simple inline Alpine.js data - no complex initialization needed
-		alpineDataAttr := string(propsJSON)
-		alpineInitScript := ""
-
-		// Add CSS, JS links, and Alpine.js initialization to the HTML
-		htmlWithLinks := addLinksToHTML(markup, alpineInitScript)
-
-		// Add inline x-data to the body tag with actual data
-		// CRITICAL: Only add to body tag, NOT as a wrapper div
-		bodyTagRegex := regexp.MustCompile(`(?i)<body[^>]*>`)
-		if bodyTagRegex.MatchString(htmlWithLinks) {
-			htmlWithLinks = bodyTagRegex.ReplaceAllStringFunc(htmlWithLinks, func(match string) string {
-				// Remove the closing > and add x-data
-				tagWithoutClose := strings.TrimSuffix(match, ">")
-				return fmt.Sprintf(`%s x-data='%s'>`, tagWithoutClose, alpineDataAttr)
-			})
-		} else {
-			// Fallback: add x-data to html tag if no body tag
-			htmlTagRegex := regexp.MustCompile(`(?i)<html[^>]*>`)
-			if htmlTagRegex.MatchString(htmlWithLinks) {
-				htmlWithLinks = htmlTagRegex.ReplaceAllStringFunc(htmlWithLinks, func(match string) string {
-					tagWithoutClose := strings.TrimSuffix(match, ">")
-					return fmt.Sprintf(`%s x-data='%s'>`, tagWithoutClose, alpineDataAttr)
-				})
-			}
-		}
-
-		// Write the output files to the public directory
-		err = os.WriteFile(publicDir+"/script.js", []byte(script), 0644) // Use standard file permissions
-		if err != nil {
-			log.Fatalf("Failed to write script.js: %v", err)
-		}
-
-		// Make sure the style doesn't contain style tags
-		style = strings.TrimSpace(style)
-		style = strings.TrimPrefix(style, "<style>")
-		style = strings.TrimSuffix(style, "</style>")
-
-		err = os.WriteFile(publicDir+"/style.css", []byte(style), 0644)
-		if err != nil {
-			log.Fatalf("Failed to write style.css: %v", err)
-		}
-
-		// Update build time with total time
-		buildTime = time.Since(startTime)
-		log.Printf("Template build completed in %v", buildTime)
-
-		// Add build time comment to HTML
-		htmlWithBuildTime := fmt.Sprintf("<!-- Build time: %v -->\n%s", buildTime, htmlWithLinks)
-
-		err = os.WriteFile(publicDir+"/index.html", []byte(htmlWithBuildTime), 0644)
-		if err != nil {
-			log.Fatalf("Failed to write index.html: %v", err)
-		}
-
-		// Serve the index.html file
-		http.ServeFile(w, r, publicDir+"/index.html")
+		// Render home page
+		renderTemplate("examples/pages/home.html", w, r)
 	})
 
 	// Add comprehensive-simple page route (WORKING - no multi-line vars)
 	http.HandleFunc("/comprehensive-simple", func(w http.ResponseWriter, r *http.Request) {
-		// Start timing the template processing
-		startTime := time.Now()
-
-		// Render the comprehensive-simple template
-		entrypoint := "examples/pages/comprehensive-simple.html"
-
-		// Read the template file
-		templateContent, err := os.ReadFile(entrypoint)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to read template: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		// Parse the template to extract front matter
-		template, err := parser.ParseTemplate(string(templateContent))
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to parse template: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		// Extract variables from the fence section
-		props := make(map[string]interface{})
-		for _, node := range template.RootNodes {
-			if fence, ok := node.(*ast.FenceSection); ok {
-				// Process variables
-				for _, variable := range fence.Variables {
-					props[variable.Name] = parseValue(variable.Value)
-				}
-
-				// Process props with default values
-				for _, prop := range fence.Props {
-					if _, exists := props[prop.Name]; !exists && prop.DefaultValue != "" {
-						props[prop.Name] = parseValue(prop.DefaultValue)
-					}
-				}
-
-				// Extract functions from the raw content
-				functionRegex := regexp.MustCompile(`function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*{[^}]*}`)
-				matches := functionRegex.FindAllStringSubmatch(fence.RawContent, -1)
-				for _, match := range matches {
-					if len(match) >= 2 {
-						props[match[1]] = match[0]
-					}
-				}
-			}
-		}
-
-		// Add build time
-		buildTime := time.Since(startTime)
-		buildTimeMs := float64(buildTime.Microseconds()) / 1000.0
-		props["buildTime"] = fmt.Sprintf("%.2fms", buildTimeMs)
-
-		// Render the template
-		markup, script, style := renderer.Render(entrypoint, props)
-
-		// Convert props to JSON for x-data
-		propsJSON, err := json.Marshal(props)
-		if err != nil {
-			propsJSON = []byte("{}")
-		}
-
-		alpineDataAttr := string(propsJSON)
-		alpineInitScript := ""
-
-		// Add links
-		htmlWithLinks := addLinksToHTML(markup, alpineInitScript)
-
-		// Add x-data to body tag
-		bodyTagRegex := regexp.MustCompile(`(?i)<body[^>]*>`)
-		if bodyTagRegex.MatchString(htmlWithLinks) {
-			htmlWithLinks = bodyTagRegex.ReplaceAllStringFunc(htmlWithLinks, func(match string) string {
-				if strings.Contains(match, "x-data") {
-					return match
-				}
-				return strings.TrimSuffix(match, ">") + fmt.Sprintf(` x-data='%s'>`, alpineDataAttr)
-			})
-		}
-
-		// Add build time comment
-		totalBuildTime := time.Since(startTime)
-		htmlComment := fmt.Sprintf("<!-- Build time: %v -->\n", totalBuildTime)
-		finalHTML := htmlComment + htmlWithLinks
-
-		// Write inline styles
-		if style != "" {
-			headEndRegex := regexp.MustCompile(`(?i)</head>`)
-			finalHTML = headEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<style>\n%s\n</style></head>", style))
-		}
-
-		// Write inline scripts
-		if script != "" {
-			bodyEndRegex := regexp.MustCompile(`(?i)</body>`)
-			finalHTML = bodyEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<script>\n%s\n</script></body>", script))
-		}
-
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(finalHTML))
+		renderTemplate("examples/pages/comprehensive-simple.html", w, r)
 	})
 
 	// Add comprehensive page route (HAS BUGS - multi-line var extraction broken)
 	http.HandleFunc("/comprehensive", func(w http.ResponseWriter, r *http.Request) {
-		// Start timing the template processing
-		startTime := time.Now()
-
-		// Render the comprehensive template
-		entrypoint := "examples/pages/comprehensive.html"
-
-		// Read the template file
-		templateContent, err := os.ReadFile(entrypoint)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to read template: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		// Parse the template to extract front matter
-		template, err := parser.ParseTemplate(string(templateContent))
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to parse template: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		// Extract variables from the fence section
-		props := make(map[string]interface{})
-		for _, node := range template.RootNodes {
-			if fence, ok := node.(*ast.FenceSection); ok {
-				// Process variables
-				for _, variable := range fence.Variables {
-					props[variable.Name] = parseValue(variable.Value)
-				}
-
-				// Process props with default values
-				for _, prop := range fence.Props {
-					if _, exists := props[prop.Name]; !exists && prop.DefaultValue != "" {
-						props[prop.Name] = parseValue(prop.DefaultValue)
-					}
-				}
-
-				// Extract functions from the raw content
-				functionRegex := regexp.MustCompile(`function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*{[^}]*}`)
-				matches := functionRegex.FindAllStringSubmatch(fence.RawContent, -1)
-				for _, match := range matches {
-					if len(match) >= 2 {
-						props[match[1]] = match[0]
-					}
-				}
-
-				// Arrow functions
-				arrowFnRegex := regexp.MustCompile(`(const\s+)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(\([^)]*\)|[a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>\s*{[^}]*}`)
-				arrowMatches := arrowFnRegex.FindAllStringSubmatch(fence.RawContent, -1)
-				for _, match := range arrowMatches {
-					if len(match) >= 3 {
-						props[match[2]] = match[0]
-					}
-				}
-			}
-		}
-
-		// Add build time
-		buildTime := time.Since(startTime)
-		buildTimeMs := float64(buildTime.Microseconds()) / 1000.0
-		props["buildTime"] = fmt.Sprintf("%.2fms", buildTimeMs)
-
-		// Render the template
-		markup, script, style := renderer.Render(entrypoint, props)
-
-		// Convert props to JSON for x-data
-		propsJSON, err := json.Marshal(props)
-		if err != nil {
-			propsJSON = []byte("{}")
-		}
-
-		alpineDataAttr := string(propsJSON)
-		alpineInitScript := ""
-
-		// Add links
-		htmlWithLinks := addLinksToHTML(markup, alpineInitScript)
-
-		// Add x-data to body tag
-		bodyTagRegex := regexp.MustCompile(`(?i)<body[^>]*>`)
-		if bodyTagRegex.MatchString(htmlWithLinks) {
-			htmlWithLinks = bodyTagRegex.ReplaceAllStringFunc(htmlWithLinks, func(match string) string {
-				if strings.Contains(match, "x-data") {
-					return match
-				}
-				return strings.TrimSuffix(match, ">") + fmt.Sprintf(` x-data='%s'>`, alpineDataAttr)
-			})
-		}
-
-		// Add build time comment
-		totalBuildTime := time.Since(startTime)
-		htmlComment := fmt.Sprintf("<!-- Build time: %v -->\n", totalBuildTime)
-		finalHTML := htmlComment + htmlWithLinks
-
-		// Write inline styles
-		if style != "" {
-			headEndRegex := regexp.MustCompile(`(?i)</head>`)
-			finalHTML = headEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<style>\n%s\n</style></head>", style))
-		}
-
-		// Write inline scripts
-		if script != "" {
-			bodyEndRegex := regexp.MustCompile(`(?i)</body>`)
-			finalHTML = bodyEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<script>\n%s\n</script></body>", script))
-		}
-
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(finalHTML))
+		renderTemplate("examples/pages/comprehensive.html", w, r)
 	})
 
 	// Start the server
@@ -431,6 +61,304 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// renderTemplate is a unified handler for rendering template files
+// It replaces the manual x-data building logic with proper renderer.Render() usage
+//
+// Pattern: Service Implementation Pattern [Load: 12]
+// Cognitive Load: 12 (read: 2, parse: 2, extract props: 3, render: 2, inject: 2, send: 1)
+func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+
+	// Read template file (COGNITIVE LOAD RULE: wrapped error)
+	templateContent, err := os.ReadFile(entrypoint)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to read template: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Parse template to extract fence data (COGNITIVE LOAD RULE: wrapped error)
+	template, err := parser.ParseTemplate(string(templateContent))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to parse template: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Extract initial props from fence section (for buildTime)
+	props := make(map[string]interface{})
+	for _, node := range template.RootNodes {
+		if fence, ok := node.(*ast.FenceSection); ok {
+			// Process variables
+			for _, variable := range fence.Variables {
+				props[variable.Name] = parseValue(variable.Value)
+			}
+
+			// Process props with default values
+			for _, prop := range fence.Props {
+				if _, exists := props[prop.Name]; !exists && prop.DefaultValue != "" {
+					props[prop.Name] = parseValue(prop.DefaultValue)
+				}
+			}
+
+			// CRITICAL: Extract functions from RawContent
+			// The parser doesn't extract function declarations into Variables
+			// So we need to manually parse them from the raw fence content
+			extractedFunctions := extractFunctionsFromFence(fence.RawContent)
+			for name, funcBody := range extractedFunctions {
+				props[name] = funcBody
+			}
+
+			break
+		}
+	}
+
+	// Add build time as a prop
+	buildTime := time.Since(startTime)
+	buildTimeMs := float64(buildTime.Microseconds()) / 1000.0
+	props["buildTime"] = fmt.Sprintf("%.2fms", buildTimeMs)
+
+	// CRITICAL: Use renderer.Render() - this calls the transformer
+	// which uses alpineDataFormatter for correct x-data generation
+	// The transformer will NOT add x-data to <html> or <body> tags, so we need to do it here
+	markup, script, style := renderer.Render(entrypoint, props)
+
+	// CRITICAL: Generate x-data using transformer's alpineDataFormatter
+	// This function is not exported, so we need to call Transform to get the data scope
+	// and then format it ourselves
+	xDataValue := buildXDataFromProps(props)
+
+	// Build final HTML with x-data injected
+	finalHTML := markup
+
+	// Inject x-data into body tag (or html tag as fallback)
+	bodyTagRegex := regexp.MustCompile(`(?i)<body[^>]*>`)
+	if bodyTagRegex.MatchString(finalHTML) {
+		finalHTML = bodyTagRegex.ReplaceAllStringFunc(finalHTML, func(match string) string {
+			// Check if x-data already exists
+			if strings.Contains(match, "x-data") {
+				return match
+			}
+			// Remove the closing > and add x-data
+			tagWithoutClose := strings.TrimSuffix(match, ">")
+			return fmt.Sprintf(`%s x-data="%s">`, tagWithoutClose, escapeXDataForAttr(xDataValue))
+		})
+	} else {
+		// Fallback: add x-data to html tag if no body tag
+		htmlTagRegex := regexp.MustCompile(`(?i)<html[^>]*>`)
+		if htmlTagRegex.MatchString(finalHTML) {
+			finalHTML = htmlTagRegex.ReplaceAllStringFunc(finalHTML, func(match string) string {
+				if strings.Contains(match, "x-data") {
+					return match
+				}
+				tagWithoutClose := strings.TrimSuffix(match, ">")
+				return fmt.Sprintf(`%s x-data="%s">`, tagWithoutClose, escapeXDataForAttr(xDataValue))
+			})
+		}
+	}
+
+	// Inject styles into <head>
+	if style != "" {
+		headEndRegex := regexp.MustCompile(`(?i)</head>`)
+		finalHTML = headEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<style>\n%s\n</style></head>", style))
+	}
+
+	// Inject scripts before </body>
+	if script != "" {
+		bodyEndRegex := regexp.MustCompile(`(?i)</body>`)
+		finalHTML = bodyEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<script>\n%s\n</script></body>", script))
+	}
+
+	// Add Alpine.js CDN if not already present
+	if !strings.Contains(finalHTML, "alpinejs") {
+		headEndRegex := regexp.MustCompile(`(?i)</head>`)
+		finalHTML = headEndRegex.ReplaceAllString(finalHTML,
+			`<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script></head>`)
+	}
+
+	// Add build time comment
+	totalBuildTime := time.Since(startTime)
+	htmlComment := fmt.Sprintf("<!-- Build time: %v -->\n", totalBuildTime)
+	finalHTML = htmlComment + finalHTML
+
+	// Send response
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(finalHTML))
+}
+
+// extractFunctionsFromFence extracts function declarations from fence section content
+// Returns a map of function name -> function body
+//
+// Pattern: Regex Extraction Pattern [Load: 10]
+// Cognitive Load: 10 (regex compile: 2, find all: 3, extract names: 2, map construction: 3)
+func extractFunctionsFromFence(content string) map[string]string {
+	functions := make(map[string]string)
+
+	// Regex to match function declarations:
+	// function name(...) { ... }
+	// Handles nested braces correctly
+	funcRegex := regexp.MustCompile(`function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{`)
+
+	// Find all function declarations
+	matches := funcRegex.FindAllStringSubmatchIndex(content, -1)
+
+	for _, match := range matches {
+		// match[0], match[1] are the full match indices
+		// match[2], match[3] are the function name indices
+		funcStart := match[0]
+		nameStart := match[2]
+		nameEnd := match[3]
+
+		funcName := content[nameStart:nameEnd]
+
+		// Find the matching closing brace for this function
+		braceStart := match[1] // End of the initial match (right after opening {)
+		braceDepth := 1
+		braceEnd := braceStart
+
+		for braceEnd < len(content) && braceDepth > 0 {
+			if content[braceEnd] == '{' {
+				braceDepth++
+			} else if content[braceEnd] == '}' {
+				braceDepth--
+			}
+			braceEnd++
+		}
+
+		if braceDepth == 0 {
+			// Successfully found the full function
+			funcBody := content[funcStart:braceEnd]
+			functions[funcName] = funcBody
+			log.Printf("[extractFunctionsFromFence] Found function: %s (%d chars)", funcName, len(funcBody))
+		} else {
+			log.Printf("[extractFunctionsFromFence] WARNING: Could not find closing brace for function %s", funcName)
+		}
+	}
+
+	return functions
+}
+
+// buildXDataFromProps creates an Alpine.js x-data attribute value from props
+// This builds a JavaScript object literal (NOT JSON) to support functions
+//
+// CRITICAL: Functions must NOT be quoted. Example output:
+// {buildTime:'20ms',formatPrice:function formatPrice(price){return "$"+price.toFixed(2);}}
+//
+// Pattern: Data Formatting Pattern [Load: 12]
+// Cognitive Load: 12 (iterate props: 2, detect functions: 3, format values: 5, join: 2)
+func buildXDataFromProps(props map[string]interface{}) string {
+	if len(props) == 0 {
+		return "{}"
+	}
+
+	// COGNITIVE LOAD RULE: preallocate slice
+	parts := make([]string, 0, len(props))
+
+	// Sort keys for consistent output (easier debugging)
+	keys := make([]string, 0, len(props))
+	for key := range props {
+		if !strings.HasPrefix(key, "$") {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := props[key]
+
+		// Format value as JavaScript (NOT JSON)
+		var formattedValue string
+		switch v := value.(type) {
+		case string:
+			// Check if it's a function definition
+			if strings.HasPrefix(v, "function ") || strings.Contains(v, "=>") {
+				// Function - keep as-is, just minify whitespace for HTML attribute
+				formattedValue = minifyFunction(v)
+			} else {
+				// Regular string - quote with single quotes for HTML attribute safety
+				escaped := escapeStringForJS(v)
+				formattedValue = fmt.Sprintf(`'%s'`, escaped)
+			}
+		case bool:
+			formattedValue = fmt.Sprintf("%t", v)
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+			formattedValue = fmt.Sprintf("%d", v)
+		case float32, float64:
+			formattedValue = fmt.Sprintf("%v", v)
+		case nil:
+			formattedValue = "null"
+		default:
+			// Complex types (arrays, objects) - marshal to JSON
+			jsonBytes, err := json.Marshal(v)
+			if err != nil {
+				// Fallback to string representation
+				escaped := escapeStringForJS(fmt.Sprintf("%v", v))
+				formattedValue = fmt.Sprintf(`'%s'`, escaped)
+			} else {
+				formattedValue = string(jsonBytes)
+			}
+		}
+
+		// Build key:value pair for JavaScript object literal
+		parts = append(parts, fmt.Sprintf("%s:%s", key, formattedValue))
+	}
+
+	return "{" + strings.Join(parts, ",") + "}"
+}
+
+// minifyFunction removes unnecessary whitespace from function definitions
+// to make them more compact for HTML attributes
+func minifyFunction(fn string) string {
+	// Remove leading/trailing whitespace
+	fn = strings.TrimSpace(fn)
+
+	// Replace multiple spaces with single space
+	multiSpace := regexp.MustCompile(`\s+`)
+	fn = multiSpace.ReplaceAllString(fn, " ")
+
+	// Remove spaces around operators and braces (careful not to break keywords)
+	fn = strings.ReplaceAll(fn, " {", "{")
+	fn = strings.ReplaceAll(fn, "{ ", "{")
+	fn = strings.ReplaceAll(fn, " }", "}")
+	fn = strings.ReplaceAll(fn, "} ", "}")
+	fn = strings.ReplaceAll(fn, " (", "(")
+	fn = strings.ReplaceAll(fn, "( ", "(")
+	fn = strings.ReplaceAll(fn, " )", ")")
+	fn = strings.ReplaceAll(fn, ") ", ")")
+	fn = strings.ReplaceAll(fn, "; ", ";")
+
+	return fn
+}
+
+// escapeStringForJS escapes a string for use in JavaScript string literal
+func escapeStringForJS(s string) string {
+	// Escape backslashes first (must be first to avoid double-escaping)
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	// Escape single quotes (we use single quotes for strings)
+	s = strings.ReplaceAll(s, `'`, `\'`)
+	// Escape newlines
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	s = strings.ReplaceAll(s, "\r", `\r`)
+	// Escape tabs
+	s = strings.ReplaceAll(s, "\t", `\t`)
+
+	return s
+}
+
+// escapeXDataForAttr escapes an x-data value for use in HTML attribute
+// CRITICAL: We need to escape characters that would break the attribute
+//
+// Pattern: String Escaping Pattern [Load: 4]
+// Cognitive Load: 4 (replace operations: 4)
+func escapeXDataForAttr(value string) string {
+	// Escape HTML entities that would break the attribute
+	// Note: We're using double quotes for the attribute, so escape double quotes
+	value = strings.ReplaceAll(value, `&`, `&amp;`)
+	value = strings.ReplaceAll(value, `"`, `&quot;`)
+	value = strings.ReplaceAll(value, `<`, `&lt;`)
+	value = strings.ReplaceAll(value, `>`, `&gt;`)
+
+	return value
 }
 
 func registerComponents() {
@@ -519,34 +447,6 @@ func extractComponentProps(template *ast.Template) []string {
 	return props
 }
 
-func addLinksToHTML(html string, alpineInitScript string) string {
-	// Find the closing head tag
-	headCloseIndex := strings.Index(strings.ToLower(html), "</head>")
-	if headCloseIndex == -1 {
-		// If no head tag, find the opening body tag
-		bodyOpenIndex := strings.Index(strings.ToLower(html), "<body")
-		if bodyOpenIndex == -1 {
-			// If no body tag either, just prepend to the HTML
-			return `<link rel="stylesheet" href="/style.css">
-<script defer src="/script.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>` +
-				alpineInitScript + html
-		}
-
-		// Insert before the body tag
-		return html[:bodyOpenIndex] + `<link rel="stylesheet" href="/style.css">
-<script defer src="/script.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>` +
-			alpineInitScript + html[bodyOpenIndex:]
-	}
-
-	// Insert before the closing head tag
-	return html[:headCloseIndex] + `<link rel="stylesheet" href="/style.css">
-<script defer src="/script.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>` +
-		alpineInitScript + html[headCloseIndex:]
-}
-
 // convertJSToJSON converts JavaScript object syntax to valid JSON
 // Handles unquoted keys: {name: "value"} → {"name": "value"}
 func convertJSToJSON(js string) string {
@@ -572,6 +472,13 @@ func parseValue(value string) interface{} {
 	// Handle empty values
 	if value == "" {
 		return ""
+	}
+
+	// CRITICAL: Check if it's a function BEFORE trying JSON parsing
+	// Functions start with "function " or contain "=>"
+	if strings.HasPrefix(value, "function ") || strings.Contains(value, "=>") {
+		// Return the function as-is (as a string, but buildXDataFromProps will detect it)
+		return value
 	}
 
 	// CRITICAL FIX: Convert JavaScript object syntax to JSON before unmarshaling

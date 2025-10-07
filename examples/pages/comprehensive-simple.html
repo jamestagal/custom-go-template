@@ -30,10 +30,14 @@ prop settings = {
   inStockOnly: false
 }
 
-// NOTE: Functions removed temporarily due to server x-data building bug
-// The server regex extracts function definitions from fence RawContent
-// and adds them as JSON strings (broken). Need to fix server to use
-// transformer's alpineDataFormatter instead.
+// Functions for testing
+function getGreeting(name) {
+  return "Hello, " + name + "!";
+}
+
+function formatPrice(price) {
+  return "$" + price.toFixed(2);
+}
 ---
 
 <style>
@@ -103,6 +107,7 @@ prop settings = {
       <p>Welcome to {title}!</p>
       <p>Current user: <strong>{user.name}</strong> ({user.role})</p>
       <p>Hello, {user.name}!</p>
+      <p>Function call: <span x-text="getGreeting(user.name)"></span></p>
       <p>Number of products: {products.length}</p>
       <p>Current theme: {settings.theme}</p>
       <p>Currency: {settings.currency}</p>
@@ -163,7 +168,7 @@ prop settings = {
       <h3>Product List</h3>
       <ul>
         {for product in products}
-          <li>{product.name} - ${product.price}
+          <li>{product.name} - <span x-text="formatPrice(product.price)"></span>
             {if !product.inStock}
               <span style="color: red;"> (Out of Stock)</span>
             {/if}
@@ -178,7 +183,7 @@ prop settings = {
       <ol>
         {for product, index in products}
           <li value="{index + 1}">
-            {product.name} - ${product.price}
+            {product.name} - <span x-text="formatPrice(product.price)"></span>
             {if product.featured}
               <span style="color: gold;"> ★ Featured</span>
             {/if}
@@ -255,7 +260,7 @@ prop settings = {
         {if product.featured && index < 3}
           <div class="card">
             <h4>{index + 1}. {product.name}</h4>
-            <p>Price: ${product.price}</p>
+            <p>Price: <span x-text="formatPrice(product.price)"></span></p>
             <div>
               {if product.inStock}
                 <span style="color: green;">In Stock</span>
@@ -271,6 +276,40 @@ prop settings = {
           </div>
         {/if}
       {/for}
+    </div>
+  </div>
+
+  <!-- 6. Functions Tests Section -->
+  <div class="section">
+    <h2 class="section-title">6. Functions Tests</h2>
+
+    <div class="card">
+      <h3>Function Call Tests</h3>
+
+      <!-- Direct function call -->
+      <p><strong>Direct function call:</strong> <span x-text="getGreeting('World')"></span></p>
+
+      <!-- Function with variable -->
+      <p><strong>Function with variable:</strong> <span x-text="getGreeting(user.name)"></span></p>
+
+      <!-- Function in expression -->
+      <p><strong>Format static price:</strong> <span x-text="formatPrice(123.456)"></span></p>
+
+      <!-- Function in loop -->
+      <div style="margin-top: 1rem;">
+        <h4>All Products with Formatted Prices:</h4>
+        <ul>
+          {for product in products}
+            <li>
+              <span x-text="product.name"></span> -
+              <span x-text="formatPrice(product.price)"></span>
+              {if product.featured}
+                <span style="color: gold;"> ★</span>
+              {/if}
+            </li>
+          {/for}
+        </ul>
+      </div>
     </div>
   </div>
 
