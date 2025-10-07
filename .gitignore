@@ -2,6 +2,11 @@ public*
 
 # Build artifacts
 bin/
+server
+
+# Temporary files
+*.tmp
+*.patch
 
 # Backup files
 *.bak
