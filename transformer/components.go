@@ -38,6 +38,13 @@ func RegisterComponent(name string, template *ast.Template, props []string) {
 	log.Printf("Registered component template: %s with %d props", name, len(props))
 }
 
+// UnregisterComponent removes a component from the registry
+// Used for test cleanup to prevent test interference
+func UnregisterComponent(name string) {
+	delete(componentTemplateRegistry, name)
+	log.Printf("Unregistered component template: %s", name)
+}
+
 // GetComponentTemplate retrieves a component template by name
 func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
 	template, exists := componentTemplateRegistry[name]

@@ -452,13 +452,42 @@ func ScriptParser() Parser {
 }
 
 // StyleParser parses the style section and returns an *ast.StyleSection node.
+// Handles both <style> and <style ...attributes...>
 func StyleParser() Parser {
-	return Map(
-		Between(String("<style>"), String("</style>"), TakeUntil(String("</style>"))),
-		func(value interface{}) (interface{}, error) {
-			content := value.(string)
-			log.Printf("[StyleParser] Parsed style with %d chars", len(content))
-			return &ast.StyleSection{Content: content}, nil
-		},
-	)
+	return func(input string) Result {
+		// Check if starts with <style
+		if !strings.HasPrefix(input, "<style") {
+			return Result{nil, input, false, "not a style tag", false}
+		}
+
+		// Find the end of the opening tag (either > or />)
+		openTagEnd := strings.Index(input, ">")
+		if openTagEnd == -1 {
+			return Result{nil, input, false, "unclosed style opening tag", false}
+		}
+
+		// Skip past the opening tag
+		contentStart := openTagEnd + 1
+
+		// Find the closing </style> tag
+		closeTagStart := strings.Index(input[contentStart:], "</style>")
+		if closeTagStart == -1 {
+			return Result{nil, input, false, "missing </style> closing tag", false}
+		}
+
+		// Extract the content between tags
+		content := input[contentStart : contentStart+closeTagStart]
+
+		// Calculate remaining input after </style>
+		remaining := input[contentStart+closeTagStart+len("</style>"):]
+
+		log.Printf("[StyleParser] Parsed style with %d chars (with attributes support)", len(content))
+
+		return Result{
+			Value:      &ast.StyleSection{Content: content},
+			Remaining:  remaining,
+			Successful: true,
+			Error:      "",
+		}
+	}
 }

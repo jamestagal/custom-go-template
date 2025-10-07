@@ -2,6 +2,7 @@ package renderer
 
 import (
 	"fmt"
+	"path/filepath"
 	"log"
 	"os"
 	"regexp"
@@ -28,14 +29,28 @@ func Render(templatePath string, props map[string]any) (string, string, string) 
 	// Transform the AST to Alpine.js compatible nodes
 	transformedAST := transformer.TransformAST(templateAST, props)
 
-	// Generate markup, script, and style from the transformed AST
+	// CRITICAL FIX: Use original templateAST for style aggregation, not transformedAST
+	// The aggregation function needs access to FenceSection imports which may be
+	// removed or modified during transformation. The original AST preserves this.
+	componentName := extractComponentName(templatePath)
+	style := GetAggregatedStyles(templateAST, componentName)
+
+	// Generate markup and script from the transformed AST
 	markup := generateMarkup(transformedAST)
 	script := generateScript(transformedAST)
-	style := generateStyle(transformedAST)
 
 	return markup, script, style
 }
 
+// extractComponentName extracts a component name from the template path
+// Example: "examples/pages/home.html" -> "home"
+// Example: "examples/components/HeaderSimple.html" -> "HeaderSimple"
+func extractComponentName(templatePath string) string {
+	// Get base filename without extension
+	base := filepath.Base(templatePath)
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+	return name
+}
 // --- Alpine.js Attribute Generation ---
 
 func escapeAttrValue(value string, escapeSingleQuotes bool) string {
