@@ -171,6 +171,32 @@ All 7 core specs are now complete:
 
 **Note**: For detailed planning of Plenti Integration and future phases, see `.agent-os/product/roadmap.md`
 
+### 📌 Important Discovery: Global Scope is Correct for Plenti ✅
+
+**Date**: October 7, 2025
+
+After analyzing actual Plenti code (`docs.svelte`, `course.svelte`), we confirmed that **Plenti uses page-level global scope** for props, not isolated component scoping.
+
+**Key Findings**:
+- ✅ Plenti's `export let` creates page-level props (global scope)
+- ✅ Magic variables (content, allContent, allLayouts, env) are page-level
+- ✅ Our current x-data pattern on `<body>` matches Plenti's architecture
+- ❌ Component Prop Scoping would break Plenti compatibility
+
+**Evidence**:
+```svelte
+// docs.svelte - page-level props
+export let title, body, deprecated, allContent;
+
+// course.svelte - page-level props
+export let allContent, title, link;
+
+// Loop variables are loop-scoped (not component-scoped)
+{#each allContent.filter(...) as course, i}
+```
+
+**Impact**: Component Prop Scoping (originally planned as Spec 9) is **NOT needed** for Plenti integration and has been deprioritized. Our current implementation is already Plenti-compatible.
+
 ### Spec 8: Performance Optimization (Future)
 **Priority**: Medium
 **Effort**: Medium
@@ -197,7 +223,22 @@ All 7 core specs are now complete:
 - Integration testing with real Plenti sites
 - Migration documentation
 
-### Spec 9: Developer Experience (Future)
+### Spec 9: Component Prop Scoping (DEPRIORITIZED ⚠️)
+**Priority**: Very Low (Not needed for Plenti)
+**Effort**: Medium
+**Status**: DEPRIORITIZED after discovering global scope is correct Plenti pattern
+
+**Original Goal**: Component prop isolation with lexical scoping
+
+**Why Deprioritized**:
+- ❌ Would break Plenti compatibility
+- ❌ Plenti uses global scope for `export let` props
+- ✅ Current implementation already matches Plenti's architecture
+- ✅ Global x-data on `<body>` is the correct pattern
+
+**Decision**: Keep global scope pattern. Only revisit if non-Plenti use cases require component isolation.
+
+### Spec 10: Developer Experience (Future)
 **Priority**: Low
 **Effort**: Small
 
@@ -209,7 +250,7 @@ All 7 core specs are now complete:
 - Development mode with detailed logging
 - Template validation tools
 
-### Spec 10: Advanced Features (Future)
+### Spec 11: Advanced Features (Future)
 **Priority**: Low
 **Effort**: Large
 
@@ -330,11 +371,11 @@ All 7 core specs are now complete:
 - [ ] Build-time optimizations
 
 ### v1.0.0 - Production Release (Future)
-- [ ] Spec 9: Developer Experience
-- [ ] Component Prop Scoping
+- [ ] Spec 10: Developer Experience
 - [ ] Complete documentation
 - [ ] Example projects
 - [ ] Migration guide from Svelte
+- [ ] (Optional) Spec 9: Component Prop Scoping - Only if non-Plenti use cases require it
 
 ---
 
@@ -449,10 +490,11 @@ All 7 core specs are now complete:
    - Integration testing with real Plenti sites
 
 ### Long-term (2026+)
-1. **Component Prop Scoping** (Spec 9)
-2. **Performance Optimization** (Spec 10)
-3. **Developer Experience** improvements
+1. **Performance Optimization** (Future)
+2. **Developer Experience** improvements (Spec 10)
+3. **Advanced Features** (Spec 11)
 4. **v1.0 Production Release**
+5. **(Optional) Component Prop Scoping** (Spec 9) - Only if non-Plenti use cases require it
 
 ---
 

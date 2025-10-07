@@ -124,11 +124,9 @@ prop tags = []
     </div>
   {/if}
 
-  <button class="add-to-cart" {!inStock ? 'disabled' : ''}>
-    {if inStock}
-      Add to Cart
-    {else}
-      Sold Out
-    {/if}
-  </button>
+  {if inStock}
+    <button class="add-to-cart">Add to Cart</button>
+  {else}
+    <button class="add-to-cart" disabled>Sold Out</button>
+  {/if}
 </div>

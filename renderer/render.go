@@ -33,7 +33,16 @@ func Render(templatePath string, props map[string]any) (string, string, string) 
 	// The aggregation function needs access to FenceSection imports which may be
 	// removed or modified during transformation. The original AST preserves this.
 	componentName := extractComponentName(templatePath)
+	log.Printf("[Render] Calling GetAggregatedStyles for: %s", componentName)
 	style := GetAggregatedStyles(templateAST, componentName)
+	log.Printf("[Render] GetAggregatedStyles returned %d bytes", len(style))
+
+	// Check if page styles are present
+	if strings.Contains(style, "Styles from: "+componentName) {
+		log.Printf("[Render] ✓ Page styles for %s ARE included", componentName)
+	} else {
+		log.Printf("[Render] ✗ Page styles for %s NOT included", componentName)
+	}
 
 	// Generate markup and script from the transformed AST
 	markup := generateMarkup(transformedAST)
@@ -238,7 +247,7 @@ func GenerateAlpineDirectives(attributes []ast.Attribute) []string {
 		// Special case handling for test scenarios
 		// Check if this is a specific test case that needs special handling
 		// except for special characters (<, >, &)
-		// 
+		//
 		// The transformer now uses SINGLE quotes for string values inside object literals,
 		// so we can safely use DOUBLE quotes for the HTML attribute without escaping.
 		// Example: x-data="{ name: 'John', role: 'admin' }"
