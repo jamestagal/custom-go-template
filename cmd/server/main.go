@@ -19,6 +19,10 @@ import (
 	"github.com/jimafisk/custom_go_template/transformer"
 )
 
+// Global store registry loaded at startup
+// Pattern: Package-level State [Load: 2]
+var storeRegistry map[string]string
+
 func main() {
 	log.Println("Starting server...")
 
@@ -31,6 +35,10 @@ func main() {
 
 	// Register components
 	registerComponents()
+
+	// Register stores (now stored in package-level variable)
+	storeRegistry = registerStores()
+	log.Printf("Registered %d store(s)", len(storeRegistry))
 
 	// Set up the HTTP server
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -68,11 +76,11 @@ func main() {
 	}
 }
 
-// renderTemplate is a unified handler for rendering template files
-// It replaces the manual x-data building logic with proper renderer.Render() usage
+// renderTemplate is a unified handler for rendering template files with store support
+// Now integrates with the global store system (Task 3.5)
 //
-// Pattern: Service Implementation Pattern [Load: 12]
-// Cognitive Load: 12 (read: 2, parse: 2, extract props: 3, render: 2, inject: 2, send: 1)
+// Pattern: Service Implementation Pattern with Store Integration [Load: 18]
+// Cognitive Load: 18 (read: 2, parse: 3, fence parsing: 3, transform: 3, store merge: 3, render: 2, inject: 2)
 func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 
@@ -90,31 +98,39 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract fence section and parse with store registry (Task 3.5 integration)
+	var fenceWithStores *ast.FenceSection
+	for i, node := range template.RootNodes {
+		if fence, ok := node.(*ast.FenceSection); ok {
+			// Parse fence content with store registry to resolve store imports
+			fenceWithStores = parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
+			// Replace the fence section in template
+			template.RootNodes[i] = fenceWithStores
+			break
+		}
+	}
+
 	// Extract initial props from fence section (for buildTime)
 	props := make(map[string]interface{})
-	for _, node := range template.RootNodes {
-		if fence, ok := node.(*ast.FenceSection); ok {
-			// Process variables
-			for _, variable := range fence.Variables {
-				props[variable.Name] = parseValue(variable.Value)
-			}
+	if fenceWithStores != nil {
+		// Process variables
+		for _, variable := range fenceWithStores.Variables {
+			props[variable.Name] = parseValue(variable.Value)
+		}
 
-			// Process props with default values
-			for _, prop := range fence.Props {
-				if _, exists := props[prop.Name]; !exists && prop.DefaultValue != "" {
-					props[prop.Name] = parseValue(prop.DefaultValue)
-				}
+		// Process props with default values
+		for _, prop := range fenceWithStores.Props {
+			if _, exists := props[prop.Name]; !exists && prop.DefaultValue != "" {
+				props[prop.Name] = parseValue(prop.DefaultValue)
 			}
+		}
 
-			// CRITICAL: Extract functions from RawContent
-			// The parser doesn't extract function declarations into Variables
-			// So we need to manually parse them from the raw fence content
-			extractedFunctions := extractFunctionsFromFence(fence.RawContent)
-			for name, funcBody := range extractedFunctions {
-				props[name] = funcBody
-			}
-
-			break
+		// CRITICAL: Extract functions from RawContent
+		// The parser doesn't extract function declarations into Variables
+		// So we need to manually parse them from the raw fence content
+		extractedFunctions := extractFunctionsFromFence(fenceWithStores.RawContent)
+		for name, funcBody := range extractedFunctions {
+			props[name] = funcBody
 		}
 	}
 
@@ -123,10 +139,34 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	buildTimeMs := float64(buildTime.Microseconds()) / 1000.0
 	props["buildTime"] = fmt.Sprintf("%.2fms", buildTimeMs)
 
-	// CRITICAL: Use renderer.Render() - this calls the transformer
-	// which uses alpineDataFormatter for correct x-data generation
-	// The transformer will NOT add x-data to <html> or <body> tags, so we need to do it here
-	markup, script, style := renderer.Render(entrypoint, props)
+	// Transform template (this tracks store references)
+	transformed := transformer.TransformAST(template, props)
+
+	// Get tracked stores from transformer (Task 3.5: Store merging)
+	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
+	referencedStoreDefs := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
+
+	// Merge with external stores if referenced but not defined (Task 3.5: Priority system)
+	// Priority: Inline > Imported > External
+	finalStores := make(map[string]string)
+
+	// Add all referenced stores (inline + imported from fence)
+	for name, def := range referencedStoreDefs {
+		finalStores[name] = def
+	}
+
+	// Add external stores if referenced but not yet in finalStores
+	for _, storeName := range referencedStores {
+		if _, exists := finalStores[storeName]; !exists {
+			if externalDef, exists := storeRegistry[storeName]; exists {
+				finalStores[storeName] = externalDef
+				log.Printf("[renderTemplate] Added external store: %s", storeName)
+			}
+		}
+	}
+
+	// Render with stores (Task 3.5: Use RenderWithStores instead of Render)
+	markup, script, style := renderer.RenderWithStores(transformed, finalStores)
 
 	// CRITICAL: Generate x-data using transformer's alpineDataFormatter
 	// This function is not exported, so we need to call Transform to get the data scope
@@ -403,6 +443,49 @@ func registerComponents() {
 			transformer.RegisterComponent(pathWithPrefix, componentAST, componentProps)
 		}
 	}
+}
+
+// registerStores scans the stores/ directory for .js files and loads them
+// Returns a map of store name (filename without .js) to store content
+//
+// Pattern: File Discovery Pattern [Load: 8]
+// Cognitive Load: 8 (read dir: 2, filter: 2, read files: 2, map building: 2)
+func registerStores() map[string]string {
+	stores := make(map[string]string)
+	storeDir := "stores"
+
+	// Read the stores directory (COGNITIVE LOAD RULE: wrapped error)
+	files, err := os.ReadDir(storeDir)
+	if err != nil {
+		// Directory not existing is not an error - just log and return empty map
+		log.Printf("Stores directory not found (this is OK): %s", storeDir)
+		return stores
+	}
+
+	// Process each .js file in the directory
+	for _, file := range files {
+		// Skip directories and non-.js files
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".js") {
+			continue
+		}
+
+		// Extract store name from filename (e.g., "auth.js" → "auth")
+		storeName := strings.TrimSuffix(file.Name(), ".js")
+		storePath := fmt.Sprintf("%s/%s", storeDir, file.Name())
+
+		// Read store file content (COGNITIVE LOAD RULE: wrapped error)
+		content, err := os.ReadFile(storePath)
+		if err != nil {
+			log.Printf("WARNING: Failed to read store file %s: %v", storePath, err)
+			continue
+		}
+
+		// Store the content
+		stores[storeName] = string(content)
+		log.Printf("Registered store: %s from %s", storeName, storePath)
+	}
+
+	return stores
 }
 
 func extractComponentProps(template *ast.Template) []string {

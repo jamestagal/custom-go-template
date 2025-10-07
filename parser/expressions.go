@@ -653,3 +653,80 @@ func StyleParser() Parser {
 		}
 	}
 }
+
+// parseFenceContentWithStores is a wrapper for parseFenceContent that supports external store imports
+// Pattern: Parser with Registry Support [Load: 6]
+// Cognitive Load: 6 (delegate to parseFenceContent, then process store imports)
+func ParseFenceContentWithStores(content string, storeRegistry map[string]string) *ast.FenceSection {
+	// First, parse normally to get inline stores
+	fence := parseFenceContent(content)
+	
+	// If no registry provided, return fence as-is
+	if storeRegistry == nil {
+		return fence
+	}
+	
+	// Now process store imports
+	// Pattern: import store from './stores/name.js'
+	storeImportRegex := regexp.MustCompile(`^\s*import\s+store\s+from\s+['"](.+?)['"](?:;)?$`)
+	
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" {
+			continue
+		}
+		
+		// Check for store import
+		if matches := storeImportRegex.FindStringSubmatch(trimmedLine); matches != nil {
+			importPath := matches[1]
+			
+			// Extract store name from path
+			storeName := ExtractStoreNameFromPath(importPath)
+			
+			if storeName != "" {
+				// Look up store content in registry
+				if storeContent, exists := storeRegistry[storeName]; exists {
+					// Only add if not already defined inline (inline overrides import)
+					if _, alreadyDefined := fence.Stores[storeName]; !alreadyDefined {
+						fence.Stores[storeName] = storeContent
+						log.Printf("[parseFenceContentWithStores] Loaded external store: %s from %s", storeName, importPath)
+					} else {
+						log.Printf("[parseFenceContentWithStores] Inline store '%s' overrides imported store", storeName)
+					}
+				} else {
+					log.Printf("[parseFenceContentWithStores] WARNING: Store '%s' not found in registry (from %s)", storeName, importPath)
+				}
+			}
+		}
+	}
+	
+	return fence
+}
+
+// extractStoreNameFromPath extracts the store name from an import path
+// Supports various path formats:
+// - './stores/auth.js' -> 'auth'
+// - 'stores/auth.js' -> 'auth'
+// - '../stores/auth.js' -> 'auth'
+// - '/stores/auth.js' -> 'auth'
+// Pattern: Path Extraction Utility [Load: 6]
+func ExtractStoreNameFromPath(path string) string {
+	// Remove quotes if present
+	path = strings.Trim(path, `"'`)
+	
+	// Find the last slash
+	lastSlash := strings.LastIndex(path, "/")
+	if lastSlash == -1 {
+		// No slash, entire path is filename
+		return strings.TrimSuffix(path, ".js")
+	}
+	
+	// Extract filename after last slash
+	filename := path[lastSlash+1:]
+	
+	// Remove .js extension
+	storeName := strings.TrimSuffix(filename, ".js")
+	
+	return storeName
+}

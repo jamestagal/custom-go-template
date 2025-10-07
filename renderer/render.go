@@ -51,6 +51,61 @@ func Render(templatePath string, props map[string]any) (string, string, string) 
 	return markup, script, style
 }
 
+// RenderWithStores renders a transformed template AST with store initialization
+// This is the new main rendering function that integrates store initialization
+// into the final HTML output.
+//
+// Input:
+//   - transformedAST: The transformed AST from transformer.TransformAST()
+//   - storeDefinitions: Map of store names to their JS object literal definitions
+//
+// Output:
+//   - markup: The rendered HTML markup
+//   - script: The combined script content (store init + extracted scripts)
+//   - style: The extracted CSS styles
+//
+// Cognitive Load: 10
+// - Generate markup: 2
+// - Generate base script: 2
+// - Generate store script: 3
+// - Combine scripts: 2
+// - Generate style: 1
+func RenderWithStores(transformedAST *ast.Template, storeDefinitions map[string]string) (string, string, string) {
+	// Generate markup from transformed AST
+	markup := generateMarkup(transformedAST)
+
+	// Generate base script content (from <script> tags in template)
+	baseScript := generateScript(transformedAST)
+
+	// Generate store initialization script
+	storeScript := renderStoreInitializations(storeDefinitions)
+
+	// Combine scripts: store initialization comes first (before other scripts)
+	// This ensures stores are available before any component scripts run
+	var combinedScript string
+	if storeScript != "" {
+		// Extract just the script content (without <script> tags)
+		// renderStoreInitializations returns: <script>\n...content...\n</script>
+		// We want just the content part
+		scriptContent := strings.TrimPrefix(storeScript, "<script>")
+		scriptContent = strings.TrimSuffix(scriptContent, "</script>")
+		scriptContent = strings.TrimSpace(scriptContent)
+
+		if baseScript != "" {
+			combinedScript = scriptContent + "\n\n" + baseScript
+		} else {
+			combinedScript = scriptContent
+		}
+	} else {
+		combinedScript = baseScript
+	}
+
+	// Generate style content
+	style := generateStyle(transformedAST)
+
+	return markup, combinedScript, style
+}
+
 // extractComponentName extracts a component name from the template path
 // Example: "examples/pages/home.html" -> "home"
 // Example: "examples/components/HeaderSimple.html" -> "HeaderSimple"
