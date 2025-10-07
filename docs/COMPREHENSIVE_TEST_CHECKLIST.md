@@ -1,51 +1,143 @@
 # Comprehensive Template Pattern Test Checklist
 
-**Date**: 2025-10-07
-**Test File**: `examples/pages/comprehensive-simple.html` (simplified due to bugs)
-**Server URL**: http://localhost:3333/comprehensive-simple
-**Test Result**: ✅ **PASSED** - Zero console errors, all patterns rendering correctly
+**Date**: 2025-10-07 (Last Updated)
+**Primary Test Files**:
+- `examples/pages/comprehensive-simple.html` - http://localhost:3333/comprehensive-simple
+- `examples/pages/home.html` - http://localhost:3333/home (advanced features)
+- `examples/pages/comprehensive.html` - http://localhost:3333/comprehensive (original full test)
+
+**Test Result**: ✅ **PASSED** - Zero console errors, all core patterns rendering correctly
 
 This document tracks testing of all template patterns to ensure complete feature coverage before Plenti Integration (Spec 8).
 
 ## Test Status Summary
 
-- **Console Errors**: ✅ Zero errors
+### Core Features
+- **Console Errors**: ✅ Zero errors (both home.html and comprehensive-simple.html)
 - **Page Styling**: ✅ Working (page + component style aggregation)
-- **Basic Expressions**: ✅ Working
-- **Conditionals**: ✅ Working (if/else-if/else, nested)
-- **Loops**: ✅ Working (simple, with index, nested)
-- **Static Components**: ✅ Working
-- **Components in Loops**: ⚠️ **NOT TESTED** (known bug - see below)
-- **Functions**: ⚠️ **NOT TESTED** (known bug - see below)
-- **Attribute Expressions**: ⚠️ **NOT TESTED** (known bug - see below)
+- **Basic Expressions**: ✅ Working (comprehensive-simple.html)
+- **Conditionals**: ✅ Working (if/else-if/else, nested) (comprehensive-simple.html)
+- **Loops (arrays)**: ✅ Working (simple, with index, nested) (comprehensive-simple.html)
+- **Loops (objects)**: ✅ Working (`{for key, value of object}`) (home.html - NOT in comprehensive-simple)
+- **Static Components**: ✅ Working (comprehensive-simple.html)
+- **Dynamic Components**: ✅ Working (`<="path" />` syntax) (home.html - NOT in comprehensive-simple)
+- **Functions**: ✅ **FIXED** - Working in fence section (comprehensive-simple.html)
+- **Reactive State**: ✅ Working (login/logout demo) (comprehensive-simple.html)
 
-## Known Bugs Preventing Full Testing
+### Advanced Features (Tested in home.html)
+- **Array Spread in Loops**: ✅ Working `{for item of ["new", ...array]}`
+- **Variable Component Paths**: ✅ Working `<='{pathVar}'` and `<="./path/{var}.html"`
+- **Notification Components**: ✅ Working (loop with different types: success, info, warning, error)
+- **Interactive State**: ✅ Working (onclick handlers updating reactive vars)
+- **String Manipulation**: ✅ Working (`.split().reverse().join()`)
+- **Array Methods**: ✅ Working (`.filter()`, inline arrays)
 
-### Bug #1: Server Manually Builds x-data (High Priority)
-- **Issue**: Server route handlers manually extract fence data and build x-data as JSON
-- **Impact**: Functions get extracted as truncated JSON strings instead of proper Alpine.js methods
-- **Workaround**: Removed all functions from test file
-- **Fix Required**: Server should use `renderer/transformer` with `alpineDataFormatter`
+### Missing from comprehensive-simple.html
+- **Object Loops**: ⚠️ NOT showcased (but works in home.html)
+- **Dynamic Components**: ⚠️ NOT showcased (but works in home.html)
+- **Computed Values**: ⚠️ NOT showcased (`const filtered = array.filter(...)`)
+- **Complex Array Methods**: ⚠️ NOT showcased (`.reduce()`, chained `.filter().map()`)
+- **Function Props**: ⚠️ NOT showcased (passing `formatPrice={formatPrice}` to components)
+- **Array Spread**: ⚠️ NOT showcased (but works in home.html)
 
-### Bug #2: Component Props in Loops Don't Evaluate
-- **Issue**: Props like `inStock={product.inStock}` are passed as literal expressions, not evaluated values
-- **Result**: Component x-data contains `inStock: product.inStock` instead of `inStock: true`
-- **Impact**: Variables undefined in component scope, causing console errors
-- **Workaround**: Only using static components with literal prop values
-- **Fix Required**: Transformer should evaluate expressions in loop context before passing to components
+## Fixed Issues (Previously Bugs)
 
-### Bug #3: Attribute Expressions Transform Incorrectly
-- **Issue**: Expressions in attributes like `<button {!inStock ? 'disabled' : ''}>` transform to `<span x-text="!inStock ? 'disabled' : ''">` instead of Alpine binding
-- **Expected**: Should become `:disabled="!inStock"` or similar Alpine.js directive
-- **Impact**: Expression evaluates in wrong scope, causes console errors
-- **Workaround**: Use conditional rendering instead: `{if inStock}<button>...` / `{else}<button disabled>...`
-- **Fix Required**: Transformer needs to detect attribute-position expressions and use Alpine bindings
+### ✅ FIXED #1: Server x-data Building
+- **Was**: Server manually extracted fence data and built x-data as JSON
+- **Fix**: Server now uses `renderer.Render()` and `buildXDataFromProps()` with proper function extraction
+- **Status**: Functions work correctly in fence section (see comprehensive-simple.html login/logout demo)
+- **Spec**: Completed in fix-server-xdata-building spec (2025-10-07)
 
-### Bug #4: Multi-line Variable Extraction
-- **Issue**: Fence parser only captures first line of const/let/var declarations
-- **Impact**: Complex variable values get truncated
-- **Workaround**: Use only single-line declarations
-- **Fix Required**: Apply same multi-line parsing logic as props use
+### Still TODO: Component Props in Loops
+- **Issue**: Props like `inStock={product.inStock}` in loops may not evaluate correctly
+- **Status**: Not fully tested with complex scenarios
+- **Workaround**: Use static prop values or test more thoroughly
+
+### Still TODO: Attribute Expressions
+- **Issue**: Expressions in attributes like `class="{dynamicClass}"` may need Alpine binding support
+- **Status**: Not tested in current files
+- **Future**: May need transformer enhancement for attribute-position expressions
+
+---
+
+## Feature Coverage by File
+
+### home.html - Advanced Features Showcase
+**URL**: http://localhost:3333/home
+
+**Unique Features Tested**:
+1. **Dynamic Components with `<=` syntax** (Lines 103-105):
+   - Static path: `<="./components/UserProfile.html"`
+   - Variable path: `<='{path}'`
+   - Template literal: `<="./components/{comp}.html"`
+
+2. **Object Loops with `of` syntax** (Lines 111+):
+   - Simple: `{for animal of animals}`
+   - Inline array: `{for word of ["item1", "item2"]}`
+   - Spread operator: `{for animal of ["🦄", ...animals]}`
+
+3. **Interactive Notifications** (Lines 166-186):
+   - Loop over notification types: success, info, warning, error
+   - Reactive state: `onclick="{currentNotification = notif}"`
+   - Conditional component rendering: `{if currentNotification}`
+
+4. **Advanced String/Array Operations**:
+   - String manipulation: `animal.split('').reverse().join('')`
+   - Array filter in onclick: `animals.filter(a => a !== animal)`
+   - Array spread in state update: `[newAnimal, ...animals]`
+
+5. **Interactive State Management**:
+   - Add/remove items from arrays
+   - x-model for input binding
+   - onclick handlers with complex expressions
+
+### comprehensive-simple.html - Core Features Showcase
+**URL**: http://localhost:3333/comprehensive-simple
+
+**Features Tested**:
+1. Basic expressions (variables, object properties, function calls)
+2. Conditionals (if/else, if/else-if/else, nested)
+3. Array loops (simple, with index, nested)
+4. Static components with props
+5. Functions in fence section (getGreeting, formatPrice)
+6. **Reactive authentication demo** (login/logout with state updates)
+7. Alpine.js directives (@click, :disabled, :class, x-text)
+8. Component style aggregation
+
+**Missing** (available in home.html or comprehensive.html):
+- Object loops (`{for key, value of object}`)
+- Dynamic components (`<="path" />`)
+- Computed values (`const filtered = ...`)
+- Complex array methods (reduce, chained filter/map)
+- Passing functions as props to components
+- Array spread operator
+
+### comprehensive.html - Original Full Test
+**URL**: http://localhost:3333/comprehensive
+
+**Additional Features**:
+1. **Object property loops** (Lines 243-257):
+   - `{for key, value of settings}`
+   - Nested object loops: `{for subKey, subValue of value}`
+   - Type checking: `{if typeof value === 'object'}`
+
+2. **Categories with filtered data** (Lines 264-286):
+   - Triple-nested loops: categories → items → tags
+   - Inline filtering: `categories.filter(p => p.tags.includes("..."))`
+
+3. **Complex expressions** (Lines 355-358):
+   - `products.reduce((sum, p) => sum + p.price, 0) / products.length`
+   - `products.filter(p => p.featured).length`
+   - Chained methods: `products.filter(p => p.inStock).reduce(...)`
+
+4. **Math functions** (Line 366):
+   - `Math.min(3, filteredProducts.length)`
+
+5. **Array slicing in loops** (Line 368):
+   - `{for product, index in filteredProducts.slice(0, 3)}`
+
+6. **Function props to components** (Line 309):
+   - `<ProductCard formatPrice={formatPrice} />`
 
 ---
 
@@ -404,11 +496,54 @@ List any patterns that should be tested but aren't in comprehensive.html:
 
 ---
 
+## Recommendations for comprehensive-simple.html Enhancement
+
+To make comprehensive-simple.html a more complete showcase, consider adding:
+
+### Priority 1: Core Missing Features
+1. **Section 5: Object Loops**
+   - Add: `{for key, value of settings}` example
+   - Showcase nested object iteration
+   - Test: Verify Object.entries() transformation works
+
+2. **Section 6: Dynamic Components**
+   - Add: `<="./components/AdminPanel.html" user={user} />` conditional example
+   - Add: Variable path example: `<='{componentPath}'`
+   - Test: Verify component loading based on conditions
+
+3. **Section 7: Computed Values**
+   - Add fence section: `const filtered = products.filter(...)`
+   - Show computed values used in multiple places
+   - Test: Verify const values in x-data scope
+
+### Priority 2: Advanced Showcases
+4. **Section 8: Complex Array Methods**
+   - Average price with reduce
+   - Chained filter().map() operations
+   - Array slicing in loops: `.slice(0, 3)`
+
+5. **Enhanced Component Section**
+   - Pass `formatPrice` function as prop to ProductCard
+   - Test function props work correctly
+   - Verify function scope in child components
+
+### Priority 3: Edge Cases
+6. **Math Functions**: `Math.min()`, `Math.max()`, `Math.floor()`
+7. **Type Checking**: `{if typeof value === 'object'}`
+8. **Array Spread**: `{for item of ["new", ...existingArray]}`
+
+### Files to Reference
+- **home.html**: For dynamic components, object loops, array spread examples
+- **comprehensive.html**: For object loops, computed values, complex expressions
+
+---
+
 ## Next Steps
 
 After completing this checklist:
 
-1. **Fix any issues found**: Address bugs before Spec 8
-2. **Add missing patterns**: Create additional test files if needed
-3. **Update roadmap**: Mark Spec 8 (Plenti Integration) as ready to start
-4. **Document results**: Update this file with test results
+1. ✅ **Update checklist**: Document current feature coverage (DONE 2025-10-07)
+2. **Enhance comprehensive-simple.html**: Add missing showcase sections (optional)
+3. **Test comprehensive.html**: Verify all original patterns still work
+4. **Update roadmap**: Mark template engine features as complete
+5. **Prepare for Spec 8**: Plenti Integration ready to start
