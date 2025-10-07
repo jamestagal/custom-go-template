@@ -1,0 +1,135 @@
+---
+prop title = "Store System - Theme Toggle Demo"
+
+store auth = {
+  isLoggedIn: false,
+  user: {
+    name: "Guest",
+    email: ""
+  },
+  login() {
+    this.isLoggedIn = true;
+    this.user.name = "John Doe";
+    this.user.email = "john@example.com";
+  },
+  logout() {
+    this.isLoggedIn = false;
+    this.user.name = "Guest";
+    this.user.email = "";
+  }
+}
+
+store cart = {
+  items: [],
+  total: 0,
+  addItem(name, price) {
+    this.items.push({ name, price });
+    this.total += price;
+  },
+  clear() {
+    this.items = [];
+    this.total = 0;
+  }
+}
+
+store theme = {
+  mode: "light",
+  toggle() {
+    this.mode = this.mode === "light" ? "dark" : "light";
+  }
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title}</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body :style="$store.theme.mode === 'dark' ? 'background: #1a1a1a; color: #e0e0e0; font-family: system-ui; max-width: 900px; margin: 0 auto; padding: 2rem; transition: all 0.3s;' : 'background: #ffffff; color: #1a1a1a; font-family: system-ui; max-width: 900px; margin: 0 auto; padding: 2rem; transition: all 0.3s;'">
+
+  <h1 style="text-align: center;">{title}</h1>
+  <p style="text-align: center;">Current theme: <strong>{$theme.mode}</strong></p>
+
+  <!-- Theme Toggle Section -->
+  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
+    <h2 style="margin-top: 0;">🎨 Theme Toggle (ACTUALLY WORKS!)</h2>
+    <button
+      @click="$store.theme.toggle()"
+      :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-size: 1rem;' : 'background: #2563eb; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-size: 1rem;'">
+      Toggle to {$theme.mode === 'dark' ? 'Light' : 'Dark'} Mode
+    </button>
+    <p style="margin-top: 1rem;">Click the button above and watch the entire page theme change! 🌓</p>
+  </div>
+
+  <!-- Auth Section -->
+  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
+    <h2 style="margin-top: 0;">✅ Authentication Store</h2>
+    <p>Status: <strong>{$auth.isLoggedIn}</strong></p>
+    <p>User: <strong>{$auth.user.name}</strong></p>
+    <p>Email: <strong>{$auth.user.email}</strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button
+        @click="$store.auth.login()"
+        :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;'">
+        Login
+      </button>
+      <button
+        @click="$store.auth.logout()"
+        :style="$store.theme.mode === 'dark' ? 'background: #666; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;' : 'background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;'">
+        Logout
+      </button>
+    </div>
+  </div>
+
+  <!-- Cart Section -->
+  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
+    <h2 style="margin-top: 0;">🛒 Shopping Cart Store</h2>
+    <p>Items in cart: <strong>{$cart.items.length}</strong></p>
+    <p>Total: <strong>${$cart.total}</strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button
+        @click="$store.cart.addItem('Widget', 9.99)"
+        :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;'">
+        Add Widget ($9.99)
+      </button>
+      <button
+        @click="$store.cart.addItem('Gadget', 19.99)"
+        :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;'">
+        Add Gadget ($19.99)
+      </button>
+      <button
+        @click="$store.cart.addItem('Doohickey', 29.99)"
+        :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;'">
+        Add Doohickey ($29.99)
+      </button>
+      <button
+        @click="$store.cart.clear()"
+        :style="$store.theme.mode === 'dark' ? 'background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;' : 'background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;'">
+        Clear Cart
+      </button>
+    </div>
+  </div>
+
+  <!-- Features Section -->
+  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
+    <h2 style="margin-top: 0;">🎉 Features Demonstrated</h2>
+    <ul>
+      <li>✅ <strong>Live Theme Switching</strong> - Entire page updates reactively!</li>
+      <li>✅ <strong>Dynamic Styling</strong> - Using Alpine's <code>:style</code> binding</li>
+      <li>✅ <strong>Store Expressions</strong> - {$theme.mode}, {$auth.isLoggedIn}, etc.</li>
+      <li>✅ <strong>Conditional Expressions</strong> - {$theme.mode === 'dark' ? '...' : '...'}</li>
+      <li>✅ <strong>Cross-Store Reactivity</strong> - All stores update independently</li>
+      <li>✅ <strong>Smooth Transitions</strong> - CSS transitions for theme changes</li>
+    </ul>
+    <p :style="$store.theme.mode === 'dark' ? 'background: #1a4d2e; padding: 1rem; border-left: 4px solid #4ade80; margin-top: 1rem;' : 'background: #dbeafe; padding: 1rem; border-left: 4px solid #2563eb; margin-top: 1rem;'">
+      <strong>Try it!</strong> Toggle the theme and watch the background, text colors, and button styles all update instantly across the entire page!
+    </p>
+  </div>
+
+</body>
+</html>

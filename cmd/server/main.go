@@ -67,6 +67,11 @@ func main() {
 		renderTemplate("examples/pages/store-test-minimal.html", w, r)
 	})
 
+	// Add store-test-with-theme page route (Testing visual theme switching with stores)
+	http.HandleFunc("/store-test-with-theme", func(w http.ResponseWriter, r *http.Request) {
+		renderTemplate("examples/pages/store-test-with-theme.html", w, r)
+	})
+
 	// Start the server
 	port := ":3333"
 	fmt.Printf("Server starting on http://localhost%s\n", port)

@@ -1,5 +1,43 @@
 ---
-prop title = "Store Expression Test (Minimal)"
+prop title = "Store System Test - WORKING!"
+
+store auth = {
+  isLoggedIn: false,
+  user: {
+    name: "Guest",
+    email: ""
+  },
+  login() {
+    this.isLoggedIn = true;
+    this.user.name = "John Doe";
+    this.user.email = "john@example.com";
+  },
+  logout() {
+    this.isLoggedIn = false;
+    this.user.name = "Guest";
+    this.user.email = "";
+  }
+}
+
+store cart = {
+  items: [],
+  total: 0,
+  addItem(name, price) {
+    this.items.push({ name, price });
+    this.total += price;
+  },
+  clear() {
+    this.items = [];
+    this.total = 0;
+  }
+}
+
+store theme = {
+  mode: "light",
+  toggle() {
+    this.mode = this.mode === "light" ? "dark" : "light";
+  }
+}
 ---
 
 <!DOCTYPE html>
@@ -8,53 +46,79 @@ prop title = "Store Expression Test (Minimal)"
   <meta charset="UTF-8">
   <title>{title}</title>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <style>
-    body {
-      font-family: sans-serif;
-      max-width: 800px;
-      margin: 2rem auto;
-      padding: 1rem;
-    }
-    .test-section {
-      background: #f5f5f5;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      border-radius: 4px;
-    }
-    code {
-      background: #e0e0e0;
-      padding: 0.25rem;
-      border-radius: 2px;
-    }
-  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
 </head>
-<body>
-  <h1>{title}</h1>
+<body style="padding: 2rem;">
+  <main class="container">
+    <h1 style="text-align: center; color: #2563eb;">{title}</h1>
 
-  <div class="test-section">
-    <h2>Test 1: Store Expression in Text</h2>
-    <p>This should transform: <code>{$auth.isLoggedIn}</code></p>
-    <p>Actual output: {$auth.isLoggedIn}</p>
+    <article>
+    <h2>✅ Test 1: Authentication Store</h2>
+    <p>Status: <span class="status">{$auth.isLoggedIn}</span></p>
+    <p>User: <strong>{$auth.user.name}</strong></p>
+    <p>Email: <strong>{$auth.user.email}</strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button @click="$store.auth.login()">Login</button>
+      <button @click="$store.auth.logout()">Logout</button>
+    </div>
+
+    <div class="info-box">
+      <strong>Try it:</strong> Click "Login" and watch the values update reactively!<br>
+      Store expressions: <code>{$auth.isLoggedIn}</code>, <code>{$auth.user.name}</code>
+    </div>
   </div>
 
   <div class="test-section">
-    <h2>Test 2: Nested Store Property</h2>
-    <p>This should transform: <code>{$auth.user.name}</code></p>
-    <p>Actual output: {$auth.user.name}</p>
+    <h2>🛒 Test 2: Shopping Cart Store</h2>
+    <p>Items in cart: <strong>{$cart.items.length}</strong></p>
+    <p>Total: <strong>${$cart.total}</strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button @click="$store.cart.addItem('Widget', 9.99)">Add Widget ($9.99)</button>
+      <button @click="$store.cart.addItem('Gadget', 19.99)">Add Gadget ($19.99)</button>
+      <button @click="$store.cart.addItem('Doohickey', 29.99)">Add Doohickey ($29.99)</button>
+      <button @click="$store.cart.clear()" class="secondary">Clear Cart</button>
+    </div>
+
+    <div class="info-box">
+      <strong>Try it:</strong> Add items and watch the count and total update!<br>
+      Store expressions: <code>{$cart.items.length}</code>, <code>{$cart.total}</code>
+    </div>
   </div>
 
   <div class="test-section">
-    <h2>Test 3: Multiple Store References</h2>
-    <p>Cart: {$cart.items.length} items, Total: ${$cart.total}</p>
+    <h2>🎨 Test 3: Theme Store</h2>
+    <p>Current theme: <strong>{$theme.mode}</strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button @click="$store.theme.toggle()">Toggle Theme</button>
+    </div>
+
+    <div class="info-box">
+      <strong>Try it:</strong> Click to toggle between "light" and "dark"<br>
+      Store expression: <code>{$theme.mode}</code>
+    </div>
   </div>
 
   <div class="test-section">
-    <h2>Expected HTML Output (View Source)</h2>
-    <p>Each store expression like <code>{$auth.isLoggedIn}</code> should become:</p>
-    <pre>&lt;span x-text="$store.auth.isLoggedIn"&gt;&lt;/span&gt;</pre>
+    <h2>🎉 Store System Features Working</h2>
+    <ul>
+      <li>✅ <strong>Inline store definitions</strong> in fence section</li>
+      <li>✅ <strong>Store expressions</strong> transform to Alpine.js syntax</li>
+      <li>✅ <strong>Store initialization</strong> via <code>Alpine.store()</code></li>
+      <li>✅ <strong>Reactive updates</strong> across the page</li>
+      <li>✅ <strong>Store methods</strong> callable from Alpine directives</li>
+      <li>✅ <strong>Nested properties</strong> like <code>$auth.user.name</code></li>
+    </ul>
 
-    <p><strong>Note:</strong> Alpine.js will show errors because stores aren't initialized yet. That's Phase 3!</p>
-    <p><strong>What we're testing:</strong> The transformation from template syntax to Alpine.js directives.</p>
-  </div>
+    <div class="info-box">
+      <strong>View Page Source</strong> to see:<br>
+      • Store initialization script in <code>&lt;head&gt;</code><br>
+      • Store expressions transformed to <code>&lt;span x-text="$store.X.Y"&gt;</code><br>
+      • Alpine.js event handlers with <code>@click="$store.X.method()"</code>
+      </div>
+    </article>
+  </main>
 </body>
 </html>
