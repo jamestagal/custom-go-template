@@ -1112,17 +1112,162 @@ echo "export interface User {
 - **Complex operation**: Max load 25
 - **Total file**: Max load 30
 
+## Function Replacement Safety Checklist [CRITICAL]
+
+When replacing, refactoring, or creating a new version of an existing function:
+
+### BEFORE Writing the New Function
+1. **Feature Parity Audit**
+   ```markdown
+   □ List ALL features of the original function
+   □ Document ALL parameters it accepts
+   □ Document ALL return values
+   □ Identify ALL side effects (logging, caching, style aggregation, etc.)
+   □ Note ALL dependencies (files, services, external resources)
+   ```
+
+2. **Create Replacement Checklist**
+   ```go
+   // Example: Replacing Render() with RenderWithStores()
+   // Original Render() features:
+   // □ Reads template file from path
+   // □ Parses to AST
+   // □ Transforms AST
+   // □ Aggregates component styles (CRITICAL!)  ← Don't miss this!
+   // □ Generates markup
+   // □ Generates script
+   // □ Returns (markup, script, style)
+   //
+   // New RenderWithStores() must include:
+   // □ All features above PLUS
+   // □ Store initialization
+   // □ Store script generation
+   ```
+
+3. **Preserve Critical Inputs**
+   - ❌ **NEVER** reduce function signature without verifying all features still work
+   - ✅ **ALWAYS** keep access to resources needed for ALL original features
+   ```go
+   // ❌ BAD: Lost access to original AST and template path
+   func RenderWithStores(transformedAST *ast.Template, stores map[string]string)
+
+   // ✅ GOOD: Preserves all inputs needed for feature parity
+   func RenderWithStores(originalAST, transformedAST *ast.Template, stores map[string]string, templatePath string)
+   ```
+
+### DURING Implementation
+4. **Feature Implementation Tracking**
+   ```markdown
+   For each original feature:
+   □ Feature: Style aggregation
+     - [ ] Code copied from original function
+     - [ ] Adapted for new signature
+     - [ ] Tested with existing use case
+   □ Feature: Markup generation
+     - [x] Code copied
+     - [x] Working correctly
+   ```
+
+5. **Side Effect Preservation**
+   ```go
+   // Original function had these side effects:
+   // - GetAggregatedStyles() call for component CSS
+   // - Logging for debugging
+   // - Cache updates
+   //
+   // New function MUST include ALL of these, not just the "obvious" ones
+   ```
+
+### AFTER Implementation
+6. **Regression Test Checklist**
+   ```markdown
+   □ Test with original use cases (e.g., home.html with components)
+   □ Verify ALL outputs match (markup, script, STYLE)
+   □ Check for missing CSS classes
+   □ Confirm logging output is similar
+   □ Validate caching behavior
+   ```
+
+7. **Migration Strategy**
+   ```go
+   // Option A: Extend original function (safest)
+   func Render(path string, props map[string]any, stores map[string]string) {
+       // Add new features to working function
+   }
+
+   // Option B: Wrapper pattern (safe)
+   func RenderWithStores(originalAST, transformedAST, stores, path) {
+       // Reuse original function's logic
+       markup, script, _ := renderCore(transformedAST)
+       style := GetAggregatedStyles(originalAST, extractName(path)) // Don't forget!
+       // Add store-specific logic
+   }
+
+   // Option C: Complete rewrite (risky - use checklist!)
+   func RenderWithStores(...) {
+       // MUST include ALL features from original
+       // Use feature parity checklist above
+   }
+   ```
+
+### Common Pitfalls to Avoid
+```go
+// ❌ PITFALL 1: "I don't think we need this parameter"
+// Original function had templatePath parameter
+// New function removed it → Can't extract component name → No style aggregation!
+
+// ❌ PITFALL 2: "generateStyle() looks similar to GetAggregatedStyles()"
+// generateStyle() only extracts inline <style> tags
+// GetAggregatedStyles() collects ALL component styles
+// Using wrong function = missing component CSS!
+
+// ❌ PITFALL 3: "The tests pass, ship it"
+// Unit tests may not catch missing component styles
+// Need integration tests with actual components
+
+// ✅ SOLUTION: Feature parity checklist + comprehensive testing
+```
+
+### Mandatory Regression Tests
+```go
+// When replacing a renderer function, THIS TEST IS MANDATORY:
+func TestRenderWithStores_PreservesAllFeatures(t *testing.T) {
+    // Test with a page that uses multiple components
+    originalAST := parseTemplate("home.html")
+    transformed := transformAST(originalAST, props)
+
+    markup, script, styles := RenderWithStores(
+        originalAST, transformed, stores, "home.html",
+    )
+
+    // CRITICAL: Verify component styles are aggregated
+    assert.Contains(t, styles, "Styles from: Age")
+    assert.Contains(t, styles, "Styles from: UserProfile")
+    assert.Contains(t, styles, "Styles from: AdminPanel")
+    assert.Contains(t, styles, "Styles from: Footer")
+
+    // Verify markup includes component content
+    assert.Contains(t, markup, "age-badge")
+    assert.Contains(t, markup, "profile-card")
+
+    // Verify stores are initialized
+    assert.Contains(t, script, "Alpine.store(")
+}
+```
+
 ## Task Execution Rules
 1. ALWAYS read the full parent task and all sub-tasks first
 2. VALIDATE cognitive load before writing any code
 3. SELECT appropriate pattern based on complexity and requirements
-4. IMPLEMENT sub-tasks in order with pattern compliance
-5. MARK each sub-task complete with [x] immediately after completion
-6. CREATE shared types for frontend consumption
-7. ENSURE all tests pass before marking task complete
-8. VERIFY cognitive load score remains below threshold
-9. CHECK security and performance checklists for production code
-10. DOCUMENT any deviations from standard patterns with justification
+4. **IF REPLACING A FUNCTION**: Complete Function Replacement Safety Checklist FIRST
+5. IMPLEMENT sub-tasks in order with pattern compliance
+6. MARK each sub-task complete with [x] immediately after completion
+7. CREATE shared types for frontend consumption
+8. ENSURE all tests pass before marking task complete
+9. **IF REPLACED A FUNCTION**: Verify regression tests pass
+10. VERIFY cognitive load score remains below threshold
+11. CHECK security and performance checklists for production code
+12. DOCUMENT any deviations from standard patterns with justification
 
 ## MANDATORY Validation Checkpoints
 
