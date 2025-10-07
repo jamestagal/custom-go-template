@@ -38,6 +38,15 @@ function getGreeting(name) {
 function formatPrice(price) {
   return "$" + price.toFixed(2);
 }
+function login() {
+  this.isLoggedIn = true;
+  this.user = { name: "John Doe", role: "admin", email: "john@example.com" };
+}
+
+function logout() {
+  this.isLoggedIn = false;
+  this.user = { name: "Guest", role: "visitor", email: "" };
+}
 ---
 
 <style>
@@ -86,6 +95,66 @@ function formatPrice(price) {
   .bg-green-100 { background-color: #dcfce7; color: #166534; }
   .bg-purple-100 { background-color: #f3e8ff; color: #7c3aed; }
   .bg-yellow-100 { background-color: #fef3c7; color: #d97706; }
+
+  .auth-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: #f8fafc;
+    border-radius: 0.5rem;
+    border: 2px solid #e2e8f0;
+  }
+
+  .btn {
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.375rem;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background-color: #3b82f6;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background-color: #2563eb;
+  }
+
+  .btn-secondary {
+    background-color: #6b7280;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background-color: #4b5563;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .status-logged-in {
+    background-color: #dcfce7;
+    color: #166534;
+  }
+
+  .status-logged-out {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
 </style>
 
 <html lang="en">
@@ -99,14 +168,46 @@ function formatPrice(price) {
 <div class="container">
   <!-- Static Component Usage -->
   <Header title={title} user={user} isLoggedIn={isLoggedIn} />
+    <!-- Dynamic Login/Logout Controls -->
+  <div class="auth-buttons">
+    <div style="flex: 1;">
+      <h3 style="margin: 0 0 0.5rem 0; font-size: 1.125rem;">Authentication Demo</h3>
+      <p style="margin: 0 0 1rem 0; color: #64748b; font-size: 0.875rem;">
+        Click Login/Logout to see reactive state changes throughout the page
+      </p>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <button
+          @click="login()"
+          :disabled="isLoggedIn"
+          class="btn btn-primary"
+        >
+          Login as Admin
+        </button>
+        <button
+          @click="logout()"
+          :disabled="!isLoggedIn"
+          class="btn btn-secondary"
+        >
+          Logout
+        </button>
+        <div>
+          <span>Status:</span>
+          <span
+            :class="isLoggedIn ? 'status-badge status-logged-in' : 'status-badge status-logged-out'"
+            x-text="isLoggedIn ? 'Logged In' : 'Logged Out'"
+          ></span>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- 1. Basic Expressions Section -->
   <div class="section">
     <h2 class="section-title">1. Basic Expressions</h2>
     <div class="card">
       <p>Welcome to {title}!</p>
-      <p>Current user: <strong>{user.name}</strong> ({user.role})</p>
-      <p>Hello, {user.name}!</p>
+           <p>Current user: <strong><span x-text="user.name"></span></strong> (<span x-text="user.role"></span>)</p>
+      <p>Hello, <span x-text="user.name"></span>!</p>
       <p>Function call: <span x-text="getGreeting(user.name)"></span></p>
       <p>Number of products: {products.length}</p>
       <p>Current theme: {settings.theme}</p>
