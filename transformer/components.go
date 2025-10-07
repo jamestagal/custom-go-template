@@ -764,10 +764,13 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 
 	// PHASE 3: Transform component body (Task 2.6) ✓
 
-	// Filter out fence section from component body
+	// Filter out fence section and style section from component body
+	// Style sections are extracted separately by GetAggregatedStyles()
 	componentBodyNodes := []ast.Node{}
 	for _, node := range componentTemplate.Template.RootNodes {
-		if _, isFence := node.(*ast.FenceSection); !isFence {
+		_, isFence := node.(*ast.FenceSection)
+		_, isStyle := node.(*ast.StyleSection)
+		if !isFence && !isStyle {
 			componentBodyNodes = append(componentBodyNodes, node)
 		}
 	}
