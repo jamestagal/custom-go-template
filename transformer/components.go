@@ -776,6 +776,12 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 
 	// PHASE 4: Wrap with x-data (Task 2.4) ✓
 
+	// Only add x-data wrapper if component has data
+	// Components with no props, variables, or functions don't need Alpine.js wrapper
+	if len(componentDataScope) == 0 {
+		return transformedNodes
+	}
+
 	// Add x-data to the root element or wrap in a div
 	return wrapWithXData(transformedNodes, componentDataScope)
 }
