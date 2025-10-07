@@ -34,6 +34,26 @@ store cart = {
 
 store theme = {
   mode: "light",
+
+  // Computed style getters for Approach 1 (Inline Styles in Store)
+  get bodyStyle() {
+    return this.mode === 'dark'
+      ? 'background: #1a1a1a; color: #e0e0e0; font-family: system-ui; max-width: 900px; margin: 0 auto; padding: 2rem; transition: all 0.3s;'
+      : 'background: #ffffff; color: #1a1a1a; font-family: system-ui; max-width: 900px; margin: 0 auto; padding: 2rem; transition: all 0.3s;';
+  },
+
+  get sectionStyle() {
+    return this.mode === 'dark'
+      ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'
+      : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;';
+  },
+
+  get buttonStyle() {
+    return this.mode === 'dark'
+      ? 'background: #4a9eff; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-size: 1rem;'
+      : 'background: #2563eb; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-size: 1rem;';
+  },
+
   toggle() {
     this.mode = this.mode === "light" ? "dark" : "light";
   }
@@ -48,20 +68,38 @@ store theme = {
   <title>{title}</title>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
-<body :style="$store.theme.mode === 'dark' ? 'background: #1a1a1a; color: #e0e0e0; font-family: system-ui; max-width: 900px; margin: 0 auto; padding: 2rem; transition: all 0.3s;' : 'background: #ffffff; color: #1a1a1a; font-family: system-ui; max-width: 900px; margin: 0 auto; padding: 2rem; transition: all 0.3s;'">
+<body :style="$store.theme.bodyStyle">
 
   <h1 style="text-align: center;">{title}</h1>
   <p style="text-align: center;">Current theme: <strong>{$theme.mode}</strong></p>
 
-  <!-- Theme Toggle Section -->
-  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
-    <h2 style="margin-top: 0;">🎨 Theme Toggle (ACTUALLY WORKS!)</h2>
+  <!-- APPROACH 1: Inline Styles in Store (using getters) -->
+  <div :style="$store.theme.sectionStyle">
+    <h2 style="margin-top: 0;">🎨 Approach 1: Inline Styles in Store (Getters)</h2>
+    <p><strong>Pattern:</strong> Store defines <code>get bodyStyle()</code>, <code>get sectionStyle()</code>, <code>get buttonStyle()</code></p>
+    <p><strong>Usage:</strong> <code>:style="$store.theme.buttonStyle"</code></p>
     <button
       @click="$store.theme.toggle()"
-      :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-size: 1rem;' : 'background: #2563eb; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-size: 1rem;'">
+      :style="$store.theme.buttonStyle">
       Toggle to {$theme.mode === 'dark' ? 'Light' : 'Dark'} Mode
     </button>
-    <p style="margin-top: 1rem;">Click the button above and watch the entire page theme change! 🌓</p>
+    <p style="margin-top: 1rem;">✅ <strong>Benefits:</strong> Single source of truth, DRY, all theme logic in the store</p>
+    <p>✅ <strong>Clean HTML:</strong> No duplication of dark/light values in templates</p>
+  </div>
+
+  <!-- APPROACH 2: CSS Classes -->
+  <div class="theme-section" :class="$store.theme.mode">
+    <h2 style="margin-top: 0;">🎨 Approach 2: CSS Classes with :class Binding</h2>
+    <p><strong>Pattern:</strong> CSS defines <code>.theme-section.light</code> and <code>.theme-section.dark</code></p>
+    <p><strong>Usage:</strong> <code>:class="$store.theme.mode"</code></p>
+    <button
+      class="theme-btn"
+      :class="$store.theme.mode"
+      @click="$store.theme.toggle()">
+      Toggle to {$theme.mode === 'dark' ? 'Light' : 'Dark'} Mode
+    </button>
+    <p style="margin-top: 1rem;">✅ <strong>Benefits:</strong> Separation of concerns, CSS in stylesheets, better performance</p>
+    <p>✅ <strong>Production Ready:</strong> Standard CSS approach, easier for designers</p>
   </div>
 
   <!-- Auth Section -->
@@ -115,21 +153,105 @@ store theme = {
     </div>
   </div>
 
-  <!-- Features Section -->
-  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
-    <h2 style="margin-top: 0;">🎉 Features Demonstrated</h2>
-    <ul>
-      <li>✅ <strong>Live Theme Switching</strong> - Entire page updates reactively!</li>
-      <li>✅ <strong>Dynamic Styling</strong> - Using Alpine's <code>:style</code> binding</li>
-      <li>✅ <strong>Store Expressions</strong> - {$theme.mode}, {$auth.isLoggedIn}, etc.</li>
-      <li>✅ <strong>Conditional Expressions</strong> - {$theme.mode === 'dark' ? '...' : '...'}</li>
-      <li>✅ <strong>Cross-Store Reactivity</strong> - All stores update independently</li>
-      <li>✅ <strong>Smooth Transitions</strong> - CSS transitions for theme changes</li>
-    </ul>
-    <p :style="$store.theme.mode === 'dark' ? 'background: #1a4d2e; padding: 1rem; border-left: 4px solid #4ade80; margin-top: 1rem;' : 'background: #dbeafe; padding: 1rem; border-left: 4px solid #2563eb; margin-top: 1rem;'">
-      <strong>Try it!</strong> Toggle the theme and watch the background, text colors, and button styles all update instantly across the entire page!
-    </p>
+  <!-- Comparison Section -->
+  <div :style="$store.theme.sectionStyle">
+    <h2 style="margin-top: 0;">📊 Approach Comparison</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th style="text-align: left; padding: 0.5rem; border-bottom: 2px solid #ccc;">Aspect</th>
+          <th style="text-align: left; padding: 0.5rem; border-bottom: 2px solid #ccc;">Approach 1: Store Getters</th>
+          <th style="text-align: left; padding: 0.5rem; border-bottom: 2px solid #ccc;">Approach 2: CSS Classes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>Code Location</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">Styles in store (fence)</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">Styles in <code>&lt;style&gt;</code> tag</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>HTML Usage</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><code>:style="$store.theme.buttonStyle"</code></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><code>:class="$store.theme.mode"</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>DRY Principle</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Excellent - single source</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Excellent - CSS only</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>Performance</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">Good - inline styles</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Better - CSS caching</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>Designer Friendly</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">JavaScript knowledge needed</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Standard CSS workflow</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem;"><strong>Best For</strong></td>
+          <td style="padding: 0.5rem;">Dynamic, complex theming logic</td>
+          <td style="padding: 0.5rem;">✅ Production apps, team workflows</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
 </body>
 </html>
+
+<style>
+  /* Approach 2: CSS Classes for theming */
+
+  /* Base section styles */
+  .theme-section {
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    transition: all 0.3s;
+  }
+
+  /* Light mode section */
+  .theme-section.light {
+    background: #f5f5f5;
+    color: #1a1a1a;
+  }
+
+  /* Dark mode section */
+  .theme-section.dark {
+    background: #2d2d2d;
+    color: #e0e0e0;
+  }
+
+  /* Base button styles */
+  .theme-btn {
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  /* Light mode button */
+  .theme-btn.light {
+    background: #2563eb;
+    color: white;
+  }
+
+  .theme-btn.light:hover {
+    background: #1d4ed8;
+  }
+
+  /* Dark mode button */
+  .theme-btn.dark {
+    background: #4a9eff;
+    color: white;
+  }
+
+  .theme-btn.dark:hover {
+    background: #3b8ae6;
+  }
+</style>
