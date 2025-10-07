@@ -16,8 +16,9 @@ func (t *Template) NodeType() string { return "Template" }
 type FenceSection struct {
 	Imports    []ImportNode
 	Props      []PropNode
-	Variables  []VariableNode // Assuming VariableNode exists or will be added
-	RawContent string         // Store raw JS content for now
+	Variables  []VariableNode     // Assuming VariableNode exists or will be added
+	Stores     map[string]string  // Store definitions: name -> object literal as string
+	RawContent string             // Store raw JS content for now
 }
 
 func (f *FenceSection) NodeType() string { return "FenceSection" }

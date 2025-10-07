@@ -4,6 +4,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
@@ -48,10 +49,18 @@ func TextParser(delimiters ...Parser) Parser {
 	}
 }
 
-// ExpressionParser parses expressions in curly braces: {variable}
+// ExpressionParser parses expressions in curly braces: {variable} or {$store.property}
+// Pattern: Expression Router [Load: 8]
+// Cognitive Load: 8 (routing logic with $ detection)
+//
+// Routes expression parsing based on content:
+//   - {$storeName.prop} → StoreExpressionNode (via parseStoreExpression)
+//   - {variable}        → ExpressionNode
+//   - {obj.prop}        → ExpressionNode
+//   - {expr + 1}        → ExpressionNode
 func ExpressionParser() Parser {
 	return func(input string) Result {
-		// Use the lex-based expression parser
+		// Use the lex-based expression parser to extract content within braces
 		exprRes := LexExpressionParser()(input)
 		if !exprRes.Successful {
 			return exprRes
@@ -63,6 +72,28 @@ func ExpressionParser() Parser {
 		}
 
 		log.Printf("[ExpressionParser] Found expression: '%s'", expr)
+
+		// COGNITIVE LOAD RULE: Check if expression starts with $ (store reference)
+		// Route to parseStoreExpression if it's a store expression
+		if len(expr) > 0 && expr[0] == '$' {
+			// This is a store expression - parse it with parseStoreExpression
+			storeResult := parseStoreExpression()(expr)
+			if storeResult.Successful {
+				log.Printf("[ExpressionParser] Routed to store parser: %s", expr)
+				// Return store expression node with correct remaining
+				return Result{
+					Value:      storeResult.Value,
+					Remaining:  exprRes.Remaining,
+					Successful: true,
+					Error:      "",
+					Dynamic:    true,
+				}
+			}
+			// If store parsing failed, fall through to regular expression
+			log.Printf("[ExpressionParser] Store parsing failed, treating as regular expression: %s", expr)
+		}
+
+		// Regular expression (not a store)
 		return Result{
 			Value:      &ast.ExpressionNode{Expression: expr},
 			Remaining:  exprRes.Remaining,
@@ -137,6 +168,103 @@ func LexExpressionParser() Parser {
 	}
 }
 
+// parseStoreExpression parses store expressions: $storeName or $storeName.property
+// Pattern: Store Expression Parser [Load: 6]
+// Cognitive Load: 6 (simple parsing with validation)
+//
+// Syntax:
+//   - $storeName            → StoreExpressionNode{StoreName: "storeName", Property: ""}
+//   - $storeName.property   → StoreExpressionNode{StoreName: "storeName", Property: "property"}
+//   - $storeName.nested.prop → StoreExpressionNode{StoreName: "storeName", Property: "nested.prop"}
+//
+// Store names must:
+//   - Start with $ followed by letter or underscore
+//   - Contain only letters, digits, underscores
+//
+// Property paths:
+//   - Optional, separated by dots
+//   - Can have multiple levels (e.g., user.profile.name)
+func parseStoreExpression() Parser {
+	return func(input string) Result {
+		// Check if starts with $ (COGNITIVE LOAD RULE: early validation)
+		if len(input) == 0 || input[0] != '$' {
+			return Result{nil, input, false, "not a store expression", false}
+		}
+
+		// Need at least one character after $
+		if len(input) == 1 {
+			return Result{nil, input, false, "invalid store name", false}
+		}
+
+		// Parse store name after $
+		// Store name must start with letter or underscore
+		pos := 1
+		firstChar := rune(input[pos])
+		if !unicode.IsLetter(firstChar) && firstChar != '_' {
+			return Result{nil, input, false, "invalid store name", false}
+		}
+
+		// Continue parsing store name (alphanumeric + underscore)
+		storeName := strings.Builder{}
+		for pos < len(input) {
+			ch := rune(input[pos])
+			if unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' {
+				storeName.WriteRune(ch)
+				pos++
+			} else {
+				break
+			}
+		}
+
+		// Check if we have a store name (COGNITIVE LOAD RULE: validate before proceeding)
+		if storeName.Len() == 0 {
+			return Result{nil, input, false, "invalid store name", false}
+		}
+
+		storeNameStr := storeName.String()
+		property := ""
+
+		// Check for property access (dot notation)
+		if pos < len(input) && input[pos] == '.' {
+			pos++ // Skip the dot
+
+			// Parse property path (can have multiple dots)
+			propertyBuilder := strings.Builder{}
+			for pos < len(input) {
+				ch := rune(input[pos])
+				// Property can contain letters, digits, underscores, and dots
+				if unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == '.' {
+					propertyBuilder.WriteRune(ch)
+					pos++
+				} else {
+					break
+				}
+			}
+
+			property = propertyBuilder.String()
+			// Trim trailing dots if any
+			property = strings.TrimSuffix(property, ".")
+		}
+
+		// Create StoreExpressionNode (COGNITIVE LOAD RULE: wrapped success)
+		node := &ast.StoreExpressionNode{
+			StoreName: storeNameStr,
+			Property:  property,
+		}
+
+		remaining := input[pos:]
+		log.Printf("[parseStoreExpression] Parsed store expression: %s", node.String())
+
+		return Result{
+			Value:      node,
+			Remaining:  remaining,
+			Successful: true,
+			Error:      "",
+			Dynamic:    true,
+		}
+	}
+}
+
 // FenceParser parses the fence section (delimited by ---).
 func FenceParser() Parser {
 	return Map(
@@ -152,7 +280,7 @@ func FenceParser() Parser {
 	)
 }
 
-// parseFenceContent extracts props and variables from fence section content
+// parseFenceContent extracts props, variables, stores, and imports from fence section content
 // Now handles multi-line values for arrays, objects, and ternary expressions
 func parseFenceContent(content string) *ast.FenceSection {
 	fence := &ast.FenceSection{
@@ -160,6 +288,7 @@ func parseFenceContent(content string) *ast.FenceSection {
 		Props:      []ast.PropNode{},
 		Variables:  []ast.VariableNode{},
 		Imports:    []ast.ImportNode{},
+		Stores:     make(map[string]string),
 	}
 
 	lines := strings.Split(content, "\n")
@@ -167,6 +296,7 @@ func parseFenceContent(content string) *ast.FenceSection {
 	// Regex patterns for parsing
 	propRegex := regexp.MustCompile(`^\s*prop\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$`)
 	varRegex := regexp.MustCompile(`^\s*(let|const|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$`)
+	storeRegex := regexp.MustCompile(`^\s*store\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$`)
 	importRegex := regexp.MustCompile(`^\s*import\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s+from\s+['"](.+?)['"](?:;)?$`)
 
 	// Process lines with multi-line support
@@ -176,6 +306,38 @@ func parseFenceContent(content string) *ast.FenceSection {
 		trimmedLine := strings.TrimSpace(line)
 
 		if trimmedLine == "" {
+			i++
+			continue
+		}
+
+		// Check for store declaration (COGNITIVE LOAD RULE: error wrapping pattern)
+		if matches := storeRegex.FindStringSubmatch(trimmedLine); matches != nil {
+			storeName := matches[1]
+			firstLineValue := matches[2]
+
+			// Check if this is a potentially multi-line value
+			if isMultiLineValue(firstLineValue) {
+				// Multi-line value - accumulate lines until complete
+				fullValue, endIndex := parseMultiLineValue(lines, i, firstLineValue)
+				if fullValue != "" {
+					preview := fullValue
+					if len(fullValue) > 50 {
+						preview = fullValue[:50] + "..."
+					}
+					log.Printf("[parseFenceContent] Found multi-line store: %s = %s (total %d chars)", storeName, preview, len(fullValue))
+					fence.Stores[storeName] = fullValue
+					i = endIndex + 1
+					continue
+				}
+			}
+
+			// Single-line value
+			// Remove trailing semicolon if present
+			value := strings.TrimSpace(firstLineValue)
+			value = strings.TrimSuffix(value, ";")
+
+			log.Printf("[parseFenceContent] Found store: %s = %s", storeName, value)
+			fence.Stores[storeName] = value
 			i++
 			continue
 		}
@@ -276,8 +438,8 @@ func parseFenceContent(content string) *ast.FenceSection {
 		i++
 	}
 
-	log.Printf("[parseFenceContent] Extracted %d props, %d variables, %d imports",
-		len(fence.Props), len(fence.Variables), len(fence.Imports))
+	log.Printf("[parseFenceContent] Extracted %d props, %d variables, %d imports, %d stores",
+		len(fence.Props), len(fence.Variables), len(fence.Imports), len(fence.Stores))
 
 	return fence
 }
