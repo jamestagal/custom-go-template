@@ -367,6 +367,97 @@ func (h *Handler) GetConsultation(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+#### GO-FUNCTION-REPLACEMENT (Load: 9)
+**Mistake:** Creating new function version without preserving all original features
+```go
+// ❌ BAD - New function loses critical features
+// Original function (all features working):
+func Render(templatePath string) (string, string, string) {
+    template := readAndParse(templatePath)
+    transformed := transform(template)
+    markup := generateMarkup(transformed)
+    script := generateScript(transformed)
+    style := GetAggregatedStyles(template, componentName) // CRITICAL!
+    return markup, script, style
+}
+
+// New function version (MISSING style aggregation):
+func RenderWithStores(transformedAST *ast.Template, stores map[string]string) (string, string, string) {
+    markup := generateMarkup(transformedAST)
+    script := generateScript(transformedAST)
+    storeScript := renderStoreInitializations(stores)
+    combinedScript := script + "\n" + storeScript
+    style := generateStyle(transformedAST) // ❌ WRONG - only inline styles!
+    return markup, combinedScript, style
+}
+
+// Result: Component styles disappear from rendered output!
+```
+
+**Correct:** Feature parity audit + comprehensive regression tests
+```go
+// ✅ GOOD - Preserve ALL original features
+// BEFORE writing new function:
+// 1. Feature Parity Audit:
+//    □ Reads template file from path
+//    □ Parses to AST
+//    □ Transforms AST
+//    □ Aggregates component styles (CRITICAL!)
+//    □ Generates markup, script, style
+//
+// 2. New signature must support ALL features:
+func RenderWithStores(
+    originalAST *ast.Template,      // ✅ For style aggregation
+    transformedAST *ast.Template,   // ✅ For rendering
+    stores map[string]string,       // ✅ New feature
+    templatePath string,            // ✅ For component name extraction
+) (string, string, string) {
+    markup := generateMarkup(transformedAST)
+
+    // Combine scripts (new feature)
+    baseScript := generateScript(transformedAST)
+    storeScript := renderStoreInitializations(stores)
+    combinedScript := baseScript + "\n" + storeScript
+
+    // ✅ PRESERVE: Component style aggregation (original feature)
+    componentName := extractComponentName(templatePath)
+    style := GetAggregatedStyles(originalAST, componentName)
+
+    return markup, combinedScript, style
+}
+
+// ✅ MANDATORY: Regression test for style aggregation
+func TestRenderWithStores_PreservesStyleAggregation(t *testing.T) {
+    // Test that component styles are still aggregated
+    original := parseTemplate("home.html")
+    transformed := transform(original)
+    stores := map[string]string{"auth": "{ user: null }"}
+
+    _, _, styles := RenderWithStores(original, transformed, stores, "home.html")
+
+    // ✅ VERIFY: All component styles present
+    assert.Contains(t, styles, "Styles from: Age")
+    assert.Contains(t, styles, "Styles from: UserProfile")
+    assert.Contains(t, styles, "Styles from: AdminPanel")
+
+    // This test would have caught the bug immediately!
+}
+```
+
+**Detection Strategy:**
+- Look for new function versions that replace existing functions
+- Verify signature includes all resources needed for original features
+- Require explicit checklist of preserved features in PR/commit
+- Mandate regression tests that verify ALL original features
+
+**Common Pitfalls:**
+1. "I don't think we need this parameter anymore" → Lost feature access
+2. "generateStyle() looks similar to GetAggregatedStyles()" → Subtle difference causes bug
+3. "The new features work, ship it" → Didn't test old features still work
+
+**Real Bug Example:**
+See `.agent-os/standards/cognitive-load/comprehensive-testing.md` for complete case study of RenderWithStores() losing style aggregation (Bug #2025-10-08-style-aggregation, commit 0f1187c).
+
 ### 3. Svelte/SvelteKit Patterns
 
 #### SVELTE-STORE-LOOP (Load: 8)

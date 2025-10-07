@@ -16,6 +16,7 @@ frameworks:
       - GO-SLICE-PREALLOC
       - GO-MAP-CONCURRENT
       - GO-NIL-CHECK
+      - GO-FUNCTION-REPLACEMENT
       - GOFAST-SIMPLE-DI
       - GOFAST-STRATEGY-PATTERN
       - GOFAST-ERROR-VALUES
@@ -28,6 +29,7 @@ frameworks:
       - deep_nesting
       - missing_comments
       - pattern_completeness
+      - function_replacement_safety
     
   svelte:
     enabled: true
@@ -81,3 +83,6 @@ pattern_overrides:
     
   GOFAST-DTO-PATTERN:
     severity: error  # Critical - blocks API functionality
+
+  GO-FUNCTION-REPLACEMENT:
+    severity: error  # Critical - prevents feature loss during refactoring
