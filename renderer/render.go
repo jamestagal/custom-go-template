@@ -56,21 +56,24 @@ func Render(templatePath string, props map[string]any) (string, string, string) 
 // into the final HTML output.
 //
 // Input:
+//   - originalAST: The original parsed AST (before transformation) - needed for style aggregation
 //   - transformedAST: The transformed AST from transformer.TransformAST()
 //   - storeDefinitions: Map of store names to their JS object literal definitions
+//   - templatePath: Path to the template file (for component name extraction)
 //
 // Output:
 //   - markup: The rendered HTML markup
 //   - script: The combined script content (store init + extracted scripts)
-//   - style: The extracted CSS styles
+//   - style: The aggregated CSS styles (page + all component styles)
 //
-// Cognitive Load: 10
+// Cognitive Load: 12
 // - Generate markup: 2
 // - Generate base script: 2
 // - Generate store script: 3
 // - Combine scripts: 2
+// - Aggregate styles: 2
 // - Generate style: 1
-func RenderWithStores(transformedAST *ast.Template, storeDefinitions map[string]string) (string, string, string) {
+func RenderWithStores(originalAST *ast.Template, transformedAST *ast.Template, storeDefinitions map[string]string, templatePath string) (string, string, string) {
 	// Generate markup from transformed AST
 	markup := generateMarkup(transformedAST)
 
@@ -100,8 +103,12 @@ func RenderWithStores(transformedAST *ast.Template, storeDefinitions map[string]
 		combinedScript = baseScript
 	}
 
-	// Generate style content
-	style := generateStyle(transformedAST)
+	// CRITICAL FIX: Aggregate component styles from original AST
+	// Use original AST (not transformed) to preserve FenceSection imports
+	componentName := extractComponentName(templatePath)
+	log.Printf("[RenderWithStores] Aggregating styles for: %s", componentName)
+	style := GetAggregatedStyles(originalAST, componentName)
+	log.Printf("[RenderWithStores] Aggregated %d bytes of styles", len(style))
 
 	return markup, combinedScript, style
 }

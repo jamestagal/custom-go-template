@@ -171,7 +171,8 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render with stores (Task 3.5: Use RenderWithStores instead of Render)
-	markup, script, style := renderer.RenderWithStores(transformed, finalStores)
+	// CRITICAL: Pass original template AST and path for component style aggregation
+	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint)
 
 	// CRITICAL: Generate x-data using transformer's alpineDataFormatter
 	// This function is not exported, so we need to call Transform to get the data scope
