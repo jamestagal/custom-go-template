@@ -54,6 +54,11 @@ func main() {
 		renderTemplate("examples/pages/comprehensive.html", w, r)
 	})
 
+	// Add store-test-minimal page route (Testing Task 2.1: Store Expression Transformer - no definitions)
+	http.HandleFunc("/store-test-minimal", func(w http.ResponseWriter, r *http.Request) {
+		renderTemplate("examples/pages/store-test-minimal.html", w, r)
+	})
+
 	// Start the server
 	port := ":3333"
 	fmt.Printf("Server starting on http://localhost%s\n", port)

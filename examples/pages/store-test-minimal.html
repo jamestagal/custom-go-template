@@ -1,0 +1,60 @@
+---
+prop title = "Store Expression Test (Minimal)"
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{title}</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    .test-section {
+      background: #f5f5f5;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 4px;
+    }
+    code {
+      background: #e0e0e0;
+      padding: 0.25rem;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>{title}</h1>
+
+  <div class="test-section">
+    <h2>Test 1: Store Expression in Text</h2>
+    <p>This should transform: <code>{$auth.isLoggedIn}</code></p>
+    <p>Actual output: {$auth.isLoggedIn}</p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: Nested Store Property</h2>
+    <p>This should transform: <code>{$auth.user.name}</code></p>
+    <p>Actual output: {$auth.user.name}</p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 3: Multiple Store References</h2>
+    <p>Cart: {$cart.items.length} items, Total: ${$cart.total}</p>
+  </div>
+
+  <div class="test-section">
+    <h2>Expected HTML Output (View Source)</h2>
+    <p>Each store expression like <code>{$auth.isLoggedIn}</code> should become:</p>
+    <pre>&lt;span x-text="$store.auth.isLoggedIn"&gt;&lt;/span&gt;</pre>
+
+    <p><strong>Note:</strong> Alpine.js will show errors because stores aren't initialized yet. That's Phase 3!</p>
+    <p><strong>What we're testing:</strong> The transformation from template syntax to Alpine.js directives.</p>
+  </div>
+</body>
+</html>
