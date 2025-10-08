@@ -146,6 +146,25 @@ var storeAttrPattern = regexp.MustCompile(`\{\$([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA
 // Cognitive Load: 4 (regex pattern)
 var storeConditionPattern = regexp.MustCompile(`\$([a-zA-Z_][a-zA-Z0-9_]*)(\.[a-zA-Z_][a-zA-Z0-9_]*)+`)
 
+// Pattern to detect ALREADY-TRANSFORMED store references: $store.storeName.property
+// This is used to track stores that are already in Alpine.js format (e.g., in @click handlers)
+// Matches: $store.storeName.anything
+// Cognitive Load: 4 (regex pattern)
+var alpineStorePattern = regexp.MustCompile(`\$store\.([a-zA-Z_][a-zA-Z0-9_]*)`)
+
+// trackAlpineStoreReferences scans for $store.storeName patterns and tracks them
+// This handles cases where store references are already in Alpine.js format
+// Cognitive Load: 5 (regex matching + tracking)
+func trackAlpineStoreReferences(value string) {
+	matches := alpineStorePattern.FindAllStringSubmatch(value, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			storeName := match[1] // Captured group is the store name
+			TrackStoreReference(storeName)
+		}
+	}
+}
+
 // transformStoreExpressionsInCondition transforms store expressions in conditional expressions
 // Input: "$auth.isLoggedIn" -> Output: "$store.auth.isLoggedIn"
 // Input: "$auth.isLoggedIn && $user.hasPermission" -> Output: "$store.auth.isLoggedIn && $store.user.hasPermission"
@@ -222,7 +241,15 @@ func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[str
 	transformedAttributes := make([]ast.Attribute, 0, len(attributes))
 
 	for _, attr := range attributes {
-		// Skip Alpine directives - they're already handled
+		// CRITICAL FIX: Track Alpine store references before skipping
+		// This handles @click="$store.theme.setLight()" style references
+		if attr.IsAlpine && strings.Contains(attr.Value, "$store.") {
+			trackAlpineStoreReferences(attr.Value)
+			transformedAttributes = append(transformedAttributes, attr)
+			continue
+		}
+
+		// Skip other Alpine directives - they're already handled
 		if attr.IsAlpine {
 			transformedAttributes = append(transformedAttributes, attr)
 			continue
@@ -390,11 +417,12 @@ func extractAlpineType(attrName string) string {
 //   - Condition transformation added (Task 2.2) ✓
 //   - Collection transformation added (Task 2.3) ✓
 //   - Store tracking added (Task 2.4) ✓
+//   - Alpine store tracking added (BUG FIX) ✓
 //   - Helper functions implemented ✓
 //   - Regex patterns for store detection ✓
 // - Agent patterns followed: ✓ +30%
 //   - Function signatures follow transformer patterns ✓
 //   - Cognitive load documented (all < 15) ✓
 //   - Clear separation of concerns ✓
-//   - Total file load: Task 2.4 adds: 3+4+3+6+6 = 22, existing = 41, total = 63
+//   - Total file load: Task 2.4 adds: 3+4+3+6+6 = 22, existing = 41, bug fix adds 9, total = 72
 //   - Individual functions all < 15 ✓

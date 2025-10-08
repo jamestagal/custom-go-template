@@ -160,6 +160,64 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 - [ ] Show patterns for store methods
 - [ ] Include best practices for store structure
 
+## Bug Fixes & Maintenance
+
+### BUG FIX: Alpine Store Tracking for @click Handlers ✅
+**Date**: 2025-10-08
+**Severity**: Critical
+**Impact**: Theme store (and potentially others) not initialized, causing runtime errors
+
+**Issue**: Store references already in Alpine format (e.g., `@click="$store.theme.setLight()"`) were not being tracked, causing stores to be defined but not initialized.
+
+**Root Cause**: `transformAttributesWithStores()` skipped Alpine directives without tracking store references.
+
+**Fix Tasks**:
+- [x] Add `alpineStorePattern` regex to detect `$store.storeName.*` syntax
+- [x] Create `trackAlpineStoreReferences()` function to track Alpine store refs
+- [x] Update `transformAttributesWithStores()` to track before skipping Alpine attrs
+- [x] Create regression test suite (`stores_alpine_tracking_test.go`)
+- [x] Verify all stores now initialized correctly
+- [x] Test in browser (theme buttons work without errors)
+
+**Files Modified**:
+- `transformer/stores.go` - Added Alpine store tracking (11 lines, cognitive load +9)
+- `transformer/stores_alpine_tracking_test.go` - New test file (162 lines, 4 test functions)
+
+**Documentation**:
+- `.agent-os/specs/2025-10-07-global-store-system/BUG_FIX_ALPINE_STORE_TRACKING.md` - Detailed fix report
+- `.agent-os/specs/2025-10-07-global-store-system/BUG_FIX_SUMMARY.md` - Executive summary
+- `.agent-os/specs/2025-10-07-global-store-system/BUG_FIX_FLOW_DIAGRAM.md` - Visual flow diagrams
+
+**Verification**:
+```bash
+# Before: Only 2 stores
+curl http://localhost:3333/store-components-demo | grep -c "Alpine.store"
+# Output: 2
+
+# After: All 3 stores
+curl http://localhost:3333/store-components-demo | grep -c "Alpine.store"
+# Output: 3
+
+# Debug logs confirm all tracked:
+[DEBUG] Referenced stores: [cart theme auth]  ✓
+[DEBUG] Final stores keys: [cart theme auth]  ✓
+```
+
+**Test Coverage**: 4 new test functions, all passing ✓
+- `TestTrackAlpineStoreReferences` - Unit test for tracking
+- `TestTransformAttributesWithAlpineStores` - Integration test
+- `TestAlpineStorePattern` - Regex validation
+- `TestBugFix_ThemeStoreNotTracked` - Regression test
+
+**Cognitive Load Analysis**:
+- `alpineStorePattern` regex: 4 points
+- `trackAlpineStoreReferences()`: 5 points
+- Integration in `transformAttributesWithStores()`: 2 points
+- Total added: 11 points
+- File total: 72 points (within limits ✓)
+
+**Status**: ✅ FIXED AND TESTED
+
 ## Phase Completion Status
 
 ### Phase 1: Parser Foundation ✅
@@ -211,155 +269,6 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 - Build succeeds ✅
 
 **Phase 2 Complete**: All transformation tasks finished. Store expressions are properly transformed and tracked. Ready for Phase 3 (Rendering & Server).
-
-### Phase 3: Rendering & Server 🚧
-- **Status**: IN PROGRESS
-- **Tasks**: 4/5 complete (80%)
-- **Test Coverage**: 100% (renderer tests)
-- **Cognitive Load**: All functions < 10 ✅
-- **Dependencies**: Phase 2 complete ✅
-- **Completion Reports**:
-  - Task 3.1: `.agent-os/specs/2025-10-07-global-store-system/TASK3.1_COMPLETION_REPORT.md` ✅
-  - Task 3.2: `.agent-os/specs/2025-10-07-global-store-system/TASK3.2_COMPLETION_REPORT.md` ✅
-  - Task 3.3: `.agent-os/specs/2025-10-07-global-store-system/TASK3.3_COMPLETION_REPORT.md` ✅
-
-**Key Achievements (Task 3.1)**:
-- Created `renderer/stores.go` with store rendering logic
-- Implemented `renderStoreInitializations()` function (Cognitive Load: 8)
-- Generates proper `Alpine.store('name', {...})` calls
-- Wraps in `document.addEventListener('alpine:init', ...)`
-- Handles empty stores, single store, multiple stores
-- Handles stores with methods and nested objects
-- Created comprehensive test suite: `renderer/stores_test.go` (10 test cases)
-- All tests pass (100% success rate)
-- No regressions in existing renderer tests
-- Deterministic output (sorted store names)
-- Clean, formatted JavaScript generation
-- Build succeeds ✅
-
-**Key Achievements (Task 3.2)**:
-- Created `renderer/store_integration_test.go` with 6 integration tests
-- Implemented `RenderWithStores()` function (Cognitive Load: 10)
-- Combines store initialization with component scripts
-- Store script placed before component scripts (proper init order)
-- Handles empty store maps gracefully
-- All tests pass (100% success rate, 69 total renderer tests)
-- No regressions in existing renderer tests
-- Build succeeds ✅
-- Tests cover: single store, multiple stores, no stores, conditionals, loops, HTML structure
-
-**Key Achievements (Task 3.3)**:
-- Created `registerStores()` function in `cmd/server/main.go` (Cognitive Load: 8)
-- Scans `stores/` directory for `.js` files
-- Reads store file content
-- Extracts store name from filename (e.g., `auth.js` → `auth`)
-- Returns `map[string]string` (store name → content)
-- Handles missing/empty directory gracefully (logs warning, returns empty map)
-- Logs registered stores at startup
-- Called from `main()` during server initialization
-- Build succeeds ✅
-- Server startup verified with store registration logs
-- Created example store files: `stores/auth.js`, `stores/cart.js`
-
-**Task 3.3 Complete**: Store file discovery fully implemented. Server scans and loads external store files on startup.
-
-### Phase 4: Integration Testing
-- **Status**: BLOCKED (waiting for Phase 3)
-- **Tasks**: 0/5 complete
-- **Dependencies**: Phase 3 complete
-
-### Phase 5: Documentation & Examples
-- **Status**: BLOCKED (waiting for Phase 4)
-- **Tasks**: 0/4 complete
-- **Dependencies**: Phase 4 complete
-
-## Estimated Timeline
-
-- **Phase 1**: ~~3-4 days~~ ✅ COMPLETE
-- **Phase 2**: ~~3-4 days~~ ✅ COMPLETE
-- **Phase 3**: 4-5 days (Rendering & server) → 3/5 tasks complete (60%)
-- **Phase 4**: 3-4 days (Integration testing)
-- **Phase 5**: 2-3 days (Documentation)
-
-**Remaining**: ~7 days (Task 3.3 complete, 2 more tasks in Phase 3, then Phases 4-5)
-
-## Success Criteria
-
-### Phase 1 ✅
-1. ✅ Parse inline store definitions: `store auth = { loggedIn: false }`
-2. ✅ Parse store references: `{$auth.loggedIn}`
-3. ✅ Create `StoreExpressionNode` AST type
-4. ✅ Route store expressions correctly in parser
-5. ✅ All existing tests pass (no regressions)
-6. ✅ Backward compatibility maintained
-
-### Phase 2 ✅
-1. ✅ Transform store expressions in text: `{$auth.user}` → `<span x-text="$store.auth.user">`
-2. ✅ Transform store expressions in conditionals: `{if $auth.isLoggedIn}` → `<template x-if="$store.auth.isLoggedIn">`
-3. ✅ Transform store expressions in loops: `{for item in $cart.items}` → `<template x-for="item in $store.cart.items">` (Task 2.3)
-4. ✅ Track store references during transformation (Task 2.4)
-
-### Phase 3 (In Progress)
-1. ✅ Render store initializations: `Alpine.store('auth', { loggedIn: false })` (Task 3.1)
-2. ✅ Integrate into HTML output (Task 3.2)
-3. ✅ Discover external store files (Task 3.3)
-4. ✅ Import resolution (Task 3.4)
-5. ⏳ Merge inline and external stores (Task 3.5)
-
-### Overall Project
-1. Parse inline store definitions: `store auth = { loggedIn: false }` ✅
-2. Parse store references: `{$auth.loggedIn}` ✅
-3. Transform to Alpine.js: `<span x-text="$store.auth.loggedIn">` ✅ (Task 2.1)
-4. Transform conditionals with stores: `{if $auth.isLoggedIn}` ✅ (Task 2.2)
-5. Transform loops with stores: `{for item in $cart.items}` ✅ (Task 2.3)
-6. Track store references during transformation ✅ (Task 2.4)
-7. Generate store initialization: `Alpine.store('auth', { loggedIn: false })` ✅ (Task 3.1)
-8. Integrate into HTML output ✅ (Task 3.2)
-9. Load external store files from `stores/` directory ✅ (Task 3.3)
-10. Import resolution and merge ⏳ (Tasks 3.4-3.5)
-11. Cross-component reactivity works (change in one component updates others) ⏳ (Phase 4)
-12. All existing tests pass (no regressions) ✅
-13. Documentation complete with examples ⏳ (Phase 5)
-
-## Dependencies Between Tasks
-
-- Task 2.x depends on Task 1.x ✅ (transformation needs parser)
-- Task 3.x depends on Task 2.x ✅ (rendering needs transformation + tracking)
-- Task 3.2 depends on Task 3.1 ✅ (rendering integration needs renderer)
-- Task 3.4 depends on Task 3.3 ✅ (import resolution needs store registry)
-- Task 3.5 depends on Task 3.3 and 3.4 (merge needs discovery and import resolution)
-- Task 4.x depends on Task 1.x ✅, 2.x ✅, 3.x (integration tests need complete implementation)
-- Task 5.x can start after Task 3.x (examples need working implementation)
-
-**Task 3.4 Complete**: Store import resolution fully implemented. Parser recognizes `import store from './stores/name.js'` syntax and loads content from registry.
-
-**Key Achievements (Task 3.4)**:
-- Created `parseFenceContentWithStores()` wrapper function (Cognitive Load: 6)
-- Implemented `extractStoreNameFromPath()` utility (Cognitive Load: 6)
-- Parser recognizes lowercase "store" keyword for store imports
-- Distinguishes store imports from component imports (uppercase vs lowercase)
-- Supports multiple path formats: `./stores/`, `stores/`, `../stores/`, `/stores/`
-- Inline stores properly override imported stores (correct precedence)
-- Non-existent stores gracefully skipped with warning log
-- Created comprehensive test suite: `parser/store_import_test.go` (18 test cases)
-- All tests pass (100% success rate)
-- No regressions in existing parser tests (100% pass rate)
-- Build succeeds ✅
-- Total Cognitive Load: 12 < 30 ✅
-- Completion Report: `.agent-os/specs/2025-10-07-global-store-system/TASK3.4_COMPLETION_REPORT.md`
-
-**Key Achievements (Task 3.5)**:
-- Added package-level `storeRegistry` variable for server-wide access
-- Updated `renderTemplate()` to use `ParseFenceContentWithStores()` (Cognitive Load: 18)
-- Integrated store merging: Inline > Imported > External priority system
-- Server passes store registry to parser for import resolution
-- Uses `RenderWithStores()` for final HTML output with store initialization
-- Created comprehensive E2E test suite: `tests/store_integration_e2e_test.go` (9 test cases)
-- All tests pass (100% success rate)
-- No regressions in existing tests
-- Build succeeds ✅
-- Total Cognitive Load: 18 < 30 ✅
-- Completion Report: `.agent-os/specs/2025-10-07-global-store-system/TASK3.5_COMPLETION_REPORT.md`
 
 ### Phase 3: Rendering & Server ✅
 - **Status**: COMPLETE
@@ -416,3 +325,75 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 **Phase 4 Complete**: All integration testing finished. The Global Store System is thoroughly tested and ready for Phase 5 (Documentation & Examples).
 
 **Ready for Phase 5 (Documentation & Examples)!**
+
+### Phase 5: Documentation & Examples
+- **Status**: BLOCKED (waiting for Phase 4)
+- **Tasks**: 0/4 complete
+- **Dependencies**: Phase 4 complete
+
+## Estimated Timeline
+
+- **Phase 1**: ~~3-4 days~~ ✅ COMPLETE
+- **Phase 2**: ~~3-4 days~~ ✅ COMPLETE
+- **Phase 3**: ~~4-5 days~~ ✅ COMPLETE
+- **Phase 4**: ~~3-4 days~~ ✅ COMPLETE
+- **Phase 5**: 2-3 days (Documentation) → IN PROGRESS
+
+**Remaining**: ~2 days (Phase 5 documentation and examples)
+
+## Success Criteria
+
+### Phase 1 ✅
+1. ✅ Parse inline store definitions: `store auth = { loggedIn: false }`
+2. ✅ Parse store references: `{$auth.loggedIn}`
+3. ✅ Create `StoreExpressionNode` AST type
+4. ✅ Route store expressions correctly in parser
+5. ✅ All existing tests pass (no regressions)
+6. ✅ Backward compatibility maintained
+
+### Phase 2 ✅
+1. ✅ Transform store expressions in text: `{$auth.user}` → `<span x-text="$store.auth.user">`
+2. ✅ Transform store expressions in conditionals: `{if $auth.isLoggedIn}` → `<template x-if="$store.auth.isLoggedIn">`
+3. ✅ Transform store expressions in loops: `{for item in $cart.items}` → `<template x-for="item in $store.cart.items">` (Task 2.3)
+4. ✅ Track store references during transformation (Task 2.4)
+5. ✅ Track Alpine store references (Bug Fix 2025-10-08)
+
+### Phase 3 ✅
+1. ✅ Render store initializations: `Alpine.store('auth', { loggedIn: false })` (Task 3.1)
+2. ✅ Integrate into HTML output (Task 3.2)
+3. ✅ Discover external store files (Task 3.3)
+4. ✅ Import resolution (Task 3.4)
+5. ✅ Merge inline and external stores (Task 3.5)
+
+### Phase 4 ✅
+1. ✅ Cross-component reactivity works (Task 4.1)
+2. ✅ Props vs stores separation works (Task 4.2)
+3. ✅ Nested property access works (Task 4.3)
+4. ✅ Complex integration scenarios work (Task 4.4)
+5. ✅ No regressions (Task 4.5)
+
+### Overall Project
+1. Parse inline store definitions: `store auth = { loggedIn: false }` ✅
+2. Parse store references: `{$auth.loggedIn}` ✅
+3. Transform to Alpine.js: `<span x-text="$store.auth.loggedIn">` ✅ (Task 2.1)
+4. Transform conditionals with stores: `{if $auth.isLoggedIn}` ✅ (Task 2.2)
+5. Transform loops with stores: `{for item in $cart.items}` ✅ (Task 2.3)
+6. Track store references during transformation ✅ (Task 2.4)
+7. Track Alpine store references ✅ (Bug Fix 2025-10-08)
+8. Generate store initialization: `Alpine.store('auth', { loggedIn: false })` ✅ (Task 3.1)
+9. Integrate into HTML output ✅ (Task 3.2)
+10. Load external store files from `stores/` directory ✅ (Task 3.3)
+11. Import resolution and merge ✅ (Tasks 3.4-3.5)
+12. Cross-component reactivity works ✅ (Phase 4)
+13. All existing tests pass (no regressions) ✅
+14. Documentation complete with examples ⏳ (Phase 5)
+
+## Dependencies Between Tasks
+
+- Task 2.x depends on Task 1.x ✅ (transformation needs parser)
+- Task 3.x depends on Task 2.x ✅ (rendering needs transformation + tracking)
+- Task 3.2 depends on Task 3.1 ✅ (rendering integration needs renderer)
+- Task 3.4 depends on Task 3.3 ✅ (import resolution needs store registry)
+- Task 3.5 depends on Task 3.3 and 3.4 ✅ (merge needs discovery and import resolution)
+- Task 4.x depends on Task 1.x ✅, 2.x ✅, 3.x ✅ (integration tests need complete implementation)
+- Task 5.x can start after Task 3.x ✅ (examples need working implementation)

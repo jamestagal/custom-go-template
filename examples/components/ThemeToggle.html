@@ -1,0 +1,91 @@
+---
+<!-- ThemeToggle Component - Uses theme store -->
+import store from './stores/theme.js'
+---
+
+<div class="theme-toggle">
+  <span class="theme-label">Theme:</span>
+  <div class="toggle-buttons">
+    <button
+      @click="$store.theme.setLight()"
+      class="theme-btn"
+      :class="{ active: $store.theme.mode === 'light' }">
+      ☀️ Light
+    </button>
+    <button
+      @click="$store.theme.setDark()"
+      class="theme-btn"
+      :class="{ active: $store.theme.mode === 'dark' }">
+      🌙 Dark
+    </button>
+  </div>
+  <button
+    @click="$store.theme.toggle()"
+    class="toggle-btn"
+    title="Toggle theme">
+    🔄
+  </button>
+</div>
+
+<style>
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.theme-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.toggle-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.theme-btn {
+  border: 2px solid #e5e7eb;
+  background: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  color: #6b7280;
+}
+
+.theme-btn:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.theme-btn.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.toggle-btn {
+  border: none;
+  background: #2563eb;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  background: #1d4ed8;
+  transform: rotate(180deg);
+}
+</style>

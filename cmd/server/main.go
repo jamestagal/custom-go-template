@@ -33,12 +33,12 @@ func main() {
 		log.Fatalf("Failed to create public directory: %v", err)
 	}
 
-	// Register components
-	registerComponents()
-
-	// Register stores (now stored in package-level variable)
+	// Register stores FIRST (before components need them)
 	storeRegistry = registerStores()
 	log.Printf("Registered %d store(s)", len(storeRegistry))
+
+	// Register components (now with store registry available)
+	registerComponents(storeRegistry)
 
 	// Set up the HTTP server
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +70,11 @@ func main() {
 	// Add store-test-with-theme page route (Testing visual theme switching with stores)
 	http.HandleFunc("/store-test-with-theme", func(w http.ResponseWriter, r *http.Request) {
 		renderTemplate("examples/pages/store-test-with-theme.html", w, r)
+	})
+
+	// Store components demo page
+	http.HandleFunc("/store-components-demo", func(w http.ResponseWriter, r *http.Request) {
+		renderTemplate("examples/pages/store-components-demo.html", w, r)
 	})
 
 	// Start the server
@@ -149,7 +154,21 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 
 	// Get tracked stores from transformer (Task 3.5: Store merging)
 	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
+	log.Printf("[DEBUG] Referenced stores: %v", referencedStores)
+
+	allDefKeys := make([]string, 0, len(allDefinitions))
+	for k := range allDefinitions {
+		allDefKeys = append(allDefKeys, k)
+	}
+	log.Printf("[DEBUG] All definitions keys: %v", allDefKeys)
+
 	referencedStoreDefs := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
+
+	refDefKeys := make([]string, 0, len(referencedStoreDefs))
+	for k := range referencedStoreDefs {
+		refDefKeys = append(refDefKeys, k)
+	}
+	log.Printf("[DEBUG] Referenced store defs keys: %v", refDefKeys)
 
 	// Merge with external stores if referenced but not defined (Task 3.5: Priority system)
 	// Priority: Inline > Imported > External
@@ -169,6 +188,12 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	finalKeys := make([]string, 0, len(finalStores))
+	for k := range finalStores {
+		finalKeys = append(finalKeys, k)
+	}
+	log.Printf("[DEBUG] Final stores keys: %v", finalKeys)
 
 	// Render with stores (Task 3.5: Use RenderWithStores instead of Render)
 	// CRITICAL: Pass original template AST and path for component style aggregation
@@ -412,7 +437,12 @@ func escapeXDataForAttr(value string) string {
 	return value
 }
 
-func registerComponents() {
+// registerComponents scans the components directory and registers each component
+// Now accepts storeRegistry to parse component fence sections with store imports
+//
+// Pattern: File Discovery Pattern with Store Integration [Load: 12]
+// Cognitive Load: 12 (read dir: 2, iterate: 2, read file: 2, parse: 2, fence parsing: 2, register: 2)
+func registerComponents(storeRegistry map[string]string) {
 	// Register components with the transformer
 	componentDir := "examples/components"
 	files, err := os.ReadDir(componentDir)
@@ -436,6 +466,18 @@ func registerComponents() {
 			componentAST, err := parser.ParseTemplate(string(componentContent))
 			if err != nil {
 				log.Fatalf("Error parsing component: %v", err)
+			}
+
+			// Parse fence section with store registry to resolve store imports
+			for i, node := range componentAST.RootNodes {
+				if fence, ok := node.(*ast.FenceSection); ok {
+					// Parse fence content with store registry
+					fenceWithStores := parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
+					// Replace the fence section in component AST
+					componentAST.RootNodes[i] = fenceWithStores
+					log.Printf("[registerComponents] Parsed fence for %s with %d stores", componentName, len(fenceWithStores.Stores))
+					break
+				}
 			}
 
 			// Extract props from the component template
@@ -535,61 +577,17 @@ func extractComponentProps(template *ast.Template) []string {
 					}
 				}
 			}
+			break
 		}
 	}
 
 	return props
 }
 
-// convertJSToJSON converts JavaScript object syntax to valid JSON
-// Handles unquoted keys: {name: "value"} → {"name": "value"}
-func convertJSToJSON(js string) string {
-	js = strings.TrimSpace(js)
-
-	// Only convert if it looks like a JS object or array
-	if !(strings.HasPrefix(js, "{") || strings.HasPrefix(js, "[")) {
-		return js
-	}
-
-	// Simple regex to quote unquoted object keys
-	// Matches: word characters followed by colon (but not inside quotes)
-	// This is a simplified approach - for production use a proper JS parser
-	re := regexp.MustCompile(`([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:`)
-	result := re.ReplaceAllString(js, `$1"$2":`)
-
-	return result
-}
-
 func parseValue(value string) interface{} {
 	value = strings.TrimSpace(value)
 
-	// Handle empty values
-	if value == "" {
-		return ""
-	}
-
-	// CRITICAL: Check if it's a function BEFORE trying JSON parsing
-	// Functions start with "function " or contain "=>"
-	if strings.HasPrefix(value, "function ") || strings.Contains(value, "=>") {
-		// Return the function as-is (as a string, but buildXDataFromProps will detect it)
-		return value
-	}
-
-	// CRITICAL FIX: Convert JavaScript object syntax to JSON before unmarshaling
-	// JavaScript: {name: "value"} → JSON: {"name": "value"}
-	// This allows fence section objects to be parsed as structured data
-	jsonValue := convertJSToJSON(value)
-
-	// Try to parse as JSON first (handles arrays, objects, numbers, booleans, null)
-	var parsedValue interface{}
-	if err := json.Unmarshal([]byte(jsonValue), &parsedValue); err == nil {
-		// Successfully parsed as JSON
-		return parsedValue
-	}
-
-	// If JSON parsing failed, try specific type conversions
-
-	// Handle booleans
+	// Try boolean
 	if value == "true" {
 		return true
 	}
@@ -597,27 +595,22 @@ func parseValue(value string) interface{} {
 		return false
 	}
 
-	// Handle null
-	if value == "null" {
-		return nil
-	}
-
-	// Handle numbers (integers)
-	if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
+	// Try integer
+	if intVal, err := strconv.Atoi(value); err == nil {
 		return intVal
 	}
 
-	// Handle numbers (floats)
+	// Try float
 	if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
 		return floatVal
 	}
 
-	// Handle quoted strings - remove quotes
-	if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
-		(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
-		return value[1 : len(value)-1]
+	// Remove quotes if present
+	if (strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`)) ||
+		(strings.HasPrefix(value, `'`) && strings.HasSuffix(value, `'`)) {
+		value = value[1 : len(value)-1]
 	}
 
-	// Default: return as string
+	// Default to string
 	return value
 }
