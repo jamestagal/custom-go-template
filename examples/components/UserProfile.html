@@ -18,6 +18,9 @@ function formatDate(str) {
 
 // Get role badge class
 function getRoleBadge(role) {
+  if (!role) {
+    return { bg: 'bg-gray-100', text: 'text-gray-800' };
+  }
   return {
     'admin': { bg: 'bg-red-100', text: 'text-red-800' },
     'manager': { bg: 'bg-purple-100', text: 'text-purple-800' },
@@ -28,6 +31,9 @@ function getRoleBadge(role) {
 }
 
 get roleBadge() {
+  if (!this.user || !this.user.role) {
+    return { bg: 'bg-gray-100', text: 'text-gray-800' };
+  }
   return this.getRoleBadge(this.user.role);
 }
 
@@ -128,8 +134,10 @@ get formattedJoinDate() {
     <div class="profile-avatar-small">
       {if user.avatar}
         <img src="{user.avatar}" alt="{user.name}" />
-      {else}
+      {else if user.name}
         {user.name.charAt(0)}
+      {else}
+        U
       {/if}
     </div>
     <div>
@@ -147,8 +155,10 @@ get formattedJoinDate() {
       <div class="profile-avatar">
         {if user.avatar}
           <img src="{user.avatar}" alt="{user.name}" />
-        {else}
+        {else if user.name}
           {user.name.charAt(0)}
+        {else}
+          U
         {/if}
       </div>
       <h2 class="profile-name">{user.name}</h2>
