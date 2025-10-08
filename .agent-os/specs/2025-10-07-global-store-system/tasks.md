@@ -137,16 +137,16 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 ### Phase 5: Documentation & Examples
 
 **Task 5.1: Create Example Store Files**
-- [ ] Create `stores/auth.js` with login/logout
-- [ ] Create `stores/cart.js` with add/remove items
-- [ ] Create `stores/theme.js` with light/dark mode
-- [ ] Document store file format
+- [x] Create `stores/auth.js` with login/logout
+- [x] Create `stores/cart.js` with add/remove items
+- [x] Create `stores/theme.js` with light/dark mode
+- [x] Document store file format
 
 **Task 5.2: Create Example Components Using Stores**
-- [ ] Create `examples/components/LoginStatus.html` (uses auth store)
-- [ ] Create `examples/components/CartBadge.html` (uses cart store)
-- [ ] Create `examples/components/ThemeToggle.html` (uses theme store)
-- [ ] Create example page demonstrating all stores
+- [x] Create `examples/components/LoginStatus.html` (uses auth store)
+- [x] Create `examples/components/CartBadge.html` (uses cart store)
+- [x] Create `examples/components/ThemeToggle.html` (uses theme store)
+- [x] Create example page demonstrating all stores
 
 **Task 5.3: Update Project Documentation**
 - [ ] Add store syntax section to README

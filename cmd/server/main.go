@@ -108,14 +108,20 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract fence section and parse with store registry (Task 3.5 integration)
+	// Extract fence section and parse with store registry ONLY if needed (Task 3.5 integration)
 	var fenceWithStores *ast.FenceSection
 	for i, node := range template.RootNodes {
 		if fence, ok := node.(*ast.FenceSection); ok {
-			// Parse fence content with store registry to resolve store imports
-			fenceWithStores = parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
-			// Replace the fence section in template
-			template.RootNodes[i] = fenceWithStores
+			// Only re-parse if fence contains store imports
+			if strings.Contains(fence.RawContent, "import store from") {
+				// Parse fence content with store registry to resolve store imports
+				fenceWithStores = parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
+				// Replace the fence section in template
+				template.RootNodes[i] = fenceWithStores
+			} else {
+				// No store imports, use the already-parsed fence as-is
+				fenceWithStores = fence
+			}
 			break
 		}
 	}
