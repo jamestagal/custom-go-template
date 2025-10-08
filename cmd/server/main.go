@@ -141,12 +141,10 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// CRITICAL: Extract functions from RawContent
-		// The parser doesn't extract function declarations into Variables
-		// So we need to manually parse them from the raw fence content
-		extractedFunctions := extractFunctionsFromFence(fenceWithStores.RawContent)
-		for name, funcBody := range extractedFunctions {
-			props[name] = funcBody
+		// UPDATED: Extract functions from FenceSection.Functions field (Task 2.3)
+		// This replaces the manual regex-based extraction
+		for _, function := range fenceWithStores.Functions {
+			props[function.Name] = function.Body
 		}
 	}
 
@@ -270,6 +268,9 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 
 // extractFunctionsFromFence extracts function declarations from fence section content
 // Returns a map of function name -> function body
+//
+// DEPRECATED: This function is kept for backward compatibility but should not be needed
+// now that FenceSection.Functions exists. It will be removed in a future refactor.
 //
 // Pattern: Regex Extraction Pattern [Load: 10]
 // Cognitive Load: 10 (regex compile: 2, find all: 3, extract names: 2, map construction: 3)
@@ -474,14 +475,23 @@ func registerComponents(storeRegistry map[string]string) {
 				log.Fatalf("Error parsing component: %v", err)
 			}
 
-			// Parse fence section with store registry to resolve store imports
+			// TASK 2.2 FIX: Only re-parse fence if component has store imports
+			// This preserves functions that were already parsed by ParseTemplate
 			for i, node := range componentAST.RootNodes {
 				if fence, ok := node.(*ast.FenceSection); ok {
-					// Parse fence content with store registry
-					fenceWithStores := parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
-					// Replace the fence section in component AST
-					componentAST.RootNodes[i] = fenceWithStores
-					log.Printf("[registerComponents] Parsed fence for %s with %d stores", componentName, len(fenceWithStores.Stores))
+					// Only re-parse if component has store imports
+					if strings.Contains(fence.RawContent, "import store from") {
+						// Parse fence content with store registry to resolve imports
+						fenceWithStores := parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
+						// Replace the fence section in component AST
+						componentAST.RootNodes[i] = fenceWithStores
+						log.Printf("[registerComponents] Re-parsed fence with stores for %s (stores: %d, functions: %d)",
+							componentName, len(fenceWithStores.Stores), len(fenceWithStores.Functions))
+					} else {
+						// No store imports - keep the already-parsed fence with functions intact
+						log.Printf("[registerComponents] Preserved original fence for %s (functions: %d)",
+							componentName, len(fence.Functions))
+					}
 					break
 				}
 			}

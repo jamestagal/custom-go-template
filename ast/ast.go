@@ -17,6 +17,7 @@ type FenceSection struct {
 	Imports    []ImportNode
 	Props      []PropNode
 	Variables  []VariableNode     // Assuming VariableNode exists or will be added
+	Functions  []FunctionNode     // Function declarations in the fence
 	Stores     map[string]string  // Store definitions: name -> object literal as string
 	RawContent string             // Store raw JS content for now
 }
@@ -62,6 +63,17 @@ type VariableNode struct {
 
 func (v *VariableNode) NodeType() string { return "Variable" }
 
+// FunctionNode represents a function declaration in the fence
+// Supports both regular functions and getters
+type FunctionNode struct {
+	Name     string // Function name
+	Params   string // Function parameters as string (e.g., "str" or "role, fallback")
+	Body     string // Function body as string (complete function definition)
+	IsGetter bool   // true for "get name() {}", false for "function name() {}"
+}
+
+func (f *FunctionNode) NodeType() string { return "Function" }
+
 // Element represents an HTML element
 type Element struct {
 	TagName     string
@@ -103,6 +115,23 @@ type ExpressionNode struct {
 }
 
 func (e *ExpressionNode) NodeType() string { return "Expression" }
+
+// StoreExpressionNode represents a store reference like $storeName.property
+// This is used by the Global Store System for Alpine.js $store integration
+type StoreExpressionNode struct {
+	StoreName string // Name of the store (e.g., "auth", "cart")
+	Property  string // Property path (e.g., "user.name", can be empty for just $storeName)
+}
+
+func (s *StoreExpressionNode) NodeType() string { return "StoreExpression" }
+
+// String provides a debug representation of StoreExpressionNode
+func (s *StoreExpressionNode) String() string {
+	if s.Property == "" {
+		return "$" + s.StoreName
+	}
+	return "$" + s.StoreName + "." + s.Property
+}
 
 // Conditional represents an if/else if/else structure
 type Conditional struct {
