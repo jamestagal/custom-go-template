@@ -149,16 +149,16 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 - [x] Create example page demonstrating all stores
 
 **Task 5.3: Update Project Documentation**
-- [ ] Add store syntax section to README
-- [ ] Update CLAUDE.md with store system architecture
-- [ ] Document props vs stores distinction
-- [ ] Add troubleshooting guide for common issues
+- [x] Add store syntax section to README
+- [x] Update CLAUDE.md with store system architecture
+- [x] Document props vs stores distinction
+- [x] Add troubleshooting guide for common issues
 
 **Task 5.4: Create Developer Guide**
-- [ ] Document when to use stores vs props
-- [ ] Explain store file organization conventions
-- [ ] Show patterns for store methods
-- [ ] Include best practices for store structure
+- [x] Document when to use stores vs props
+- [x] Explain store file organization conventions
+- [x] Show patterns for store methods
+- [x] Include best practices for store structure
 
 ## Bug Fixes & Maintenance
 
