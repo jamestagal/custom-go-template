@@ -775,7 +775,7 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 		}
 	}
 	// Recursively transform component body with its isolated scope
-	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false)
+	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
 
 	// PHASE 4: Wrap with x-data (Task 2.4) ✓
 

@@ -170,7 +170,7 @@ func createLoopTemplate(loopExpr string, content []ast.Node, dataScope map[strin
 	}
 	log.Printf("createLoopTemplate: received %d content nodes: %v", len(content), contentDescs)
 	// Transform the content first
-	transformedContent := transformNodes(content, dataScope, false)
+	transformedContent := transformNodes(content, dataScope, false, false)
 
 	// Alpine.js x-for requires exactly ONE child element
 	// If we have multiple children OR the child is a template element, wrap in a div
@@ -444,13 +444,13 @@ func transformNestedConditionalsInLoops(nodes []ast.Node, dataScope map[string]a
 	}
 
 	// Now transform the result nodes
-	return transformNodes(result, dataScope, false)
+	return transformNodes(result, dataScope, false, false)
 }
 
 // createConditionalTemplate creates a template element with an x-if directive
 func createConditionalTemplate(condition string, content []ast.Node, dataScope map[string]any, isElseIf bool) *ast.Element {
 	// Transform the content
-	transformedContent := transformNodes(content, dataScope, false)
+	transformedContent := transformNodes(content, dataScope, false, false)
 
 	// Create attributes for the template
 	attrs := []ast.Attribute{

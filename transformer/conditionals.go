@@ -31,7 +31,7 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 	}
 
 	// Transform the content of the if branch
-	transformedContent := transformNodes(node.IfContent, dataScope, false)
+	transformedContent := transformNodes(node.IfContent, dataScope, false, false)
 
 	// Alpine.js x-if requires exactly ONE child element
 	// If we have multiple children OR the child is a template element, wrap in a div
@@ -89,7 +89,7 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 			}
 
 			// Transform the content of the else-if branch
-			elseIfContent := transformNodes(node.ElseIfContent[i], dataScope, false)
+			elseIfContent := transformNodes(node.ElseIfContent[i], dataScope, false, false)
 
 			// Alpine.js x-if requires exactly ONE child element
 			if needsWrapper(elseIfContent) {
@@ -135,7 +135,7 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 		}
 
 		// Transform the content of the else branch
-		elseContent := transformNodes(node.ElseContent, dataScope, false)
+		elseContent := transformNodes(node.ElseContent, dataScope, false, false)
 
 		// Alpine.js x-if requires exactly ONE child element
 		if needsWrapper(elseContent) {

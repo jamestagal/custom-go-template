@@ -20,7 +20,7 @@ import store from './stores/cart.js'
     </div>
     {if $cart.items.length > 0}
       <div class="cart-total">
-        Total: <strong>${$cart.total.toFixed(2)}</strong>
+        Total: $<strong x-text="$store.cart.formattedTotal"></strong>
       </div>
     {/if}
   </div>

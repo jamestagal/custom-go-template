@@ -38,8 +38,8 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 	// Start the transformation process
 	log.Printf("TransformAST: Starting node transformation")
 
-	// Transform the root nodes
-	transformedNodes := transformNodes(template.RootNodes, dataScope, true)
+	// Transform the root nodes (not in literal context)
+	transformedNodes := transformNodes(template.RootNodes, dataScope, true, false)
 
 	// Create a new template with the transformed nodes
 	transformedTemplate := &ast.Template{
@@ -57,8 +57,17 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 
 // The transformTextWithExpressions function is already implemented in expressions.go
 
+// isLiteralContentElement checks if an element's content should be treated as literal (not transformed)
+// Elements like <pre>, <code>, <textarea> should display their content as-is
+// Cognitive Load: 3 (simple string comparison)
+func isLiteralContentElement(tagName string) bool {
+	tag := strings.ToLower(tagName)
+	return tag == "pre" || tag == "code" || tag == "textarea" || tag == "script" || tag == "style"
+}
+
 // transformNodes recursively transforms AST nodes to their Alpine.js equivalents
-func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapper bool) []ast.Node {
+// inLiteralContext: when true, text content is not transformed (for <pre>, <code>, etc.)
+func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapper bool, inLiteralContext bool) []ast.Node {
 	var transformedNodes []ast.Node
 	var hasDataScope bool
 
@@ -71,8 +80,11 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 	for _, node := range nodes {
 		switch n := node.(type) {
 		case *ast.TextNode:
-			// Check if the text contains double-curly braces or single braces
-			if strings.Contains(n.Content, "{") || strings.Contains(n.Content, "{") {
+			// CRITICAL FIX: Skip transformation if we're in a literal content context
+			if inLiteralContext {
+				// Pass through as-is without any transformation
+				transformedNodes = append(transformedNodes, n)
+			} else if strings.Contains(n.Content, "{") || strings.Contains(n.Content, "{") {
 				// Transform text nodes with expressions
 				textNodes := transformTextWithExpressions(n.Content, dataScope)
 				transformedNodes = append(transformedNodes, textNodes...)
@@ -92,8 +104,12 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			// This ensures variables defined in child elements don't leak to siblings
 			childScope := CreateChildScope(dataScope)
 
+			// CRITICAL FIX: Check if this element requires literal content handling
+			childInLiteralContext := isLiteralContentElement(element.TagName)
+
 			// Recursively transform children with the child scope
-			element.Children = transformNodes(element.Children, childScope, false)
+			// Pass the literal context flag to children
+			element.Children = transformNodes(element.Children, childScope, false, childInLiteralContext)
 
 			// Merge any new variables back to parent scope
 			MergeScopes(dataScope, childScope)

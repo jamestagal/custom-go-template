@@ -238,7 +238,7 @@ func TestTransformNodesWithStoreExpressions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Transform nodes
-			result := transformNodes(tt.nodes, tt.dataScope, false)
+			result := transformNodes(tt.nodes, tt.dataScope, false, false)
 
 			// Render to string
 			var sb strings.Builder

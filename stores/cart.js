@@ -1,6 +1,9 @@
 {
   items: [],
   total: 0,
+  get formattedTotal() {
+    return this.total.toFixed(2);
+  },
   addItem(item) {
     this.items.push(item);
     this.total += item.price;

@@ -169,6 +169,7 @@ func trackAlpineStoreReferences(value string) {
 // Input: "$auth.isLoggedIn" -> Output: "$store.auth.isLoggedIn"
 // Input: "$auth.isLoggedIn && $user.hasPermission" -> Output: "$store.auth.isLoggedIn && $store.user.hasPermission"
 // Input: "isActive && $auth.isLoggedIn" -> Output: "isActive && $store.auth.isLoggedIn"
+// Input: "$store.theme.mode === 'dark'" -> Output: "$store.theme.mode === 'dark'" (unchanged - already transformed)
 // Context: When store expressions appear in conditional conditions (if/else-if)
 // Cognitive Load: 10 (regex replacement + store tracking)
 func transformStoreExpressionsInCondition(condition string) string {
@@ -179,19 +180,37 @@ func transformStoreExpressionsInCondition(condition string) string {
 	// Replace all store expressions: $storeName.property -> $store.storeName.property
 	// The regex captures: $1 = storeName, $2 = .property (including the dot)
 	// We need to insert "$store." between the $ and storeName
+	// CRITICAL FIX: Skip if already transformed (storeName == "store")
 	transformed := storeConditionPattern.ReplaceAllStringFunc(condition, func(match string) string {
-		// match is like "$auth.isLoggedIn"
-		// Remove the leading $ to get "auth.isLoggedIn"
+		// match is like "$auth.isLoggedIn" or "$store.theme.mode"
+		// Remove the leading $ to get "auth.isLoggedIn" or "store.theme.mode"
 		withoutDollar := strings.TrimPrefix(match, "$")
 
 		// Extract store name (before first dot)
 		parts := strings.SplitN(withoutDollar, ".", 2)
-		if len(parts) > 0 {
-			// Track this store reference (Task 2.4)
-			TrackStoreReference(parts[0])
+		if len(parts) == 0 {
+			return match // Should never happen, but be safe
 		}
 
-		// Return "$store." + the captured part
+		storeName := parts[0]
+
+		// CRITICAL FIX: Skip if already transformed (storeName == "store")
+		// This prevents $store.theme.mode from becoming $store.store.theme.mode
+		if storeName == "store" {
+			// Still track the actual store name (second part)
+			if len(parts) > 1 {
+				actualStoreParts := strings.SplitN(parts[1], ".", 2)
+				if len(actualStoreParts) > 0 {
+					TrackStoreReference(actualStoreParts[0])
+				}
+			}
+			return match // Return unchanged
+		}
+
+		// Track this store reference (Task 2.4)
+		TrackStoreReference(storeName)
+
+		// Transform: $storeName.property -> $store.storeName.property
 		return "$store." + withoutDollar
 	})
 
@@ -202,6 +221,7 @@ func transformStoreExpressionsInCondition(condition string) string {
 // Input: "$cart.items" -> Output: "$store.cart.items"
 // Input: "$user.profile.wishlist.products" -> Output: "$store.user.profile.wishlist.products"
 // Input: "items" -> Output: "items" (unchanged, not a store expression)
+// Input: "$store.cart.items" -> Output: "$store.cart.items" (unchanged - already transformed)
 // Context: When collection appears in loop (for item in collection)
 // Cognitive Load: 7 (simple string prefix detection + tracking)
 func transformStoreExpressionInCollection(collection string) string {
@@ -221,16 +241,32 @@ func transformStoreExpressionInCollection(collection string) string {
 	}
 
 	// Extract store name for tracking
-	// Remove the leading $ to get "storeName.property"
+	// Remove the leading $ to get "storeName.property" or "store.storeName.property"
 	withoutDollar := strings.TrimPrefix(collection, "$")
 	parts := strings.SplitN(withoutDollar, ".", 2)
-	if len(parts) > 0 {
-		// Track this store reference (Task 2.4)
-		TrackStoreReference(parts[0])
+	if len(parts) == 0 {
+		return collection // Should never happen, but be safe
 	}
 
+	storeName := parts[0]
+
+	// CRITICAL FIX: Skip if already transformed (storeName == "store")
+	// This prevents $store.cart.items from becoming $store.store.cart.items
+	if storeName == "store" {
+		// Still track the actual store name (second part)
+		if len(parts) > 1 {
+			actualStoreParts := strings.SplitN(parts[1], ".", 2)
+			if len(actualStoreParts) > 0 {
+				TrackStoreReference(actualStoreParts[0])
+			}
+		}
+		return collection // Return unchanged
+	}
+
+	// Track this store reference (Task 2.4)
+	TrackStoreReference(storeName)
+
 	// Transform: $storeName.property -> $store.storeName.property
-	// Return "$store." + the captured part
 	return "$store." + withoutDollar
 }
 
@@ -420,6 +456,7 @@ func extractAlpineType(attrName string) string {
 //   - Alpine store tracking added (BUG FIX) ✓
 //   - Helper functions implemented ✓
 //   - Regex patterns for store detection ✓
+//   - CRITICAL BUG FIX: Skip already-transformed $store.* patterns ✓
 // - Agent patterns followed: ✓ +30%
 //   - Function signatures follow transformer patterns ✓
 //   - Cognitive load documented (all < 15) ✓

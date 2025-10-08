@@ -118,7 +118,7 @@ import store from './stores/theme.js'
         <!-- Cart Store State -->
         <div class="state-card" :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`">
           <h3>🛒 Cart Store</h3>
-          <pre class="state-display" x-text="`{\n  items: [${$store.cart.items.length} items],\n  total: $${$store.cart.total.toFixed(2)}\n}`"></pre>
+          <pre class="state-display" x-text="`{\n  items: [${$store.cart.items.length} items],\n  total: $${$store.cart.formattedTotal}\n}`"></pre>
           {if $cart.items.length > 0}
             <div class="cart-items-list">
               <strong>Items:</strong>
@@ -189,8 +189,8 @@ import store from './stores/auth.js'
       <div class="doc-card" :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'}; border-left: 4px solid #10b981;`">
         <h3 style="color: #10b981;">5. Theme Reactivity</h3>
         <p>Notice how all elements on this page use <code>:style</code> bindings:</p>
-        <pre class="code-display">:style="`background: ${$store.theme.getCurrentColors().background};
-         color: ${$store.theme.getCurrentColors().text};`"</pre>
+        <pre class="code-display">:style="&#96;background: &#36;&#123;&#36;store.theme.getCurrentColors().background&#125;;
+         color: &#36;&#123;&#36;store.theme.getCurrentColors().text&#125;;&#96;"</pre>
         <p style="margin-top: 0.5rem;">This makes the entire page reactive to theme changes!</p>
       </div>
     </div>
