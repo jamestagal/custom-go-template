@@ -26,12 +26,15 @@ var storeRegistry map[string]string
 func main() {
 	log.Println("Starting server...")
 
-	// Create the public directory if it doesn't exist
-	publicDir := "./public" // Use a variable for clarity
-	err := os.MkdirAll(publicDir, 0755)
-	if err != nil {
-		log.Fatalf("Failed to create public directory: %v", err)
+	// Create asset directories if they don't exist
+	assetDirs := []string{"./scripts", "./styles", "./images", "./public"}
+	for _, dir := range assetDirs {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			log.Fatalf("Failed to create directory %s: %v", dir, err)
+		}
 	}
+	log.Println("Asset directories initialized")
 
 	// Register stores FIRST (before components need them)
 	storeRegistry = registerStores()
@@ -42,48 +45,74 @@ func main() {
 
 	// Set up the HTTP server
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Serve static files from the public directory
+		// Serve static files from organized directories
 		if r.URL.Path != "/" {
-			http.ServeFile(w, r, publicDir+r.URL.Path)
+			serveStaticFile(w, r)
 			return
 		}
 
 		// Render home page
-		renderTemplate("examples/pages/home.html", w, r)
+		renderTemplate("layouts/content/_index.html", w, r)
 	})
 
 	// Add comprehensive-simple page route (WORKING - no multi-line vars)
 	http.HandleFunc("/comprehensive-simple", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("examples/pages/comprehensive-simple.html", w, r)
+		renderTemplate("layouts/content/comprehensive.html", w, r)
 	})
 
 	// Add comprehensive page route (HAS BUGS - multi-line var extraction broken)
 	http.HandleFunc("/comprehensive", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("examples/pages/comprehensive.html", w, r)
+		renderTemplate("layouts/content/comprehensive.html", w, r)
 	})
 
 	// Add store-test-minimal page route (Testing Task 2.1: Store Expression Transformer - no definitions)
 	http.HandleFunc("/store-test-minimal", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("examples/pages/store-test-minimal.html", w, r)
+		renderTemplate("layouts/content/store-test-minimal.html", w, r)
 	})
 
 	// Add store-test-with-theme page route (Testing visual theme switching with stores)
 	http.HandleFunc("/store-test-with-theme", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("examples/pages/store-test-with-theme.html", w, r)
+		renderTemplate("layouts/content/store-test-with-theme.html", w, r)
 	})
 
-	// Store components demo page
+	// Store components demo page (both routes for compatibility)
 	http.HandleFunc("/store-components-demo", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("examples/pages/store-components-demo.html", w, r)
+		renderTemplate("layouts/content/store-demo.html", w, r)
+	})
+	http.HandleFunc("/store-demo", func(w http.ResponseWriter, r *http.Request) {
+		renderTemplate("layouts/content/store-demo.html", w, r)
 	})
 
 	// Start the server
 	port := ":3333"
 	fmt.Printf("Server starting on http://localhost%s\n", port)
-	err = http.ListenAndServe(port, nil)
+	err := http.ListenAndServe(port, nil)
 	if err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// serveStaticFile handles serving static files from organized asset directories
+// Routes: /scripts/* → ./scripts/, /styles/* → ./styles/, /images/* → ./images/, /* → ./public/
+func serveStaticFile(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	var filePath string
+
+	// Route to appropriate directory based on path prefix
+	switch {
+	case strings.HasPrefix(path, "/scripts/"):
+		filePath = "." + path
+	case strings.HasPrefix(path, "/styles/"):
+		filePath = "." + path
+	case strings.HasPrefix(path, "/images/"):
+		filePath = "." + path
+	default:
+		// Everything else goes to public directory
+		filePath = "./public" + path
+	}
+
+	// Serve the file
+	http.ServeFile(w, r, filePath)
 }
 
 // renderTemplate is a unified handler for rendering template files with store support
@@ -371,16 +400,9 @@ func buildXDataFromProps(props map[string]interface{}) string {
 		case nil:
 			formattedValue = "null"
 		default:
-			// Complex types (arrays, objects) - marshal to JSON
-			jsonBytes, err := json.Marshal(v)
-			if err != nil {
-				// Fallback to string representation
-				escaped := escapeStringForJS(fmt.Sprintf("%v", v))
-				formattedValue = fmt.Sprintf(`'%s'`, escaped)
-			} else {
-				formattedValue = string(jsonBytes)
-			}
-		}
+			// Complex types (arrays, objects) - use transformer's formatter
+			// This correctly formats maps as JavaScript object literals, not JSON strings
+			formattedValue = transformer.FormatGoValueToJS(v)		}
 
 		// Build key:value pair for JavaScript object literal
 		parts = append(parts, fmt.Sprintf("%s:%s", key, formattedValue))
@@ -446,21 +468,36 @@ func escapeXDataForAttr(value string) string {
 
 // registerComponents scans the components directory and registers each component
 // Now accepts storeRegistry to parse component fence sections with store imports
+// Also registers global layout components from layouts/global/
 //
-// Pattern: File Discovery Pattern with Store Integration [Load: 12]
-// Cognitive Load: 12 (read dir: 2, iterate: 2, read file: 2, parse: 2, fence parsing: 2, register: 2)
+// Pattern: File Discovery Pattern with Store Integration [Load: 15]
+// Cognitive Load: 15 (read 2 dirs: 4, iterate: 2, read file: 2, parse: 2, fence parsing: 2, register: 3)
 func registerComponents(storeRegistry map[string]string) {
-	// Register components with the transformer
-	componentDir := "examples/components"
-	files, err := os.ReadDir(componentDir)
+	// Register regular components from layouts/components
+	componentDir := "layouts/components"
+	registerComponentsFromDir(componentDir, "../components/", storeRegistry)
+
+	// Register global layout components from layouts/global
+	globalDir := "layouts/global"
+	registerComponentsFromDir(globalDir, "../global/", storeRegistry)
+}
+
+// registerComponentsFromDir registers all components from a directory
+// Pattern: Component Registration Helper [Load: 12]
+func registerComponentsFromDir(dir string, pathPrefix string, storeRegistry map[string]string) {
+	files, err := os.ReadDir(dir)
 	if err != nil {
-		log.Fatalf("Failed to read component directory: %v", err)
+		log.Printf("Warning: Failed to read directory %s: %v", dir, err)
+		return
 	}
 
 	for _, file := range files {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".html") {
-			componentName := strings.TrimSuffix(file.Name(), ".html")
-			componentPath := fmt.Sprintf("%s/%s", componentDir, file.Name())
+			// Extract base name and capitalize first letter (matches Plenti/Svelte convention)
+			// e.g., "footer.html" -> "Footer", matching: import Footer from "./footer.html"
+			baseName := strings.TrimSuffix(file.Name(), ".html")
+			componentName := strings.ToUpper(baseName[:1]) + baseName[1:]
+			componentPath := fmt.Sprintf("%s/%s", dir, file.Name())
 			log.Printf("Registering component: %s from %s", componentName, componentPath)
 
 			// Read component file
@@ -502,8 +539,8 @@ func registerComponents(storeRegistry map[string]string) {
 			// Register the component with the transformer - both by name and by path
 			transformer.RegisterComponent(componentName, componentAST, componentProps)
 
-			// Also register with path for import resolution
-			pathWithPrefix := fmt.Sprintf("./components/%s.html", componentName)
+			// Also register with path prefix for import resolution (using lowercase filename)
+			pathWithPrefix := fmt.Sprintf("%s%s", pathPrefix, file.Name())
 			transformer.RegisterComponent(pathWithPrefix, componentAST, componentProps)
 		}
 	}
@@ -600,10 +637,49 @@ func extractComponentProps(template *ast.Template) []string {
 	return props
 }
 
+
+// convertJSToJSON converts JavaScript object syntax to valid JSON
+// Handles unquoted keys: {name: "value"} → {"name": "value"}
+func convertJSToJSON(js string) string {
+	js = strings.TrimSpace(js)
+
+	// Only convert if it looks like a JS object or array
+	if !(strings.HasPrefix(js, "{") || strings.HasPrefix(js, "[")) {
+		return js
+	}
+
+	// Simple regex to quote unquoted object keys
+	// Matches: word characters followed by colon (but not inside quotes)
+	// This is a simplified approach - for production use a proper JS parser
+	re := regexp.MustCompile(`([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:`)
+	result := re.ReplaceAllString(js, `$1"$2":`)
+
+	return result
+}
+
 func parseValue(value string) interface{} {
 	value = strings.TrimSpace(value)
 
-	// Try boolean
+	// Handle empty values
+	if value == "" {
+		return ""
+	}
+
+	// CRITICAL FIX: Convert JavaScript object syntax to JSON before unmarshaling
+	// JavaScript: {name: "value"} → JSON: {"name": "value"}
+	// This allows fence section objects to be parsed as structured data
+	jsonValue := convertJSToJSON(value)
+
+	// Try to parse as JSON first (handles arrays, objects, numbers, booleans, null)
+	var parsedValue interface{}
+	if err := json.Unmarshal([]byte(jsonValue), &parsedValue); err == nil {
+		// Successfully parsed as JSON
+		return parsedValue
+	}
+
+	// If JSON parsing failed, try specific type conversions
+
+	// Handle booleans
 	if value == "true" {
 		return true
 	}
@@ -611,17 +687,22 @@ func parseValue(value string) interface{} {
 		return false
 	}
 
-	// Try integer
-	if intVal, err := strconv.Atoi(value); err == nil {
+	// Handle null
+	if value == "null" {
+		return nil
+	}
+
+	// Handle numbers (integers)
+	if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
 		return intVal
 	}
 
-	// Try float
+	// Handle numbers (floats)
 	if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
 		return floatVal
 	}
 
-	// Remove quotes if present
+	// Handle quoted strings - remove quotes
 	if (strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`)) ||
 		(strings.HasPrefix(value, `'`) && strings.HasSuffix(value, `'`)) {
 		value = value[1 : len(value)-1]

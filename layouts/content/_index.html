@@ -1,10 +1,11 @@
 ---
-import HeaderSimple from "./components/HeaderSimple.html";
-import Footer from "./components/Footer.html";
-import Age from "./components/Age.html";
-import Todos from "./components/Todos.html";
-import AdminPanel from "./components/AdminPanel.html";
-import Notification from "./components/Notification.html";
+import Head from "../global/head.html";
+import Header from "../global/header.html";
+import Footer from "../global/footer.html";
+import Age from "../components/age.html";
+import Todos from "../components/todos.html";
+import AdminPanel from "../components/adminpanel.html";
+import Notification from "../components/notification.html";
 
 prop name = "Benjamin"
 prop age = 55
@@ -12,8 +13,8 @@ prop animals = ["dog", "cat", "bird"]
 prop newAnimal = ""
 
 let salutation = "Hello"
-let path = "./components/UserProfile.html"
-let comp = "UserProfile"
+let path = "../components/userprofile.html"
+let comp = "userprofile"
 
 // Define user objects for dynamic component testing
 let user1 = {
@@ -53,26 +54,19 @@ let currentNotification = null
 
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Custom Go Template - Home</title>
-  <link rel="stylesheet" href="/cms.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <script defer src="/cms.js"></script>
-</head>
+<Head title="Custom Go Template - Home" description="A powerful template engine with reactive components" />
 <body>
   <!-- CMS Panel -->
   <div id="plenti_cms"></div>
   <button id="toggle_plenti_cms">Toggle CMS</button>
 
-  <HeaderSimple />
+  <Header />
 
   <main style="padding: 2rem;">
      <div style="background-color: #f0f0f0; padding: 0.5rem 1rem; border-radius: 0.25rem; margin-bottom: 1rem; font-size: 0.875rem; color: #666;">
       ⚡ Build time: <strong>{buildTime}</strong>
     </div>
-    
+
     <h1>{salutation} {name}!</h1>
 
     <!-- Basic conditionals -->
@@ -100,9 +94,9 @@ let currentNotification = null
       <!-- Dynamic components (Jim's innovative <= syntax) with object props -->
       <div style="margin: 2rem 0;">
         <h2>User Profile Examples with Object Props</h2>
-        <="./components/UserProfile.html" user={user1} showRole={true} />
+        <="../components/userprofile.html" user={user1} showRole={true} />
         <='{path}' user={user2} showRole={true} />
-        <="./components/{comp}.html" user={user3} showRole={true} />
+        <="../components/{comp}.html" user={user3} showRole={true} />
       </div>
 
       <!-- Loops with nested conditionals and advanced JS expressions -->

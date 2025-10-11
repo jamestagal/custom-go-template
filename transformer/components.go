@@ -60,6 +60,35 @@ func GetAllRegisteredKeys() []string {
 	return keys
 }
 
+// isStructuralTag checks if a tag should skip x-data wrapping
+//
+// Pattern: Helper Function [Load: 3]
+// Cognitive Load: 3 (simple map lookup)
+//
+// These are HTML structural/metadata tags that should never be reactive.
+// Adding x-data to these tags causes Alpine.js to try parsing their content
+// as reactive code, which breaks meta tags and other structural elements.
+//
+// Structural tags that should NEVER get x-data:
+//   - html: Root document element
+//   - head: Document metadata section
+//   - body: Document content section (x-data added by server if needed)
+//   - !doctype: Document type declaration
+//
+// Example:
+//   isStructuralTag("head")    // Returns: true
+//   isStructuralTag("div")     // Returns: false
+//   isStructuralTag("header")  // Returns: false (this is a regular component)
+func isStructuralTag(tagName string) bool {
+	structural := map[string]bool{
+		"html":     true,
+		"head":     true,
+		"body":     true,
+		"!doctype": true,
+	}
+	return structural[strings.ToLower(tagName)]
+}
+
 // normalizeComponentPath generates all possible lookup keys for a component path
 //
 // Pattern: Helper Function [Load: 8]
@@ -791,17 +820,25 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 
 // wrapWithXData ensures the component output has an x-data attribute
 //
-// Pattern: Helper Function [Load: 10]
-// Cognitive Load: 10 (element type checking: 4, attribute manipulation: 6)
+// Pattern: Helper Function [Load: 12]
+// Cognitive Load: 12 (structural tag check: 2, element type checking: 4, attribute manipulation: 6)
+//
+// CRITICAL CHANGE (Phase A - 2025-10-11):
+// Skip adding x-data to structural HTML tags (html, head, body, !doctype).
+// These tags should never be reactive as they contain metadata or are managed by the server.
 //
 // Requirements from Task 2.4:
 // 1. Format data scope as Alpine.js object
-// 2. Add x-data to single root element if it exists
+// 2. Add x-data to single root element if it exists AND it's not structural
 // 3. Wrap multiple nodes in div with x-data
+// 4. Skip wrapping for structural tags (html, head, body)
 //
 // Example:
 //   Single element: <div class="card">content</div>
 //     → <div x-data='{...}' class="card">content</div>
+//
+//   Structural tag: <head>metadata</head>
+//     → <head>metadata</head> (NO x-data added)
 //
 //   Multiple nodes: [<h1>Title</h1>, <p>Content</p>]
 //     → <div x-data='{...}'><h1>Title</h1><p>Content</p></div>
@@ -816,7 +853,7 @@ func wrapWithXData(nodes []ast.Node, dataScope map[string]any) []ast.Node {
 		AlpineType: "data",
 	}
 
-	// REQUIREMENT 2: Check for single root element (COGNITIVE LOAD: 4)
+	// REQUIREMENT 2: Check for single root element (COGNITIVE LOAD: 6)
 	// If there's exactly one node and it's an Element, add x-data to it
 	if len(nodes) == 0 {
 		// No nodes - return empty div with x-data
@@ -832,6 +869,13 @@ func wrapWithXData(nodes []ast.Node, dataScope map[string]any) []ast.Node {
 	// Check for single root element (REQUIREMENT 2)
 	if len(nodes) == 1 {
 		if element, ok := nodes[0].(*ast.Element); ok {
+			// CRITICAL: Check if this is a structural tag (COGNITIVE LOAD: 2)
+			if isStructuralTag(element.TagName) {
+				log.Printf("wrapWithXData: Skipping x-data for structural tag <%s>", element.TagName)
+				// Return as-is without x-data - structural tags should not be reactive
+				return nodes
+			}
+
 			// Check if x-data already exists to avoid duplicates
 			hasXData := false
 			for _, attr := range element.Attributes {
