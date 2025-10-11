@@ -1,6 +1,4 @@
 ---
-prop title = "Global Store System - Component Demo"
-
 import LoginStatus from '../components/LoginStatus.html'
 import CartBadge from '../components/CartBadge.html'
 import ThemeToggle from '../components/ThemeToggle.html'
@@ -15,7 +13,7 @@ import store from './stores/theme.js'
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{title}</title>
+    <title>Global Store System - Component Demo</title>
     <script
       defer
       src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
@@ -26,7 +24,7 @@ import store from './stores/theme.js'
   >
     <div class="container">
       <h1 :style="`color: ${$store.theme.getCurrentColors().text};`">
-        {title}
+        Global Store System - Component Demo
       </h1>
       <p
         class="subtitle"

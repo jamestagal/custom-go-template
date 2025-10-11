@@ -61,7 +61,17 @@ Template Source → Parser → AST → Transformer → Rendered HTML/CSS/JS
    - `js.go` - Scope JavaScript
    - `html.go` - HTML scoping utilities
 
-6. **`cmd/server/`** - Development server
+6. **`loader/`** - Content JSON loading utilities
+   - Loads JSON content from `content/` directory based on route paths
+   - `LoadContentJSON()` - Loads and parses JSON from content files
+   - `RoutePathToFilePath()` - Maps route paths to file paths (e.g., `/store-demo` → `content/pages/store-demo.json`)
+   - `ExtractComponentFields()` - Extracts component data from Plenti structure (components array)
+   - `IsCollectionType()` - Detects JSON format type (collection vs single)
+   - Supports both Plenti collection types (with `components` array) and single types (flat JSON)
+   - Used by the export let system to inject content from JSON files
+   - See: `.agent-os/specs/2025-10-11-export-let-content-injection/` for full details
+
+7. **`cmd/server/`** - Development server
    - Serves templates at http://localhost:3000
    - Registers components from `examples/components/`
    - Extracts props, variables, and functions from fence sections
@@ -103,9 +113,58 @@ Front matter between `---` markers containing:
 - `import ComponentName from './components/ComponentName.html'`
 - `import store from './stores/storeName.js'` - Import global stores
 - `store storeName = { ... }` - Inline store definitions
-- `prop propName = defaultValue`
+- `prop propName = defaultValue` - Component props with default values
+- `export let propName, propName2` - Props from JSON content (Svelte-compatible)
 - `let/const/var variableName = value`
 - Functions for Alpine.js data
+
+### Export Let Content Injection
+
+Components can use `export let` to declare props that come from JSON content files, following Svelte patterns for Plenti compatibility.
+
+**Syntax:**
+```html
+---
+export let title, description, link, image
+---
+
+<div class="card">
+  <h2>{title}</h2>
+  <p>{description}</p>
+  <a href="{link}">Learn More</a>
+</div>
+```
+
+**JSON Structure (Plenti format):**
+```json
+{
+  "components": [
+    {
+      "name": "card",
+      "fields": {
+        "title": "Welcome",
+        "description": "Content from JSON",
+        "link": "/about",
+        "image": "hero.jpg"
+      }
+    }
+  ]
+}
+```
+
+**How It Works:**
+1. Route handler loads JSON from `content/pages/` based on URL path
+2. System extracts component fields matching component name
+3. Content is injected into exported props before rendering
+4. Missing props with defaults use the default value (with warning)
+5. Missing props without defaults cause an error
+
+**Key Files:**
+- `loader/loader.go` - Loads JSON content from files
+- `renderer/content_injection.go` - Injects content into exported props
+- `content/pages/*.json` - Content files with Plenti structure
+
+**See:** `.agent-os/specs/2025-10-11-export-let-content-injection/` for full implementation details
 
 ### Global Store System
 

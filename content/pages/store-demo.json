@@ -1,4 +1,16 @@
 {
-  "title": "Store Components Demo",
-  "description": "Interactive demonstration of the global store system"
+  "components": [
+    {
+      "name": "LoginStatus",
+      "fields": {}
+    },
+    {
+      "name": "CartBadge",
+      "fields": {}
+    },
+    {
+      "name": "ThemeToggle",
+      "fields": {}
+    }
+  ]
 }

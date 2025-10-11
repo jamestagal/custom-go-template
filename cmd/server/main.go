@@ -10,10 +10,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	// Import the new renderer package
 	"github.com/jimafisk/custom_go_template/ast"
+	"github.com/jimafisk/custom_go_template/loader"
 	"github.com/jimafisk/custom_go_template/parser"
 	"github.com/jimafisk/custom_go_template/renderer"
 	"github.com/jimafisk/custom_go_template/transformer"
@@ -22,6 +24,13 @@ import (
 // Global store registry loaded at startup
 // Pattern: Package-level State [Load: 2]
 var storeRegistry map[string]string
+
+// TASK 4.4: Content cache for performance
+// Pattern: In-Memory Cache [Load: 5]
+var (
+	contentCache   = make(map[string]map[string]interface{})
+	contentCacheMu sync.RWMutex
+)
 
 func main() {
 	log.Println("Starting server...")
@@ -51,8 +60,8 @@ func main() {
 			return
 		}
 
-		// Render home page
-		renderTemplate("layouts/content/_index.html", w, r)
+		// Render home page using Plenti-style component iteration
+		renderPlentiPage(w, r)
 	})
 
 	// Add comprehensive-simple page route (WORKING - no multi-line vars)
@@ -75,7 +84,7 @@ func main() {
 		renderTemplate("layouts/content/store-test-with-theme.html", w, r)
 	})
 
-	// Store components demo page (both routes for compatibility)
+	// TASK 4.1 & 4.2: Store components demo page with content loading
 	http.HandleFunc("/store-components-demo", func(w http.ResponseWriter, r *http.Request) {
 		renderTemplate("layouts/content/store-demo.html", w, r)
 	})
@@ -115,11 +124,262 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filePath)
 }
 
+// loadContentWithCache loads content JSON with caching for performance
+// TASK 4.4: Content caching implementation
+//
+// Pattern: Cache-Aside Pattern [Load: 12]
+// Cognitive Load: 12 (cache lookup: 3, load on miss: 3, cache update: 3, error handling: 3)
+func loadContentWithCache(routePath string) (map[string]interface{}, error) {
+	// Check cache first (read lock for concurrent access)
+	contentCacheMu.RLock()
+	cached, exists := contentCache[routePath]
+	contentCacheMu.RUnlock()
+
+	if exists {
+		log.Printf("loadContentWithCache: cache hit for %s", routePath)
+		return cached, nil
+	}
+
+	// Cache miss - load from file
+	log.Printf("loadContentWithCache: cache miss for %s, loading from file", routePath)
+	contentData, err := loader.LoadContentForRoute(routePath)
+	if err != nil {
+		return nil, fmt.Errorf("loadContentWithCache: %w", err)
+	}
+
+	// Update cache (write lock)
+	contentCacheMu.Lock()
+	contentCache[routePath] = contentData
+	contentCacheMu.Unlock()
+
+	return contentData, nil
+}
+
+// invalidateContentCache clears the content cache (useful for development)
+// Can be called via HTTP endpoint or during file watching
+func invalidateContentCache() {
+	contentCacheMu.Lock()
+	defer contentCacheMu.Unlock()
+
+	contentCache = make(map[string]map[string]interface{})
+	log.Println("Content cache invalidated")
+}
+
+// renderPlentiPage renders a page using Plenti-style component iteration
+// This mimics Svelte's {#each components as {name, fields}} pattern but at the server level.
+// No template file is needed - components are rendered directly from the registry based on
+// the components array in the content JSON.
+//
+// Pattern: Plenti Component Iteration [Load: 25]
+// Cognitive Load: 25 (content load: 3, component iteration: 5, component rendering: 8, assembly: 5, output: 4)
+func renderPlentiPage(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	routePath := r.URL.Path
+
+	// Load content JSON for this route
+	contentData, err := loadContentWithCache(routePath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to load content: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Check if content has components array (Plenti format)
+	componentsRaw, hasComponents := contentData["components"]
+	if !hasComponents {
+		http.Error(w, "Content must have a 'components' array for Plenti-style rendering", http.StatusInternalServerError)
+		return
+	}
+
+	// Type assert to array
+	components, ok := componentsRaw.([]interface{})
+	if !ok {
+		http.Error(w, fmt.Sprintf("Invalid components structure: expected array, got %T", componentsRaw), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("renderPlentiPage: found %d components to render", len(components))
+
+	// Render each component and collect HTML/CSS/JS
+	var allMarkup strings.Builder
+	var allStyles strings.Builder
+	var allScripts strings.Builder
+	var allStores = make(map[string]string)
+
+	for i, compRaw := range components {
+		comp, ok := compRaw.(map[string]interface{})
+		if !ok {
+			log.Printf("Warning: component %d is not a map, skipping", i)
+			continue
+		}
+
+		// Extract component name
+		nameRaw, ok := comp["name"]
+		if !ok {
+			log.Printf("Warning: component %d has no name, skipping", i)
+			continue
+		}
+
+		name, ok := nameRaw.(string)
+		if !ok {
+			log.Printf("Warning: component %d name is not a string, skipping", i)
+			continue
+		}
+
+		// Extract component fields
+		fieldsRaw, ok := comp["fields"]
+		if !ok {
+			log.Printf("Warning: component %s has no fields, using empty map", name)
+			fieldsRaw = make(map[string]interface{})
+		}
+
+		fields, ok := fieldsRaw.(map[string]interface{})
+		if !ok {
+			log.Printf("Warning: component %s fields is not a map, using empty map", name)
+			fields = make(map[string]interface{})
+		}
+
+		log.Printf("Rendering component %s with %d fields", name, len(fields))
+
+		// Render the component with its fields
+		markup, script, style, stores := renderComponentWithFields(name, fields)
+
+		allMarkup.WriteString(markup)
+		allMarkup.WriteString("\n")
+
+		if style != "" {
+			allStyles.WriteString(style)
+			allStyles.WriteString("\n")
+		}
+
+		if script != "" {
+			allScripts.WriteString(script)
+			allScripts.WriteString("\n")
+		}
+
+		// Merge stores
+		for storeName, storeDef := range stores {
+			if _, exists := allStores[storeName]; !exists {
+				allStores[storeName] = storeDef
+			}
+		}
+	}
+
+	// Build final HTML page
+	finalHTML := buildHTMLPage(allMarkup.String(), allStyles.String(), allScripts.String(), allStores)
+
+	// Add build time comment
+	totalBuildTime := time.Since(startTime)
+	htmlComment := fmt.Sprintf("<!-- Build time: %v -->\n", totalBuildTime)
+	finalHTML = htmlComment + finalHTML
+
+	// Send response
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(finalHTML))
+}
+
+// renderComponentWithFields renders a single component with given fields as props
+// Returns: markup, script, style, stores
+func renderComponentWithFields(componentName string, fields map[string]interface{}) (string, string, string, map[string]string) {
+	// Look up component template
+	componentTemplate, exists := transformer.GetComponentTemplate(componentName)
+	if !exists {
+		log.Printf("Warning: Component %s not found in registry", componentName)
+		return fmt.Sprintf("<!-- Component %s not found -->", componentName), "", "", nil
+	}
+
+	// Build props map from fields
+	props := make(map[string]interface{})
+	for key, value := range fields {
+		props[key] = value
+	}
+
+	// Transform the component AST with props
+	transformed := transformer.TransformAST(componentTemplate.Template, props)
+
+	// Get stores from transformer
+	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
+	referencedStoreDefs := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
+
+	// Merge with external stores if needed
+	finalStores := make(map[string]string)
+	for name, def := range referencedStoreDefs {
+		finalStores[name] = def
+	}
+	for _, storeName := range referencedStores {
+		if _, exists := finalStores[storeName]; !exists {
+			if externalDef, exists := storeRegistry[storeName]; exists {
+				finalStores[storeName] = externalDef
+			}
+		}
+	}
+
+	// Render the component
+	markup, script, style := renderer.RenderWithStores(componentTemplate.Template, transformed, finalStores, "")
+
+	return markup, script, style, finalStores
+}
+
+// buildHTMLPage assembles the final HTML page from components
+func buildHTMLPage(markup, styles, scripts string, stores map[string]string) string {
+	var html strings.Builder
+
+	html.WriteString("<!DOCTYPE html>\n")
+	html.WriteString("<html lang=\"en\">\n")
+	html.WriteString("<head>\n")
+	html.WriteString("  <meta charset=\"UTF-8\">\n")
+	html.WriteString("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n")
+	html.WriteString("  <title>Page</title>\n")
+	html.WriteString("  <link rel=\"stylesheet\" href=\"/styles/style.css\">\n")
+
+	// Add styles
+	if styles != "" {
+		html.WriteString("  <style>\n")
+		html.WriteString(styles)
+		html.WriteString("  </style>\n")
+	}
+
+	// Add Alpine.js CDN
+	html.WriteString("  <script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script>\n")
+
+	html.WriteString("</head>\n")
+	html.WriteString("<body>\n")
+
+	// Add component markup
+	html.WriteString(markup)
+
+	// Add scripts (including store initializations)
+	if scripts != "" || len(stores) > 0 {
+		html.WriteString("  <script>\n")
+
+		// Add store initializations
+		if len(stores) > 0 {
+			html.WriteString("    // Initialize Alpine.js stores\n")
+			html.WriteString("    document.addEventListener('alpine:init', () => {\n")
+			for storeName, storeDef := range stores {
+				html.WriteString(fmt.Sprintf("      Alpine.store('%s', %s);\n", storeName, storeDef))
+			}
+			html.WriteString("    });\n")
+		}
+
+		if scripts != "" {
+			html.WriteString(scripts)
+		}
+
+		html.WriteString("  </script>\n")
+	}
+
+	html.WriteString("</body>\n")
+	html.WriteString("</html>\n")
+
+	return html.String()
+}
+
 // renderTemplate is a unified handler for rendering template files with store support
 // Now integrates with the global store system (Task 3.5)
+// UPDATED: Now supports content injection (Task 4)
 //
-// Pattern: Service Implementation Pattern with Store Integration [Load: 18]
-// Cognitive Load: 18 (read: 2, parse: 3, fence parsing: 3, transform: 3, store merge: 3, render: 2, inject: 2)
+// Pattern: Service Implementation Pattern with Store Integration [Load: 20]
+// Cognitive Load: 20 (read: 2, parse: 3, fence parsing: 3, content loading: 3, transform: 3, store merge: 3, render: 2, inject: 1)
 func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 
@@ -137,10 +397,55 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TASK 4.1 & 4.2: Load content JSON for this route
+	// Extract route path from request URL
+	routePath := r.URL.Path
+	contentData, err := loadContentWithCache(routePath)
+	if err != nil {
+		// Content loading failure is not fatal - log warning and continue
+		log.Printf("Warning: failed to load content for route %s: %v", routePath, err)
+		contentData = nil // No content injection
+	} else if len(contentData) > 0 {
+		log.Printf("Loaded content for route %s: %d top-level keys", routePath, len(contentData))
+	}
+
 	// Extract fence section and parse with store registry ONLY if needed (Task 3.5 integration)
 	var fenceWithStores *ast.FenceSection
 	for i, node := range template.RootNodes {
 		if fence, ok := node.(*ast.FenceSection); ok {
+			// TASK 4: Inject content into exported props BEFORE store parsing
+			if contentData != nil && len(fence.ExportedProps) > 0 {
+				// Check if this is a collection type - extract component fields
+				if loader.IsCollectionType(contentData) {
+					// For collection types, we need to know which component we're rendering
+					// For now, use a simple heuristic: first component in the array
+					// TODO: In future, route could specify which component to use
+					componentsRaw, ok := contentData["components"]
+					if ok {
+						if components, ok := componentsRaw.([]interface{}); ok && len(components) > 0 {
+							if firstComp, ok := components[0].(map[string]interface{}); ok {
+								if fields, ok := firstComp["fields"].(map[string]interface{}); ok {
+									// Use the extracted fields for injection
+									contentData = fields
+									log.Printf("Extracted fields from first component for injection: %d fields", len(fields))
+								}
+							}
+						}
+					}
+				}
+
+				// Inject content props
+				injectedFence, err := renderer.InjectContentProps(fence, contentData)
+				if err != nil {
+					log.Printf("Warning: content injection failed: %v", err)
+					// Continue with original fence
+					fenceWithStores = fence
+				} else {
+					fence = injectedFence
+					log.Printf("Content injection successful: %d exported props injected", len(fence.ExportedProps))
+				}
+			}
+
 			// Only re-parse if fence contains store imports
 			if strings.Contains(fence.RawContent, "import store from") {
 				// Parse fence content with store registry to resolve store imports
@@ -148,8 +453,9 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 				// Replace the fence section in template
 				template.RootNodes[i] = fenceWithStores
 			} else {
-				// No store imports, use the already-parsed fence as-is
+				// No store imports, use the already-parsed fence as-is (possibly with injected content)
 				fenceWithStores = fence
+				template.RootNodes[i] = fenceWithStores
 			}
 			break
 		}

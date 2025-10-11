@@ -13,17 +13,57 @@ import (
 	"github.com/jimafisk/custom_go_template/transformer"
 )
 
-func Render(templatePath string, props map[string]any) (string, string, string) {
-	// Read template file
+// Render renders a template file with optional content injection.
+// Parameters:
+//   - templatePath: Path to the template file
+//   - props: Component props (default values, initial data)
+//   - contentData: Optional content from JSON files (nil = no content injection)
+//
+// Returns:
+//   - markup: Rendered HTML
+//   - script: Extracted JavaScript
+//   - style: Extracted CSS
+//
+// Cognitive Load: 18
+// - Read file: 2
+// - Parse template: 2
+// - Content injection (optional): 3
+// - Transform: 3
+// - Aggregate styles: 2
+// - Generate outputs: 6
+func Render(templatePath string, props map[string]any, contentData map[string]interface{}) (string, string, string) {
+	// Read template file (COGNITIVE LOAD RULE: wrapped error)
 	content, err := os.ReadFile(templatePath)
 	if err != nil {
-		log.Fatalf("Error reading template: %v", err)
+		log.Fatalf("Render: failed to read template %s: %v", templatePath, err)
 	}
 
-	// Parse the template to AST
+	// Parse the template to AST (COGNITIVE LOAD RULE: wrapped error)
 	templateAST, err := parser.ParseTemplate(string(content))
 	if err != nil {
-		log.Fatalf("Error parsing template: %v", err)
+		log.Fatalf("Render: failed to parse template %s: %v", templatePath, err)
+	}
+
+	// TASK 4.1: Inject content into exported props if contentData provided
+	if contentData != nil {
+		// Find fence section and inject content
+		for i, node := range templateAST.RootNodes {
+			if fence, ok := node.(*ast.FenceSection); ok {
+				// Only inject if there are exported props
+				if len(fence.ExportedProps) > 0 {
+					injectedFence, err := InjectContentProps(fence, contentData)
+					if err != nil {
+						log.Printf("Warning: failed to inject content props: %v", err)
+						// Continue with original fence (graceful degradation)
+					} else {
+						// Replace fence with injected version
+						templateAST.RootNodes[i] = injectedFence
+						log.Printf("Render: injected %d content props into fence", len(injectedFence.ExportedProps))
+					}
+				}
+				break
+			}
+		}
 	}
 
 	// Transform the AST to Alpine.js compatible nodes

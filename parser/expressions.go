@@ -288,6 +288,7 @@ func parseFenceContent(content string) *ast.FenceSection {
 	fence := &ast.FenceSection{
 		RawContent: content,
 		Props:      []ast.PropNode{},
+		ExportedProps: []string{},
 		Variables:  []ast.VariableNode{},
 		Functions:  []ast.FunctionNode{},
 		Imports:    []ast.ImportNode{},
@@ -302,6 +303,7 @@ func parseFenceContent(content string) *ast.FenceSection {
 	storeRegex := regexp.MustCompile(`^\s*store\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$`)
 	importRegex := regexp.MustCompile(`^\s*import\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s+from\s+['"](.+?)['"](?:;)?$`)
 
+	exportLetRegex := regexp.MustCompile(`^\s*export\s+let\s+(.*)$`)
 	// Function patterns: both regular functions and getters
 	functionRegex := regexp.MustCompile(`^\s*function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)\s*\{`)
 	getterRegex := regexp.MustCompile(`^\s*get\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(\s*\)\s*\{`)
@@ -313,6 +315,28 @@ func parseFenceContent(content string) *ast.FenceSection {
 		trimmedLine := strings.TrimSpace(line)
 
 		if trimmedLine == "" {
+			i++
+			continue
+		}
+		// Check for export let declaration (COGNITIVE LOAD RULE: parse before variables)
+		if matches := exportLetRegex.FindStringSubmatch(trimmedLine); matches != nil {
+			propList := matches[1]
+
+			// Remove optional semicolon
+			propList = strings.TrimSuffix(strings.TrimSpace(propList), ";")
+
+			// Split by comma and extract prop names
+			if propList != "" {
+				propNames := strings.Split(propList, ",")
+				for _, propName := range propNames {
+					propName = strings.TrimSpace(propName)
+					if propName != "" {
+						log.Printf("[parseFenceContent] Found exported prop: %s", propName)
+						fence.ExportedProps = append(fence.ExportedProps, propName)
+					}
+				}
+			}
+
 			i++
 			continue
 		}
@@ -482,8 +506,8 @@ func parseFenceContent(content string) *ast.FenceSection {
 		i++
 	}
 
-	log.Printf("[parseFenceContent] Extracted %d props, %d variables, %d functions, %d imports, %d stores",
-		len(fence.Props), len(fence.Variables), len(fence.Functions), len(fence.Imports), len(fence.Stores))
+	log.Printf("[parseFenceContent] Extracted %d props, %d exported props, %d variables, %d functions, %d imports, %d stores",
+		len(fence.Props), len(fence.ExportedProps), len(fence.Variables), len(fence.Functions), len(fence.Imports), len(fence.Stores))
 
 	return fence
 }

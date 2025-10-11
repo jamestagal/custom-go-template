@@ -1,0 +1,14 @@
+{
+  "components": [
+    {
+      "name": "Hero2436",
+      "fields": {
+        "topper": "Welcome to Artistitch",
+        "title": "Tattoo & Body Art Templates",
+        "description": "UV body painting, blacklight realism, geometric illusions, abstract expression, and fine line body art in North Portland, OR.",
+        "buttonText": "Book A Call",
+        "buttonLink": "/contact"
+      }
+    }
+  ]
+}

@@ -14,12 +14,13 @@ func (t *Template) NodeType() string { return "Template" }
 
 // FenceSection represents the fence section of a template
 type FenceSection struct {
-	Imports    []ImportNode
-	Props      []PropNode
-	Variables  []VariableNode     // Assuming VariableNode exists or will be added
-	Functions  []FunctionNode     // Function declarations in the fence
-	Stores     map[string]string  // Store definitions: name -> object literal as string
-	RawContent string             // Store raw JS content for now
+	Imports       []ImportNode
+	Props         []PropNode
+	ExportedProps []string           // Prop names that should come from content JSON (Svelte-style export let)
+	Variables     []VariableNode     // Assuming VariableNode exists or will be added
+	Functions     []FunctionNode     // Function declarations in the fence
+	Stores        map[string]string  // Store definitions: name -> object literal as string
+	RawContent    string             // Store raw JS content for now
 }
 
 func (f *FenceSection) NodeType() string { return "FenceSection" }

@@ -299,6 +299,7 @@ Template Source → Parser → AST → Transformer → Rendered HTML/CSS/JS
 - **`transformer/`** - Transforms AST to Alpine.js nodes
 - **`renderer/`** - Generates final HTML/CSS/JS
 - **`scoping/`** - CSS and JS scoping utilities
+- **`loader/`** - Content JSON loading utilities for export let system
 - **`cmd/server/`** - Development server
 
 See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation.
