@@ -3,10 +3,18 @@ public*
 # Build artifacts
 bin/
 server
+main
+example-server
+detailed_parse
+nested_conditional
+parser_bug
+server_test
+*.exe
 
 # Temporary files
 *.tmp
 *.patch
+*.orig
 
 # Backup files
 *.bak
@@ -14,3 +22,8 @@ server
 
 # Log files
 *.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
