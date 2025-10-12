@@ -294,6 +294,412 @@ func TestParseFenceContent_NavItemsConditional(t *testing.T) {
 	t.Logf("Successfully parsed navItems with %d characters", len(value))
 }
 
+// ===== STORE PARSING TESTS =====
+
+func TestParseFenceContent_SingleLineStore(t *testing.T) {
+	input := `store counter = { count: 0, increment() { this.count++; } }`
+
+	fence := parseFenceContent(input)
+
+	if len(fence.Stores) != 1 {
+		t.Errorf("Expected 1 store, got %d", len(fence.Stores))
+		return
+	}
+
+	storeDef, exists := fence.Stores["counter"]
+	if !exists {
+		t.Errorf("Store 'counter' not found in stores map")
+		return
+	}
+
+	expectedValue := `{ count: 0, increment() { this.count++; } }`
+	if storeDef != expectedValue {
+		t.Errorf("Expected store definition:\n%s\n\nGot:\n%s", expectedValue, storeDef)
+	}
+}
+
+func TestParseFenceContent_MultiLineStore(t *testing.T) {
+	input := `store auth = {
+  isLoggedIn: false,
+  user: null,
+  login() {
+    this.isLoggedIn = true;
+  },
+  logout() {
+    this.isLoggedIn = false;
+  }
+}`
+
+	fence := parseFenceContent(input)
+
+	if len(fence.Stores) != 1 {
+		t.Errorf("Expected 1 store, got %d", len(fence.Stores))
+		return
+	}
+
+	storeDef, exists := fence.Stores["auth"]
+	if !exists {
+		t.Errorf("Store 'auth' not found in stores map")
+		return
+	}
+
+	// Check that it's the complete multi-line definition
+	expectedValue := `{
+  isLoggedIn: false,
+  user: null,
+  login() {
+    this.isLoggedIn = true;
+  },
+  logout() {
+    this.isLoggedIn = false;
+  }
+}`
+
+	if storeDef != expectedValue {
+		t.Errorf("Expected store definition:\n%s\n\nGot:\n%s", expectedValue, storeDef)
+	}
+
+	// Verify key components
+	requiredStrings := []string{"isLoggedIn", "user", "login()", "logout()"}
+	for _, str := range requiredStrings {
+		if !contains(storeDef, str) {
+			t.Errorf("Store definition missing '%s'", str)
+		}
+	}
+}
+
+func TestParseFenceContent_MultipleStores(t *testing.T) {
+	input := `store auth = {
+  isLoggedIn: false,
+  user: null
+}
+
+store cart = {
+  items: [],
+  total: 0,
+  addItem(item) {
+    this.items.push(item);
+    this.total += item.price;
+  }
+}
+
+store theme = {
+  mode: "light",
+  toggle() {
+    this.mode = this.mode === "light" ? "dark" : "light";
+  }
+}`
+
+	fence := parseFenceContent(input)
+
+	if len(fence.Stores) != 3 {
+		t.Errorf("Expected 3 stores, got %d", len(fence.Stores))
+		return
+	}
+
+	// Check auth store
+	authDef, exists := fence.Stores["auth"]
+	if !exists {
+		t.Errorf("Store 'auth' not found")
+	} else {
+		if !contains(authDef, "isLoggedIn") || !contains(authDef, "user") {
+			t.Errorf("auth store incomplete: %s", authDef)
+		}
+	}
+
+	// Check cart store
+	cartDef, exists := fence.Stores["cart"]
+	if !exists {
+		t.Errorf("Store 'cart' not found")
+	} else {
+		if !contains(cartDef, "items") || !contains(cartDef, "addItem") {
+			t.Errorf("cart store incomplete: %s", cartDef)
+		}
+	}
+
+	// Check theme store
+	themeDef, exists := fence.Stores["theme"]
+	if !exists {
+		t.Errorf("Store 'theme' not found")
+	} else {
+		if !contains(themeDef, "mode") || !contains(themeDef, "toggle") {
+			t.Errorf("theme store incomplete: %s", themeDef)
+		}
+	}
+}
+
+func TestParseFenceContent_StoreWithNestedObjects(t *testing.T) {
+	input := `store user = {
+  profile: {
+    name: "John",
+    email: "john@example.com",
+    settings: {
+      theme: "dark",
+      notifications: true
+    }
+  },
+  updateProfile(data) {
+    this.profile = { ...this.profile, ...data };
+  }
+}`
+
+	fence := parseFenceContent(input)
+
+	if len(fence.Stores) != 1 {
+		t.Errorf("Expected 1 store, got %d", len(fence.Stores))
+		return
+	}
+
+	storeDef, exists := fence.Stores["user"]
+	if !exists {
+		t.Errorf("Store 'user' not found")
+		return
+	}
+
+	// Verify all nested content is present
+	requiredStrings := []string{
+		"profile",
+		"name",
+		"email",
+		"settings",
+		"theme",
+		"notifications",
+		"updateProfile",
+	}
+
+	for _, str := range requiredStrings {
+		if !contains(storeDef, str) {
+			t.Errorf("Store definition missing '%s': %s", str, storeDef)
+		}
+	}
+}
+
+func TestParseFenceContent_MixedPropsVarsAndStores(t *testing.T) {
+	input := `import Header from "./components/Header.html"
+
+prop title = "My App"
+prop count = 42
+
+let localVar = "test"
+
+store auth = {
+  isLoggedIn: false,
+  user: null
+}
+
+store cart = {
+  items: [],
+  total: 0
+}
+
+const config = {
+  debug: true
+}`
+
+	fence := parseFenceContent(input)
+
+	// Verify imports
+	if len(fence.Imports) != 1 {
+		t.Errorf("Expected 1 import, got %d", len(fence.Imports))
+	} else if fence.Imports[0].Name != "Header" {
+		t.Errorf("Expected import 'Header', got '%s'", fence.Imports[0].Name)
+	}
+
+	// Verify props
+	if len(fence.Props) != 2 {
+		t.Errorf("Expected 2 props, got %d", len(fence.Props))
+	} else {
+		if fence.Props[0].Name != "title" {
+			t.Errorf("Expected prop 'title', got '%s'", fence.Props[0].Name)
+		}
+		if fence.Props[1].Name != "count" {
+			t.Errorf("Expected prop 'count', got '%s'", fence.Props[1].Name)
+		}
+	}
+
+	// Verify variables
+	if len(fence.Variables) != 2 {
+		t.Errorf("Expected 2 variables, got %d", len(fence.Variables))
+	} else {
+		if fence.Variables[0].Name != "localVar" {
+			t.Errorf("Expected variable 'localVar', got '%s'", fence.Variables[0].Name)
+		}
+		if fence.Variables[1].Name != "config" {
+			t.Errorf("Expected variable 'config', got '%s'", fence.Variables[1].Name)
+		}
+	}
+
+	// Verify stores
+	if len(fence.Stores) != 2 {
+		t.Errorf("Expected 2 stores, got %d", len(fence.Stores))
+		return
+	}
+
+	if _, exists := fence.Stores["auth"]; !exists {
+		t.Errorf("Store 'auth' not found")
+	}
+
+	if _, exists := fence.Stores["cart"]; !exists {
+		t.Errorf("Store 'cart' not found")
+	}
+}
+
+func TestParseFenceContent_StoreWithArrays(t *testing.T) {
+	input := `store notifications = {
+  items: [
+    { id: 1, message: "Welcome", read: false },
+    { id: 2, message: "New message", read: false }
+  ],
+  unreadCount() {
+    return this.items.filter(n => !n.read).length;
+  },
+  markAsRead(id) {
+    const notification = this.items.find(n => n.id === id);
+    if (notification) {
+      notification.read = true;
+    }
+  }
+}`
+
+	fence := parseFenceContent(input)
+
+	if len(fence.Stores) != 1 {
+		t.Errorf("Expected 1 store, got %d", len(fence.Stores))
+		return
+	}
+
+	storeDef, exists := fence.Stores["notifications"]
+	if !exists {
+		t.Errorf("Store 'notifications' not found")
+		return
+	}
+
+	// Verify array and methods are present
+	requiredStrings := []string{
+		"items",
+		"message",
+		"Welcome",
+		"unreadCount",
+		"markAsRead",
+		"filter",
+		"find",
+	}
+
+	for _, str := range requiredStrings {
+		if !contains(storeDef, str) {
+			t.Errorf("Store definition missing '%s'", str)
+		}
+	}
+}
+
+func TestParseFenceContent_StoreWithComplexMethods(t *testing.T) {
+	input := `store dataStore = {
+  data: [],
+  async fetchData() {
+    const response = await fetch('/api/data');
+    this.data = await response.json();
+  },
+  filterBy(predicate) {
+    return this.data.filter(predicate);
+  },
+  sortBy(key, order = 'asc') {
+    return [...this.data].sort((a, b) => {
+      if (order === 'asc') {
+        return a[key] > b[key] ? 1 : -1;
+      }
+      return a[key] < b[key] ? 1 : -1;
+    });
+  }
+}`
+
+	fence := parseFenceContent(input)
+
+	if len(fence.Stores) != 1 {
+		t.Errorf("Expected 1 store, got %d", len(fence.Stores))
+		return
+	}
+
+	storeDef, exists := fence.Stores["dataStore"]
+	if !exists {
+		t.Errorf("Store 'dataStore' not found")
+		return
+	}
+
+	// Verify complex method content
+	requiredStrings := []string{
+		"async fetchData",
+		"await fetch",
+		"filterBy",
+		"predicate",
+		"sortBy",
+		"order = 'asc'",
+		".sort(",
+	}
+
+	for _, str := range requiredStrings {
+		if !contains(storeDef, str) {
+			t.Errorf("Store definition missing '%s': %s", str, storeDef)
+		}
+	}
+}
+
+func TestParseFenceContent_StoreNameValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		storeName   string
+		shouldExist bool
+	}{
+		{
+			name:        "simple name",
+			input:       `store auth = { loggedIn: false }`,
+			storeName:   "auth",
+			shouldExist: true,
+		},
+		{
+			name:        "underscore in name",
+			input:       `store user_profile = { name: "" }`,
+			storeName:   "user_profile",
+			shouldExist: true,
+		},
+		{
+			name:        "camelCase name",
+			input:       `store userAuth = { token: null }`,
+			storeName:   "userAuth",
+			shouldExist: true,
+		},
+		{
+			name:        "PascalCase name",
+			input:       `store UserAuth = { token: null }`,
+			storeName:   "UserAuth",
+			shouldExist: true,
+		},
+		{
+			name:        "name with numbers",
+			input:       `store auth2 = { loggedIn: false }`,
+			storeName:   "auth2",
+			shouldExist: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fence := parseFenceContent(tt.input)
+
+			if tt.shouldExist {
+				if len(fence.Stores) != 1 {
+					t.Errorf("Expected 1 store, got %d", len(fence.Stores))
+					return
+				}
+
+				if _, exists := fence.Stores[tt.storeName]; !exists {
+					t.Errorf("Expected store '%s' not found", tt.storeName)
+				}
+			}
+		})
+	}
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 &&

@@ -79,7 +79,7 @@ func debugRenderer() {
 
 		// 5. Render the template using the renderer package
 		fmt.Printf("Rendering template %s...\n", file)
-		markup, script, style := renderer.Render(file, props)
+		markup, script, style := renderer.Render(file, props, nil)
 
 		// 6. Check render output
 		if markup == "" {

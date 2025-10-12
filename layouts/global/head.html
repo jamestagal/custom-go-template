@@ -1,0 +1,30 @@
+---
+<!-- Head Component - Reusable <head> section with Alpine.js -->
+prop title = "My App"
+prop description = "A template engine powered app"
+---
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{title}</title>
+	<meta name="description" content="{description}">
+
+	<!-- Alpine.js - Global reactive framework -->
+	<script src="//unpkg.com/alpinejs" defer></script>
+
+	<!-- App Scripts -->
+	<script defer type="text/javascript" src="/scripts/script.js"></script>
+	<script defer type="text/javascript" src="/scripts/cms.js"></script>
+
+	<!-- App Styles -->
+	<link rel="stylesheet" href="/styles/style.css">
+	<link rel="stylesheet" href="/styles/cms.css">
+	  <link
+    rel="preload"
+    href="/static/fonts/roboto-v29-latin-regular.woff2 "
+    as="font"
+    type="font/woff2"
+    crossorigin
+  />
+</head>

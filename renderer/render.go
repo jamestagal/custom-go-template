@@ -13,17 +13,57 @@ import (
 	"github.com/jimafisk/custom_go_template/transformer"
 )
 
-func Render(templatePath string, props map[string]any) (string, string, string) {
-	// Read template file
+// Render renders a template file with optional content injection.
+// Parameters:
+//   - templatePath: Path to the template file
+//   - props: Component props (default values, initial data)
+//   - contentData: Optional content from JSON files (nil = no content injection)
+//
+// Returns:
+//   - markup: Rendered HTML
+//   - script: Extracted JavaScript
+//   - style: Extracted CSS
+//
+// Cognitive Load: 18
+// - Read file: 2
+// - Parse template: 2
+// - Content injection (optional): 3
+// - Transform: 3
+// - Aggregate styles: 2
+// - Generate outputs: 6
+func Render(templatePath string, props map[string]any, contentData map[string]interface{}) (string, string, string) {
+	// Read template file (COGNITIVE LOAD RULE: wrapped error)
 	content, err := os.ReadFile(templatePath)
 	if err != nil {
-		log.Fatalf("Error reading template: %v", err)
+		log.Fatalf("Render: failed to read template %s: %v", templatePath, err)
 	}
 
-	// Parse the template to AST
+	// Parse the template to AST (COGNITIVE LOAD RULE: wrapped error)
 	templateAST, err := parser.ParseTemplate(string(content))
 	if err != nil {
-		log.Fatalf("Error parsing template: %v", err)
+		log.Fatalf("Render: failed to parse template %s: %v", templatePath, err)
+	}
+
+	// TASK 4.1: Inject content into exported props if contentData provided
+	if contentData != nil {
+		// Find fence section and inject content
+		for i, node := range templateAST.RootNodes {
+			if fence, ok := node.(*ast.FenceSection); ok {
+				// Only inject if there are exported props
+				if len(fence.ExportedProps) > 0 {
+					injectedFence, err := InjectContentProps(fence, contentData)
+					if err != nil {
+						log.Printf("Warning: failed to inject content props: %v", err)
+						// Continue with original fence (graceful degradation)
+					} else {
+						// Replace fence with injected version
+						templateAST.RootNodes[i] = injectedFence
+						log.Printf("Render: injected %d content props into fence", len(injectedFence.ExportedProps))
+					}
+				}
+				break
+			}
+		}
 	}
 
 	// Transform the AST to Alpine.js compatible nodes
@@ -49,6 +89,68 @@ func Render(templatePath string, props map[string]any) (string, string, string) 
 	script := generateScript(transformedAST)
 
 	return markup, script, style
+}
+
+// RenderWithStores renders a transformed template AST with store initialization
+// This is the new main rendering function that integrates store initialization
+// into the final HTML output.
+//
+// Input:
+//   - originalAST: The original parsed AST (before transformation) - needed for style aggregation
+//   - transformedAST: The transformed AST from transformer.TransformAST()
+//   - storeDefinitions: Map of store names to their JS object literal definitions
+//   - templatePath: Path to the template file (for component name extraction)
+//
+// Output:
+//   - markup: The rendered HTML markup
+//   - script: The combined script content (store init + extracted scripts)
+//   - style: The aggregated CSS styles (page + all component styles)
+//
+// Cognitive Load: 12
+// - Generate markup: 2
+// - Generate base script: 2
+// - Generate store script: 3
+// - Combine scripts: 2
+// - Aggregate styles: 2
+// - Generate style: 1
+func RenderWithStores(originalAST *ast.Template, transformedAST *ast.Template, storeDefinitions map[string]string, templatePath string) (string, string, string) {
+	// Generate markup from transformed AST
+	markup := generateMarkup(transformedAST)
+
+	// Generate base script content (from <script> tags in template)
+	baseScript := generateScript(transformedAST)
+
+	// Generate store initialization script
+	storeScript := renderStoreInitializations(storeDefinitions)
+
+	// Combine scripts: store initialization comes first (before other scripts)
+	// This ensures stores are available before any component scripts run
+	var combinedScript string
+	if storeScript != "" {
+		// Extract just the script content (without <script> tags)
+		// renderStoreInitializations returns: <script>\n...content...\n</script>
+		// We want just the content part
+		scriptContent := strings.TrimPrefix(storeScript, "<script>")
+		scriptContent = strings.TrimSuffix(scriptContent, "</script>")
+		scriptContent = strings.TrimSpace(scriptContent)
+
+		if baseScript != "" {
+			combinedScript = scriptContent + "\n\n" + baseScript
+		} else {
+			combinedScript = scriptContent
+		}
+	} else {
+		combinedScript = baseScript
+	}
+
+	// CRITICAL FIX: Aggregate component styles from original AST
+	// Use original AST (not transformed) to preserve FenceSection imports
+	componentName := extractComponentName(templatePath)
+	log.Printf("[RenderWithStores] Aggregating styles for: %s", componentName)
+	style := GetAggregatedStyles(originalAST, componentName)
+	log.Printf("[RenderWithStores] Aggregated %d bytes of styles", len(style))
+
+	return markup, combinedScript, style
 }
 
 // extractComponentName extracts a component name from the template path
@@ -541,6 +643,11 @@ func renderNode(sb *strings.Builder, node ast.Node) {
 		// For expression nodes, we need to render them in a way Alpine.js can understand
 		// Typically, this would be with x-text, but it depends on the context
 		sb.WriteString(fmt.Sprintf("<span x-text=\"%v\"></span>", n.Expression))
+	case *ast.DynamicComponentByNameNode:
+		// FALLBACK: Render diagnostic comment for unresolved dynamic component
+		// This should rarely happen since transformer resolves these nodes
+		// If we see this in output, it means transformation failed
+		sb.WriteString(RenderDynamicComponentByName(n))
 	default:
 		// Log unknown node types but don't treat as errors
 		log.Printf("Unknown node type: %T", n)

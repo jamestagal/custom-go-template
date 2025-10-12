@@ -4,6 +4,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
@@ -48,10 +49,18 @@ func TextParser(delimiters ...Parser) Parser {
 	}
 }
 
-// ExpressionParser parses expressions in curly braces: {variable}
+// ExpressionParser parses expressions in curly braces: {variable} or {$store.property}
+// Pattern: Expression Router [Load: 8]
+// Cognitive Load: 8 (routing logic with $ detection)
+//
+// Routes expression parsing based on content:
+//   - {$storeName.prop} → StoreExpressionNode (via parseStoreExpression)
+//   - {variable}        → ExpressionNode
+//   - {obj.prop}        → ExpressionNode
+//   - {expr + 1}        → ExpressionNode
 func ExpressionParser() Parser {
 	return func(input string) Result {
-		// Use the lex-based expression parser
+		// Use the lex-based expression parser to extract content within braces
 		exprRes := LexExpressionParser()(input)
 		if !exprRes.Successful {
 			return exprRes
@@ -63,6 +72,28 @@ func ExpressionParser() Parser {
 		}
 
 		log.Printf("[ExpressionParser] Found expression: '%s'", expr)
+
+		// COGNITIVE LOAD RULE: Check if expression starts with $ (store reference)
+		// Route to parseStoreExpression if it's a store expression
+		if len(expr) > 0 && expr[0] == '$' {
+			// This is a store expression - parse it with parseStoreExpression
+			storeResult := parseStoreExpression()(expr)
+			if storeResult.Successful {
+				log.Printf("[ExpressionParser] Routed to store parser: %s", expr)
+				// Return store expression node with correct remaining
+				return Result{
+					Value:      storeResult.Value,
+					Remaining:  exprRes.Remaining,
+					Successful: true,
+					Error:      "",
+					Dynamic:    true,
+				}
+			}
+			// If store parsing failed, fall through to regular expression
+			log.Printf("[ExpressionParser] Store parsing failed, treating as regular expression: %s", expr)
+		}
+
+		// Regular expression (not a store)
 		return Result{
 			Value:      &ast.ExpressionNode{Expression: expr},
 			Remaining:  exprRes.Remaining,
@@ -137,6 +168,103 @@ func LexExpressionParser() Parser {
 	}
 }
 
+// parseStoreExpression parses store expressions: $storeName or $storeName.property
+// Pattern: Store Expression Parser [Load: 6]
+// Cognitive Load: 6 (simple parsing with validation)
+//
+// Syntax:
+//   - $storeName            → StoreExpressionNode{StoreName: "storeName", Property: ""}
+//   - $storeName.property   → StoreExpressionNode{StoreName: "storeName", Property: "property"}
+//   - $storeName.nested.prop → StoreExpressionNode{StoreName: "storeName", Property: "nested.prop"}
+//
+// Store names must:
+//   - Start with $ followed by letter or underscore
+//   - Contain only letters, digits, underscores
+//
+// Property paths:
+//   - Optional, separated by dots
+//   - Can have multiple levels (e.g., user.profile.name)
+func parseStoreExpression() Parser {
+	return func(input string) Result {
+		// Check if starts with $ (COGNITIVE LOAD RULE: early validation)
+		if len(input) == 0 || input[0] != '$' {
+			return Result{nil, input, false, "not a store expression", false}
+		}
+
+		// Need at least one character after $
+		if len(input) == 1 {
+			return Result{nil, input, false, "invalid store name", false}
+		}
+
+		// Parse store name after $
+		// Store name must start with letter or underscore
+		pos := 1
+		firstChar := rune(input[pos])
+		if !unicode.IsLetter(firstChar) && firstChar != '_' {
+			return Result{nil, input, false, "invalid store name", false}
+		}
+
+		// Continue parsing store name (alphanumeric + underscore)
+		storeName := strings.Builder{}
+		for pos < len(input) {
+			ch := rune(input[pos])
+			if unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' {
+				storeName.WriteRune(ch)
+				pos++
+			} else {
+				break
+			}
+		}
+
+		// Check if we have a store name (COGNITIVE LOAD RULE: validate before proceeding)
+		if storeName.Len() == 0 {
+			return Result{nil, input, false, "invalid store name", false}
+		}
+
+		storeNameStr := storeName.String()
+		property := ""
+
+		// Check for property access (dot notation)
+		if pos < len(input) && input[pos] == '.' {
+			pos++ // Skip the dot
+
+			// Parse property path (can have multiple dots)
+			propertyBuilder := strings.Builder{}
+			for pos < len(input) {
+				ch := rune(input[pos])
+				// Property can contain letters, digits, underscores, and dots
+				if unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == '.' {
+					propertyBuilder.WriteRune(ch)
+					pos++
+				} else {
+					break
+				}
+			}
+
+			property = propertyBuilder.String()
+			// Trim trailing dots if any
+			property = strings.TrimSuffix(property, ".")
+		}
+
+		// Create StoreExpressionNode (COGNITIVE LOAD RULE: wrapped success)
+		node := &ast.StoreExpressionNode{
+			StoreName: storeNameStr,
+			Property:  property,
+		}
+
+		remaining := input[pos:]
+		log.Printf("[parseStoreExpression] Parsed store expression: %s", node.String())
+
+		return Result{
+			Value:      node,
+			Remaining:  remaining,
+			Successful: true,
+			Error:      "",
+			Dynamic:    true,
+		}
+	}
+}
+
 // FenceParser parses the fence section (delimited by ---).
 func FenceParser() Parser {
 	return Map(
@@ -152,22 +280,33 @@ func FenceParser() Parser {
 	)
 }
 
-// parseFenceContent extracts props and variables from fence section content
+// parseFenceContent extracts props, variables, functions, stores, and imports from fence section content
 // Now handles multi-line values for arrays, objects, and ternary expressions
+// Pattern: Fence Content Parser [Load: 12]
+// Cognitive Load: 12 (multiple regex patterns, line-by-line parsing, multi-line support)
 func parseFenceContent(content string) *ast.FenceSection {
 	fence := &ast.FenceSection{
 		RawContent: content,
 		Props:      []ast.PropNode{},
+		ExportedProps: []string{},
 		Variables:  []ast.VariableNode{},
+		Functions:  []ast.FunctionNode{},
 		Imports:    []ast.ImportNode{},
+		Stores:     make(map[string]string),
 	}
 
 	lines := strings.Split(content, "\n")
 
-	// Regex patterns for parsing
+	// Regex patterns for parsing (COGNITIVE LOAD RULE: precompile patterns)
 	propRegex := regexp.MustCompile(`^\s*prop\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$`)
 	varRegex := regexp.MustCompile(`^\s*(let|const|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$`)
+	storeRegex := regexp.MustCompile(`^\s*store\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(.+)$`)
 	importRegex := regexp.MustCompile(`^\s*import\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s+from\s+['"](.+?)['"](?:;)?$`)
+
+	exportLetRegex := regexp.MustCompile(`^\s*export\s+let\s+(.*)$`)
+	// Function patterns: both regular functions and getters
+	functionRegex := regexp.MustCompile(`^\s*function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)\s*\{`)
+	getterRegex := regexp.MustCompile(`^\s*get\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(\s*\)\s*\{`)
 
 	// Process lines with multi-line support
 	i := 0
@@ -176,6 +315,98 @@ func parseFenceContent(content string) *ast.FenceSection {
 		trimmedLine := strings.TrimSpace(line)
 
 		if trimmedLine == "" {
+			i++
+			continue
+		}
+		// Check for export let declaration (COGNITIVE LOAD RULE: parse before variables)
+		if matches := exportLetRegex.FindStringSubmatch(trimmedLine); matches != nil {
+			propList := matches[1]
+
+			// Remove optional semicolon
+			propList = strings.TrimSuffix(strings.TrimSpace(propList), ";")
+
+			// Split by comma and extract prop names
+			if propList != "" {
+				propNames := strings.Split(propList, ",")
+				for _, propName := range propNames {
+					propName = strings.TrimSpace(propName)
+					if propName != "" {
+						log.Printf("[parseFenceContent] Found exported prop: %s", propName)
+						fence.ExportedProps = append(fence.ExportedProps, propName)
+					}
+				}
+			}
+
+			i++
+			continue
+		}
+
+		// Check for function declaration (COGNITIVE LOAD RULE: parse before variables to avoid conflicts)
+		if matches := functionRegex.FindStringSubmatch(trimmedLine); matches != nil {
+			funcName := matches[1]
+			funcParams := matches[2]
+
+			// Find the matching closing brace for this function
+			funcBody, endIndex := parseFunctionBody(lines, i)
+			if funcBody != "" {
+				log.Printf("[parseFenceContent] Found function: %s(%s)", funcName, funcParams)
+				fence.Functions = append(fence.Functions, ast.FunctionNode{
+					Name:     funcName,
+					Params:   funcParams,
+					Body:     funcBody,
+					IsGetter: false,
+				})
+				i = endIndex + 1
+				continue
+			}
+		}
+
+		// Check for getter declaration
+		if matches := getterRegex.FindStringSubmatch(trimmedLine); matches != nil {
+			getterName := matches[1]
+
+			// Find the matching closing brace for this getter
+			getterBody, endIndex := parseFunctionBody(lines, i)
+			if getterBody != "" {
+				log.Printf("[parseFenceContent] Found getter: get %s()", getterName)
+				fence.Functions = append(fence.Functions, ast.FunctionNode{
+					Name:     getterName,
+					Params:   "",  // Getters have no params
+					Body:     getterBody,
+					IsGetter: true,
+				})
+				i = endIndex + 1
+				continue
+			}
+		}
+
+		// Check for store declaration
+		if matches := storeRegex.FindStringSubmatch(trimmedLine); matches != nil {
+			storeName := matches[1]
+			firstLineValue := matches[2]
+
+			// Check if this is a potentially multi-line value
+			if isMultiLineValue(firstLineValue) {
+				// Multi-line value - accumulate lines until complete
+				fullValue, endIndex := parseMultiLineValue(lines, i, firstLineValue)
+				if fullValue != "" {
+					preview := fullValue
+					if len(fullValue) > 50 {
+						preview = fullValue[:50] + "..."
+					}
+					log.Printf("[parseFenceContent] Found multi-line store: %s = %s (total %d chars)", storeName, preview, len(fullValue))
+					fence.Stores[storeName] = fullValue
+					i = endIndex + 1
+					continue
+				}
+			}
+
+			// Single-line value
+			value := strings.TrimSpace(firstLineValue)
+			value = strings.TrimSuffix(value, ";")
+
+			log.Printf("[parseFenceContent] Found store: %s = %s", storeName, value)
+			fence.Stores[storeName] = value
 			i++
 			continue
 		}
@@ -205,7 +436,6 @@ func parseFenceContent(content string) *ast.FenceSection {
 			}
 
 			// Single-line value
-			// Remove trailing semicolon if present
 			value := strings.TrimSpace(firstLineValue)
 			value = strings.TrimSuffix(value, ";")
 
@@ -276,10 +506,77 @@ func parseFenceContent(content string) *ast.FenceSection {
 		i++
 	}
 
-	log.Printf("[parseFenceContent] Extracted %d props, %d variables, %d imports",
-		len(fence.Props), len(fence.Variables), len(fence.Imports))
+	log.Printf("[parseFenceContent] Extracted %d props, %d exported props, %d variables, %d functions, %d imports, %d stores",
+		len(fence.Props), len(fence.ExportedProps), len(fence.Variables), len(fence.Functions), len(fence.Imports), len(fence.Stores))
 
 	return fence
+}
+
+// parseFunctionBody extracts the complete function body from lines starting at startIndex
+// Returns the full function body (including function declaration) and the ending line index
+// Pattern: Brace Matching Parser [Load: 8]
+// Cognitive Load: 8 (depth tracking, string handling, multi-line accumulation)
+func parseFunctionBody(lines []string, startIndex int) (string, int) {
+	var accumulator strings.Builder
+	braceDepth := 0
+	inString := false
+	stringChar := rune(0)
+	escaped := false
+
+	for i := startIndex; i < len(lines); i++ {
+		line := lines[i]
+
+		// Append line to accumulator
+		if i > startIndex {
+			accumulator.WriteString("\n")
+		}
+		accumulator.WriteString(line)
+
+		// Process each character to track braces
+		for _, char := range line {
+			// Handle escape sequences
+			if escaped {
+				escaped = false
+				continue
+			}
+
+			if char == '\\' {
+				escaped = true
+				continue
+			}
+
+			// Handle string literals
+			if inString {
+				if char == stringChar {
+					inString = false
+					stringChar = 0
+				}
+				continue
+			}
+
+			// Check if entering a string
+			if char == '"' || char == '\'' || char == '`' {
+				inString = true
+				stringChar = char
+				continue
+			}
+
+			// Track braces outside of strings
+			if char == '{' {
+				braceDepth++
+			} else if char == '}' {
+				braceDepth--
+				if braceDepth == 0 {
+					// Function complete
+					return accumulator.String(), i
+				}
+			}
+		}
+	}
+
+	// Unclosed function - return empty to indicate error
+	log.Printf("[parseFunctionBody] WARNING: Unclosed function starting at line %d", startIndex)
+	return "", -1
 }
 
 // isMultiLineValue checks if a value is likely to span multiple lines
@@ -490,4 +787,81 @@ func StyleParser() Parser {
 			Error:      "",
 		}
 	}
+}
+
+// ParseFenceContentWithStores is a wrapper for parseFenceContent that supports external store imports
+// Pattern: Parser with Registry Support [Load: 6]
+// Cognitive Load: 6 (delegate to parseFenceContent, then process store imports)
+func ParseFenceContentWithStores(content string, storeRegistry map[string]string) *ast.FenceSection {
+	// First, parse normally to get inline stores AND functions
+	fence := parseFenceContent(content)
+
+	// If no registry provided, return fence as-is
+	if storeRegistry == nil {
+		return fence
+	}
+
+	// Now process store imports
+	// Pattern: import store from './stores/name.js'
+	storeImportRegex := regexp.MustCompile(`^\s*import\s+store\s+from\s+['"](.+?)['"](?:;)?$`)
+
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" {
+			continue
+		}
+
+		// Check for store import
+		if matches := storeImportRegex.FindStringSubmatch(trimmedLine); matches != nil {
+			importPath := matches[1]
+
+			// Extract store name from path
+			storeName := ExtractStoreNameFromPath(importPath)
+
+			if storeName != "" {
+				// Look up store content in registry
+				if storeContent, exists := storeRegistry[storeName]; exists {
+					// Only add if not already defined inline (inline overrides import)
+					if _, alreadyDefined := fence.Stores[storeName]; !alreadyDefined {
+						fence.Stores[storeName] = storeContent
+						log.Printf("[ParseFenceContentWithStores] Loaded external store: %s from %s", storeName, importPath)
+					} else {
+						log.Printf("[ParseFenceContentWithStores] Inline store '%s' overrides imported store", storeName)
+					}
+				} else {
+					log.Printf("[ParseFenceContentWithStores] WARNING: Store '%s' not found in registry (from %s)", storeName, importPath)
+				}
+			}
+		}
+	}
+
+	return fence
+}
+
+// ExtractStoreNameFromPath extracts the store name from an import path
+// Supports various path formats:
+// - './stores/auth.js' -> 'auth'
+// - 'stores/auth.js' -> 'auth'
+// - '../stores/auth.js' -> 'auth'
+// - '/stores/auth.js' -> 'auth'
+// Pattern: Path Extraction Utility [Load: 6]
+func ExtractStoreNameFromPath(path string) string {
+	// Remove quotes if present
+	path = strings.Trim(path, `"'`)
+
+	// Find the last slash
+	lastSlash := strings.LastIndex(path, "/")
+	if lastSlash == -1 {
+		// No slash, entire path is filename
+		return strings.TrimSuffix(path, ".js")
+	}
+
+	// Extract filename after last slash
+	filename := path[lastSlash+1:]
+
+	// Remove .js extension
+	storeName := strings.TrimSuffix(filename, ".js")
+
+	return storeName
 }

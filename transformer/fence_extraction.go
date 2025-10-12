@@ -1,19 +1,21 @@
 package transformer
 
 import (
+	"log"
 	"regexp"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
-// collectComponentFenceData extracts variables, prop defaults, and functions from a
+// collectComponentFenceData extracts variables, prop defaults, functions, and STORES from a
 // component's fence section and adds them to the provided scope map.
 //
 // It processes:
 //   - fence.Variables: Parsed using parseValue() and added to scope
 //   - fence.Props: Default values parsed using parseValue() and added to scope
 //   - fence.RawContent: Function definitions extracted via regex and stored as strings
+//   - fence.Stores: Store definitions tracked for global Alpine registration
 //
 // Supported function patterns:
 //   - function name() {} - Function declarations
@@ -24,9 +26,11 @@ import (
 //   - set name(value) {} - Setter methods
 //   - async variants of all above
 //
-// The function modifies the provided scope map in-place.
+// CRITICAL FIX: Now also tracks stores from component fence sections so they're available globally
 //
-// Cognitive Load: 12 (moderate complexity with regex and multiple data sources)
+// The function modifies the provided scope map in-place and tracks stores globally.
+//
+// Cognitive Load: 14 (moderate complexity with regex, multiple data sources, and store tracking)
 func collectComponentFenceData(fence *ast.FenceSection, scope map[string]any) {
 	// Handle nil fence - return early without panic (COGNITIVE LOAD RULE)
 	if fence == nil {
@@ -43,6 +47,18 @@ func collectComponentFenceData(fence *ast.FenceSection, scope map[string]any) {
 	for _, prop := range fence.Props {
 		parsedValue := parseValue(prop.DefaultValue)
 		scope[prop.Name] = parsedValue
+	}
+
+	// CRITICAL FIX: Track stores from component fence sections
+	// These stores need to be available globally via Alpine.store()
+	// Component stores from imports are already in fence.Stores thanks to ParseFenceContentWithStores
+	if len(fence.Stores) > 0 {
+		log.Printf("[collectComponentFenceData] Tracking %d stores from component fence", len(fence.Stores))
+		for storeName, storeContent := range fence.Stores {
+			// Add to global store tracker
+			storeTracker.allDefinitions[storeName] = storeContent
+			log.Printf("[collectComponentFenceData] Added store '%s' to global tracker", storeName)
+		}
 	}
 
 	// Extract functions from RawContent if present

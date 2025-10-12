@@ -1,0 +1,83 @@
+---
+<!-- LoginStatus Component - Uses auth store -->
+import store from './stores/auth.js'
+---
+
+<div class="login-status">
+  {if $auth.isLoggedIn}
+    <div class="logged-in">
+      <span class="user-info">
+        👤 Welcome, <strong>{$auth.user.name}</strong>
+      </span>
+      <button
+        @click="$store.auth.logout()"
+        class="btn btn-secondary">
+        Logout
+      </button>
+    </div>
+  {else}
+    <div class="logged-out">
+      <span class="guest-info">👋 Guest</span>
+      <button
+        @click="$store.auth.login()"
+        class="btn btn-primary">
+        Login
+      </button>
+    </div>
+  {/if}
+</div>
+
+<style>
+.login-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.logged-in,
+.logged-out {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.user-info,
+.guest-info {
+  flex: 1;
+  font-size: 0.95rem;
+  color: #1f2937 !important; /* Always dark text for readability */
+}
+
+.btn {
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #4b5563;
+}
+</style>

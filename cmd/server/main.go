@@ -6,68 +6,257 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	// Import the new renderer package
 	"github.com/jimafisk/custom_go_template/ast"
+	"github.com/jimafisk/custom_go_template/loader"
 	"github.com/jimafisk/custom_go_template/parser"
 	"github.com/jimafisk/custom_go_template/renderer"
 	"github.com/jimafisk/custom_go_template/transformer"
 )
 
+// Global store registry loaded at startup
+// Pattern: Package-level State [Load: 2]
+var storeRegistry map[string]string
+
+// TASK 4.4: Content cache for performance
+// Pattern: In-Memory Cache [Load: 5]
+var (
+	contentCache   = make(map[string]map[string]interface{})
+	contentCacheMu sync.RWMutex
+)
+
+// TASK 5.3: Cache for getAllContent to avoid repeated directory walks
+var (
+	allContentCache   map[string]interface{}
+	allContentCacheMu sync.RWMutex
+	allContentCached  bool
+)
+
 func main() {
 	log.Println("Starting server...")
 
-	// Create the public directory if it doesn't exist
-	publicDir := "./public" // Use a variable for clarity
-	err := os.MkdirAll(publicDir, 0755)
-	if err != nil {
-		log.Fatalf("Failed to create public directory: %v", err)
+	// Create asset directories if they don't exist
+	assetDirs := []string{"./scripts", "./styles", "./images", "./public"}
+	for _, dir := range assetDirs {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			log.Fatalf("Failed to create directory %s: %v", dir, err)
+		}
 	}
+	log.Println("Asset directories initialized")
 
-	// Register components
-	registerComponents()
+	// Register stores FIRST (before components need them)
+	storeRegistry = registerStores()
+	log.Printf("Registered %d store(s)", len(storeRegistry))
+
+	// Register components (now with store registry available)
+	registerComponents(storeRegistry)
 
 	// Set up the HTTP server
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Serve static files from the public directory
+		// Serve static files from organized directories
 		if r.URL.Path != "/" {
-			http.ServeFile(w, r, publicDir+r.URL.Path)
+			serveStaticFile(w, r)
 			return
 		}
 
-		// Render home page
-		renderTemplate("examples/pages/home.html", w, r)
+		// Render home page with export let content injection
+		renderTemplate("layouts/content/_index.html", w, r)
 	})
 
 	// Add comprehensive-simple page route (WORKING - no multi-line vars)
 	http.HandleFunc("/comprehensive-simple", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("examples/pages/comprehensive-simple.html", w, r)
+		renderTemplate("layouts/content/comprehensive.html", w, r)
 	})
 
 	// Add comprehensive page route (HAS BUGS - multi-line var extraction broken)
 	http.HandleFunc("/comprehensive", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("examples/pages/comprehensive.html", w, r)
+		renderTemplate("layouts/content/comprehensive.html", w, r)
+	})
+
+	// Add store-test-minimal page route (Testing Task 2.1: Store Expression Transformer - no definitions)
+	http.HandleFunc("/store-test-minimal", func(w http.ResponseWriter, r *http.Request) {
+		renderTemplate("layouts/content/store-test-minimal.html", w, r)
+	})
+
+	// Add store-test-with-theme page route (Testing visual theme switching with stores)
+	http.HandleFunc("/store-test-with-theme", func(w http.ResponseWriter, r *http.Request) {
+		renderTemplate("layouts/content/store-test-with-theme.html", w, r)
+	})
+
+	// TASK 4.1 & 4.2: Store components demo page with content loading
+	http.HandleFunc("/store-components-demo", func(w http.ResponseWriter, r *http.Request) {
+		renderTemplate("layouts/content/store-demo.html", w, r)
+	})
+	http.HandleFunc("/store-demo", func(w http.ResponseWriter, r *http.Request) {
+		renderTemplate("layouts/content/store-demo.html", w, r)
 	})
 
 	// Start the server
 	port := ":3333"
 	fmt.Printf("Server starting on http://localhost%s\n", port)
-	err = http.ListenAndServe(port, nil)
+	err := http.ListenAndServe(port, nil)
 	if err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
 
-// renderTemplate is a unified handler for rendering template files
-// It replaces the manual x-data building logic with proper renderer.Render() usage
+// serveStaticFile handles serving static files from organized asset directories
+// Routes: /scripts/* → ./scripts/, /styles/* → ./styles/, /images/* → ./images/, /static/* → ./static/, /* → ./public/
+func serveStaticFile(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	var filePath string
+
+	// Route to appropriate directory based on path prefix
+	switch {
+	case strings.HasPrefix(path, "/scripts/"):
+		filePath = "." + path
+	case strings.HasPrefix(path, "/styles/"):
+		filePath = "." + path
+	case strings.HasPrefix(path, "/images/"):
+		filePath = "." + path
+	case strings.HasPrefix(path, "/static/"):
+		filePath = "." + path
+	default:
+		// Everything else goes to public directory
+		filePath = "./public" + path
+	}
+
+	// Serve the file
+	http.ServeFile(w, r, filePath)
+}
+
+// loadContentWithCache loads content JSON with caching for performance
+// TASK 4.4: Content caching implementation
 //
-// Pattern: Service Implementation Pattern [Load: 12]
-// Cognitive Load: 12 (read: 2, parse: 2, extract props: 3, render: 2, inject: 2, send: 1)
+// Pattern: Cache-Aside Pattern [Load: 12]
+// Cognitive Load: 12 (cache lookup: 3, load on miss: 3, cache update: 3, error handling: 3)
+func loadContentWithCache(routePath string) (map[string]interface{}, error) {
+	// Check cache first (read lock for concurrent access)
+	contentCacheMu.RLock()
+	cached, exists := contentCache[routePath]
+	contentCacheMu.RUnlock()
+
+	if exists {
+		log.Printf("loadContentWithCache: cache hit for %s", routePath)
+		return cached, nil
+	}
+
+	// Cache miss - load from file
+	log.Printf("loadContentWithCache: cache miss for %s, loading from file", routePath)
+	contentData, err := loader.LoadContentForRoute(routePath)
+	if err != nil {
+		return nil, fmt.Errorf("loadContentWithCache: %w", err)
+	}
+
+	// Update cache (write lock)
+	contentCacheMu.Lock()
+	contentCache[routePath] = contentData
+	contentCacheMu.Unlock()
+
+	return contentData, nil
+}
+
+// invalidateContentCache clears the content cache (useful for development)
+// Can be called via HTTP endpoint or during file watching
+func invalidateContentCache() {
+	contentCacheMu.Lock()
+	defer contentCacheMu.Unlock()
+
+	contentCache = make(map[string]map[string]interface{})
+
+	// Also invalidate allContent cache
+	allContentCacheMu.Lock()
+	allContentCached = false
+	allContentCache = nil
+	allContentCacheMu.Unlock()
+
+	log.Println("Content cache invalidated")
+}
+
+// TASK 5.3: getAllContent loads all content JSON files from content/ directory
+// Returns map indexed by relative path: "pages/_index", "blog/post-1", etc.
+//
+// Pattern: File Discovery Pattern with Caching [Load: 15]
+// Cognitive Load: 15 (directory walk: 5, file reading: 3, JSON parsing: 3, path formatting: 2, caching: 2)
+func getAllContent() map[string]interface{} {
+	// Check cache first
+	allContentCacheMu.RLock()
+	if allContentCached {
+		cached := allContentCache
+		allContentCacheMu.RUnlock()
+		return cached
+	}
+	allContentCacheMu.RUnlock()
+
+	// Build fresh cache
+	result := make(map[string]interface{})
+	contentDir := "content"
+
+	// Walk content directory recursively (COGNITIVE LOAD RULE: wrapped error)
+	err := filepath.Walk(contentDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			// If content directory doesn't exist, just return empty map
+			return nil
+		}
+
+		// Skip directories and non-JSON files
+		if info.IsDir() || !strings.HasSuffix(path, ".json") {
+			return nil
+		}
+
+		// Load and parse JSON (COGNITIVE LOAD RULE: wrapped error)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			log.Printf("getAllContent: Warning: Failed to read %s: %v", path, err)
+			return nil // Continue walking
+		}
+
+		var content map[string]interface{}
+		if err := json.Unmarshal(data, &content); err != nil {
+			log.Printf("getAllContent: Warning: Invalid JSON in %s: %v", path, err)
+			return nil // Continue walking
+		}
+
+		// Calculate relative key: "content/pages/about.json" -> "pages/about"
+		relPath := strings.TrimPrefix(path, contentDir+string(filepath.Separator))
+		relPath = strings.TrimSuffix(relPath, ".json")
+		// Normalize path separators for cross-platform compatibility
+		relPath = filepath.ToSlash(relPath)
+
+		result[relPath] = content
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("getAllContent: Warning: Error walking content directory: %v", err)
+	}
+
+	// Update cache
+	allContentCacheMu.Lock()
+	allContentCache = result
+	allContentCached = true
+	allContentCacheMu.Unlock()
+
+	log.Printf("getAllContent: Loaded %d content files", len(result))
+	return result
+}
+
+// renderTemplate is a unified handler for rendering template files with store support
+// Now integrates with the global store system (Task 3.5)
+// UPDATED: Now supports content injection (Task 4)
+// UPDATED: Now passes magic variables (Task 5.4)
+//
+// Pattern: Service Implementation Pattern with Store Integration [Load: 20]
+// Cognitive Load: 20 (read: 2, parse: 3, fence parsing: 3, content loading: 3, transform: 3, store merge: 3, render: 2, inject: 1)
 func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 
@@ -85,32 +274,132 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract initial props from fence section (for buildTime)
-	props := make(map[string]interface{})
-	for _, node := range template.RootNodes {
-		if fence, ok := node.(*ast.FenceSection); ok {
-			// Process variables
-			for _, variable := range fence.Variables {
-				props[variable.Name] = parseValue(variable.Value)
-			}
+	// TASK 4.1 & 4.2: Load content JSON for this route
+	// Extract route path from request URL
+	routePath := r.URL.Path
+	contentData, err := loadContentWithCache(routePath)
+	if err != nil {
+		// Content loading failure is not fatal - log warning and continue
+		log.Printf("Warning: failed to load content for route %s: %v", routePath, err)
+		contentData = nil // No content injection
+	} else if len(contentData) > 0 {
+		log.Printf("Loaded content for route %s: %d top-level keys", routePath, len(contentData))
+	}
 
-			// Process props with default values
-			for _, prop := range fence.Props {
-				if _, exists := props[prop.Name]; !exists && prop.DefaultValue != "" {
-					props[prop.Name] = parseValue(prop.DefaultValue)
+	// Extract fence section and parse with store registry ONLY if needed (Task 3.5 integration)
+	var fenceWithStores *ast.FenceSection
+	for i, node := range template.RootNodes {
+		if fence, ok := node.(*ast.FenceSection); ok {
+			// TASK 4: Inject content into exported props BEFORE store parsing
+			if contentData != nil && len(fence.ExportedProps) > 0 {
+				// Check if this is a collection type - extract component fields
+				if loader.IsCollectionType(contentData) {
+					// For collection types, we need to know which component we're rendering
+					// For now, use a simple heuristic: first component in the array
+					// TODO: In future, route could specify which component to use
+					componentsRaw, ok := contentData["components"]
+					if ok {
+						if components, ok := componentsRaw.([]interface{}); ok && len(components) > 0 {
+							if firstComp, ok := components[0].(map[string]interface{}); ok {
+								if fields, ok := firstComp["fields"].(map[string]interface{}); ok {
+									// Use the extracted fields for injection
+									contentData = fields
+									log.Printf("Extracted fields from first component for injection: %d fields", len(fields))
+								}
+							}
+						}
+					}
+				}
+
+				// Inject content props
+				injectedFence, err := renderer.InjectContentProps(fence, contentData)
+				if err != nil {
+					log.Printf("Warning: content injection failed: %v", err)
+					// Continue with original fence
+					fenceWithStores = fence
+				} else {
+					fence = injectedFence
+					log.Printf("Content injection successful: %d exported props injected", len(fence.ExportedProps))
 				}
 			}
 
-			// CRITICAL: Extract functions from RawContent
-			// The parser doesn't extract function declarations into Variables
-			// So we need to manually parse them from the raw fence content
-			extractedFunctions := extractFunctionsFromFence(fence.RawContent)
-			for name, funcBody := range extractedFunctions {
-				props[name] = funcBody
+			// Only re-parse if fence contains store imports
+			if strings.Contains(fence.RawContent, "import store from") {
+				// Parse fence content with store registry to resolve store imports
+				fenceWithStores = parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
+				// Replace the fence section in template
+				template.RootNodes[i] = fenceWithStores
+			} else {
+				// No store imports, use the already-parsed fence as-is (possibly with injected content)
+				fenceWithStores = fence
+				template.RootNodes[i] = fenceWithStores
 			}
-
 			break
 		}
+	}
+
+	// Extract initial props from fence section (for buildTime)
+	props := make(map[string]interface{})
+	if fenceWithStores != nil {
+		// Process variables
+		for _, variable := range fenceWithStores.Variables {
+			props[variable.Name] = parseValue(variable.Value)
+		}
+
+		// Process props with default values
+		for _, prop := range fenceWithStores.Props {
+			if _, exists := props[prop.Name]; !exists && prop.DefaultValue != "" {
+				props[prop.Name] = parseValue(prop.DefaultValue)
+			}
+		}
+
+		// UPDATED: Extract functions from FenceSection.Functions field (Task 2.3)
+		// This replaces the manual regex-based extraction
+		for _, function := range fenceWithStores.Functions {
+			props[function.Name] = function.Body
+		}
+	}
+
+	// TASK 5.4: Add magic variables to props (OPT-IN via export let)
+	// Only add magic variables if the template explicitly declares them in export let
+	exportedPropNames := make(map[string]bool)
+	if fenceWithStores != nil {
+		for _, propName := range fenceWithStores.ExportedProps {
+			exportedPropNames[propName] = true
+		}
+	}
+
+	if contentData != nil {
+		// Magic variable 1: components array from content JSON
+		if exportedPropNames["components"] {
+			if componentsRaw, ok := contentData["components"]; ok {
+				props["components"] = componentsRaw
+				log.Printf("Magic variable 'components' added to props (requested via export let)")
+			}
+		}
+
+		// Magic variable 2: content - full content object for this page
+		if exportedPropNames["content"] {
+			props["content"] = contentData
+			log.Printf("Magic variable 'content' added to props (requested via export let)")
+		}
+	}
+
+	// Magic variable 3: allContent - all site content (OPT-IN only)
+	if exportedPropNames["allContent"] {
+		props["allContent"] = getAllContent()
+		log.Printf("Magic variable 'allContent' added to props (requested via export let)")
+	}
+
+	// Magic variable 4: allLayouts - component registry names (OPT-IN only)
+	if exportedPropNames["allLayouts"] {
+		// Convert to array of strings for proper JSON serialization
+		layoutNames := make([]string, 0)
+		for name := range transformer.GetAllComponentNames() {
+			layoutNames = append(layoutNames, name)
+		}
+		props["allLayouts"] = layoutNames
+		log.Printf("Magic variable 'allLayouts' added to props (%d components, requested via export let)", len(layoutNames))
 	}
 
 	// Add build time as a prop
@@ -118,10 +407,55 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	buildTimeMs := float64(buildTime.Microseconds()) / 1000.0
 	props["buildTime"] = fmt.Sprintf("%.2fms", buildTimeMs)
 
-	// CRITICAL: Use renderer.Render() - this calls the transformer
-	// which uses alpineDataFormatter for correct x-data generation
-	// The transformer will NOT add x-data to <html> or <body> tags, so we need to do it here
-	markup, script, style := renderer.Render(entrypoint, props)
+	// Transform template (this tracks store references)
+	transformed := transformer.TransformAST(template, props)
+
+	// Get tracked stores from transformer (Task 3.5: Store merging)
+	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
+	log.Printf("[DEBUG] Referenced stores: %v", referencedStores)
+
+	allDefKeys := make([]string, 0, len(allDefinitions))
+	for k := range allDefinitions {
+		allDefKeys = append(allDefKeys, k)
+	}
+	log.Printf("[DEBUG] All definitions keys: %v", allDefKeys)
+
+	referencedStoreDefs := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
+
+	refDefKeys := make([]string, 0, len(referencedStoreDefs))
+	for k := range referencedStoreDefs {
+		refDefKeys = append(refDefKeys, k)
+	}
+	log.Printf("[DEBUG] Referenced store defs keys: %v", refDefKeys)
+
+	// Merge with external stores if referenced but not defined (Task 3.5: Priority system)
+	// Priority: Inline > Imported > External
+	finalStores := make(map[string]string)
+
+	// Add all referenced stores (inline + imported from fence)
+	for name, def := range referencedStoreDefs {
+		finalStores[name] = def
+	}
+
+	// Add external stores if referenced but not yet in finalStores
+	for _, storeName := range referencedStores {
+		if _, exists := finalStores[storeName]; !exists {
+			if externalDef, exists := storeRegistry[storeName]; exists {
+				finalStores[storeName] = externalDef
+				log.Printf("[renderTemplate] Added external store: %s", storeName)
+			}
+		}
+	}
+
+	finalKeys := make([]string, 0, len(finalStores))
+	for k := range finalStores {
+		finalKeys = append(finalKeys, k)
+	}
+	log.Printf("[DEBUG] Final stores keys: %v", finalKeys)
+
+	// Render with stores (Task 3.5: Use RenderWithStores instead of Render)
+	// CRITICAL: Pass original template AST and path for component style aggregation
+	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint)
 
 	// CRITICAL: Generate x-data using transformer's alpineDataFormatter
 	// This function is not exported, so we need to call Transform to get the data scope
@@ -186,58 +520,6 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(finalHTML))
 }
 
-// extractFunctionsFromFence extracts function declarations from fence section content
-// Returns a map of function name -> function body
-//
-// Pattern: Regex Extraction Pattern [Load: 10]
-// Cognitive Load: 10 (regex compile: 2, find all: 3, extract names: 2, map construction: 3)
-func extractFunctionsFromFence(content string) map[string]string {
-	functions := make(map[string]string)
-
-	// Regex to match function declarations:
-	// function name(...) { ... }
-	// Handles nested braces correctly
-	funcRegex := regexp.MustCompile(`function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{`)
-
-	// Find all function declarations
-	matches := funcRegex.FindAllStringSubmatchIndex(content, -1)
-
-	for _, match := range matches {
-		// match[0], match[1] are the full match indices
-		// match[2], match[3] are the function name indices
-		funcStart := match[0]
-		nameStart := match[2]
-		nameEnd := match[3]
-
-		funcName := content[nameStart:nameEnd]
-
-		// Find the matching closing brace for this function
-		braceStart := match[1] // End of the initial match (right after opening {)
-		braceDepth := 1
-		braceEnd := braceStart
-
-		for braceEnd < len(content) && braceDepth > 0 {
-			if content[braceEnd] == '{' {
-				braceDepth++
-			} else if content[braceEnd] == '}' {
-				braceDepth--
-			}
-			braceEnd++
-		}
-
-		if braceDepth == 0 {
-			// Successfully found the full function
-			funcBody := content[funcStart:braceEnd]
-			functions[funcName] = funcBody
-			log.Printf("[extractFunctionsFromFence] Found function: %s (%d chars)", funcName, len(funcBody))
-		} else {
-			log.Printf("[extractFunctionsFromFence] WARNING: Could not find closing brace for function %s", funcName)
-		}
-	}
-
-	return functions
-}
-
 // buildXDataFromProps creates an Alpine.js x-data attribute value from props
 // This builds a JavaScript object literal (NOT JSON) to support functions
 //
@@ -288,15 +570,9 @@ func buildXDataFromProps(props map[string]interface{}) string {
 		case nil:
 			formattedValue = "null"
 		default:
-			// Complex types (arrays, objects) - marshal to JSON
-			jsonBytes, err := json.Marshal(v)
-			if err != nil {
-				// Fallback to string representation
-				escaped := escapeStringForJS(fmt.Sprintf("%v", v))
-				formattedValue = fmt.Sprintf(`'%s'`, escaped)
-			} else {
-				formattedValue = string(jsonBytes)
-			}
+			// Complex types (arrays, objects) - use transformer's formatter
+			// This correctly formats maps as JavaScript object literals, not JSON strings
+			formattedValue = transformer.FormatGoValueToJS(v)
 		}
 
 		// Build key:value pair for JavaScript object literal
@@ -361,18 +637,38 @@ func escapeXDataForAttr(value string) string {
 	return value
 }
 
-func registerComponents() {
-	// Register components with the transformer
-	componentDir := "examples/components"
-	files, err := os.ReadDir(componentDir)
+// registerComponents scans the components directory and registers each component
+// Now accepts storeRegistry to parse component fence sections with store imports
+// Also registers global layout components from layouts/global/
+//
+// Pattern: File Discovery Pattern with Store Integration [Load: 15]
+// Cognitive Load: 15 (read 2 dirs: 4, iterate: 2, read file: 2, parse: 2, fence parsing: 2, register: 3)
+func registerComponents(storeRegistry map[string]string) {
+	// Register regular components from layouts/components
+	componentDir := "layouts/components"
+	registerComponentsFromDir(componentDir, "../components/", storeRegistry)
+
+	// Register global layout components from layouts/global
+	globalDir := "layouts/global"
+	registerComponentsFromDir(globalDir, "../global/", storeRegistry)
+}
+
+// registerComponentsFromDir registers all components from a directory
+// Pattern: Component Registration Helper [Load: 12]
+func registerComponentsFromDir(dir string, pathPrefix string, storeRegistry map[string]string) {
+	files, err := os.ReadDir(dir)
 	if err != nil {
-		log.Fatalf("Failed to read component directory: %v", err)
+		log.Printf("Warning: Failed to read directory %s: %v", dir, err)
+		return
 	}
 
 	for _, file := range files {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".html") {
-			componentName := strings.TrimSuffix(file.Name(), ".html")
-			componentPath := fmt.Sprintf("%s/%s", componentDir, file.Name())
+			// Extract base name and capitalize first letter (matches Plenti/Svelte convention)
+			// e.g., "footer.html" -> "Footer", matching: import Footer from "./footer.html"
+			baseName := strings.TrimSuffix(file.Name(), ".html")
+			componentName := strings.ToUpper(baseName[:1]) + baseName[1:]
+			componentPath := fmt.Sprintf("%s/%s", dir, file.Name())
 			log.Printf("Registering component: %s from %s", componentName, componentPath)
 
 			// Read component file
@@ -387,17 +683,81 @@ func registerComponents() {
 				log.Fatalf("Error parsing component: %v", err)
 			}
 
+			// TASK 2.2 FIX: Only re-parse fence if component has store imports
+			// This preserves functions that were already parsed by ParseTemplate
+			for i, node := range componentAST.RootNodes {
+				if fence, ok := node.(*ast.FenceSection); ok {
+					// Only re-parse if component has store imports
+					if strings.Contains(fence.RawContent, "import store from") {
+						// Parse fence content with store registry to resolve imports
+						fenceWithStores := parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
+						// Replace the fence section in component AST
+						componentAST.RootNodes[i] = fenceWithStores
+						log.Printf("[registerComponents] Re-parsed fence with stores for %s (stores: %d, functions: %d)",
+							componentName, len(fenceWithStores.Stores), len(fenceWithStores.Functions))
+					} else {
+						// No store imports - keep the already-parsed fence with functions intact
+						log.Printf("[registerComponents] Preserved original fence for %s (functions: %d)",
+							componentName, len(fence.Functions))
+					}
+					break
+				}
+			}
+
 			// Extract props from the component template
 			componentProps := extractComponentProps(componentAST)
 
 			// Register the component with the transformer - both by name and by path
 			transformer.RegisterComponent(componentName, componentAST, componentProps)
 
-			// Also register with path for import resolution
-			pathWithPrefix := fmt.Sprintf("./components/%s.html", componentName)
+			// Also register with path prefix for import resolution (using lowercase filename)
+			pathWithPrefix := fmt.Sprintf("%s%s", pathPrefix, file.Name())
 			transformer.RegisterComponent(pathWithPrefix, componentAST, componentProps)
 		}
 	}
+}
+
+// registerStores scans the stores/ directory for .js files and loads them
+// Returns a map of store name (filename without .js) to store content
+//
+// Pattern: File Discovery Pattern [Load: 8]
+// Cognitive Load: 8 (read dir: 2, filter: 2, read files: 2, map building: 2)
+func registerStores() map[string]string {
+	stores := make(map[string]string)
+	storeDir := "stores"
+
+	// Read the stores directory (COGNITIVE LOAD RULE: wrapped error)
+	files, err := os.ReadDir(storeDir)
+	if err != nil {
+		// Directory not existing is not an error - just log and return empty map
+		log.Printf("Stores directory not found (this is OK): %s", storeDir)
+		return stores
+	}
+
+	// Process each .js file in the directory
+	for _, file := range files {
+		// Skip directories and non-.js files
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".js") {
+			continue
+		}
+
+		// Extract store name from filename (e.g., "auth.js" → "auth")
+		storeName := strings.TrimSuffix(file.Name(), ".js")
+		storePath := fmt.Sprintf("%s/%s", storeDir, file.Name())
+
+		// Read store file content (COGNITIVE LOAD RULE: wrapped error)
+		content, err := os.ReadFile(storePath)
+		if err != nil {
+			log.Printf("WARNING: Failed to read store file %s: %v", storePath, err)
+			continue
+		}
+
+		// Store the content
+		stores[storeName] = string(content)
+		log.Printf("Registered store: %s from %s", storeName, storePath)
+	}
+
+	return stores
 }
 
 func extractComponentProps(template *ast.Template) []string {
@@ -441,11 +801,13 @@ func extractComponentProps(template *ast.Template) []string {
 					}
 				}
 			}
+			break
 		}
 	}
 
 	return props
 }
+
 
 // convertJSToJSON converts JavaScript object syntax to valid JSON
 // Handles unquoted keys: {name: "value"} → {"name": "value"}
@@ -472,13 +834,6 @@ func parseValue(value string) interface{} {
 	// Handle empty values
 	if value == "" {
 		return ""
-	}
-
-	// CRITICAL: Check if it's a function BEFORE trying JSON parsing
-	// Functions start with "function " or contain "=>"
-	if strings.HasPrefix(value, "function ") || strings.Contains(value, "=>") {
-		// Return the function as-is (as a string, but buildXDataFromProps will detect it)
-		return value
 	}
 
 	// CRITICAL FIX: Convert JavaScript object syntax to JSON before unmarshaling
@@ -519,11 +874,11 @@ func parseValue(value string) interface{} {
 	}
 
 	// Handle quoted strings - remove quotes
-	if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
-		(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
-		return value[1 : len(value)-1]
+	if (strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`)) ||
+		(strings.HasPrefix(value, `'`) && strings.HasSuffix(value, `'`)) {
+		value = value[1 : len(value)-1]
 	}
 
-	// Default: return as string
+	// Default to string
 	return value
 }

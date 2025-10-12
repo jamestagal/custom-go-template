@@ -23,16 +23,23 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 	// Find fence section if it exists
 	fence := FindFenceSection(template.RootNodes)
 	if fence != nil {
+		// Initialize store tracking with fence stores (Task 2.4)
+		InitStoreTracking(fence.Stores)
+		log.Printf("TransformAST: Initialized store tracking with %d store definitions", len(fence.Stores))
+
 		// Collect data from fence section
 		CollectFenceData(fence, dataScope)
 		log.Printf("TransformAST: Collected fence data, data scope now: %v", dataScope)
+	} else {
+		// No fence section, initialize empty store tracking
+		InitStoreTracking(map[string]string{})
 	}
 
 	// Start the transformation process
 	log.Printf("TransformAST: Starting node transformation")
 
-	// Transform the root nodes
-	transformedNodes := transformNodes(template.RootNodes, dataScope, true)
+	// Transform the root nodes (not in literal context)
+	transformedNodes := transformNodes(template.RootNodes, dataScope, true, false)
 
 	// Create a new template with the transformed nodes
 	transformedTemplate := &ast.Template{
@@ -50,8 +57,17 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 
 // The transformTextWithExpressions function is already implemented in expressions.go
 
+// isLiteralContentElement checks if an element's content should be treated as literal (not transformed)
+// Elements like <pre>, <code>, <textarea> should display their content as-is
+// Cognitive Load: 3 (simple string comparison)
+func isLiteralContentElement(tagName string) bool {
+	tag := strings.ToLower(tagName)
+	return tag == "pre" || tag == "code" || tag == "textarea" || tag == "script" || tag == "style"
+}
+
 // transformNodes recursively transforms AST nodes to their Alpine.js equivalents
-func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapper bool) []ast.Node {
+// inLiteralContext: when true, text content is not transformed (for <pre>, <code>, etc.)
+func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapper bool, inLiteralContext bool) []ast.Node {
 	var transformedNodes []ast.Node
 	var hasDataScope bool
 
@@ -64,8 +80,11 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 	for _, node := range nodes {
 		switch n := node.(type) {
 		case *ast.TextNode:
-			// Check if the text contains double-curly braces or single braces
-			if strings.Contains(n.Content, "{") || strings.Contains(n.Content, "{") {
+			// CRITICAL FIX: Skip transformation if we're in a literal content context
+			if inLiteralContext {
+				// Pass through as-is without any transformation
+				transformedNodes = append(transformedNodes, n)
+			} else if strings.Contains(n.Content, "{") || strings.Contains(n.Content, "{") {
 				// Transform text nodes with expressions
 				textNodes := transformTextWithExpressions(n.Content, dataScope)
 				transformedNodes = append(transformedNodes, textNodes...)
@@ -78,15 +97,19 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			// Create a copy of the element to modify
 			element := *n
 
-			// Transform attributes
+			// Transform attributes (now handles both regular and store expressions)
 			element.Attributes = transformAttributes(element.Attributes, dataScope)
 
 			// Create a child scope for the element's children
 			// This ensures variables defined in child elements don't leak to siblings
 			childScope := CreateChildScope(dataScope)
 
+			// CRITICAL FIX: Check if this element requires literal content handling
+			childInLiteralContext := isLiteralContentElement(element.TagName)
+
 			// Recursively transform children with the child scope
-			element.Children = transformNodes(element.Children, childScope, false)
+			// Pass the literal context flag to children
+			element.Children = transformNodes(element.Children, childScope, false, childInLiteralContext)
 
 			// Merge any new variables back to parent scope
 			MergeScopes(dataScope, childScope)
@@ -139,6 +162,15 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 				SelfClosing: false,
 			})
 
+		case *ast.StoreExpressionNode:
+			// Transform store expression nodes using the new dedicated function
+			// Syntax: {$storeName.property} -> <span x-text="$store.storeName.property"></span>
+			log.Printf("transformNodes: Transforming StoreExpression node: %s", n.String())
+
+			// Use the new transformStoreExpressionInText function for text context
+			storeNodes := transformStoreExpressionInText(n, dataScope)
+			transformedNodes = append(transformedNodes, storeNodes...)
+
 		case *ast.ComponentNode:
 			// Transform component nodes using the recursive component transformation
 			log.Printf("transformNodes: Transforming Component node %s", n.Name)
@@ -151,6 +183,12 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			log.Printf("transformNodes: Transforming DynamicComponent node: path=%s", n.PathExpression)
 			dynComponentNodes := transformDynamicComponent(n, dataScope)
 			transformedNodes = append(transformedNodes, dynComponentNodes...)
+
+		case *ast.DynamicComponentByNameNode:
+			// Transform dynamic component by name nodes (<Component:dynamic> syntax)
+			log.Printf("transformNodes: Transforming DynamicComponentByName node: name=%s", n.NameExpression)
+			dynByNameNodes := TransformDynamicComponentByName(n, dataScope)
+			transformedNodes = append(transformedNodes, dynByNameNodes...)
 
 		case *ast.StyleSection, *ast.ScriptSection:
 			// Pass through style and script sections unchanged
@@ -183,6 +221,16 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 
 	// Return the transformed nodes without wrapper
 	return transformedNodes
+}
+
+// buildAlpineStoreExpression converts a StoreExpressionNode to Alpine.js $store syntax
+// Input: {$storeName.property} -> Output: $store.storeName.property
+// Cognitive Load: 4 (simple string formatting)
+func buildAlpineStoreExpression(node *ast.StoreExpressionNode) string {
+	if node.Property == "" {
+		return fmt.Sprintf("$store.%s", node.StoreName)
+	}
+	return fmt.Sprintf("$store.%s.%s", node.StoreName, node.Property)
 }
 
 // needsAlpineWrapper determines if nodes need Alpine.js data wrapper
@@ -336,7 +384,11 @@ var dynamicAttrPattern = regexp.MustCompile(`\{([^}]+)\}`)
 
 // transformAttributes transforms HTML attributes, detecting dynamic {expression} patterns
 // and converting them to Alpine.js :bind syntax
+// Now also handles store expressions: {$storeName.property}
 func transformAttributes(attributes []ast.Attribute, dataScope map[string]any) []ast.Attribute {
+	// First, check for store expressions and transform them
+	attributes = transformAttributesWithStores(attributes, dataScope)
+
 	transformedAttributes := make([]ast.Attribute, 0, len(attributes))
 
 	for _, attr := range attributes {

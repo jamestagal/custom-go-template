@@ -1,0 +1,16 @@
+{
+  "components": [
+    {
+      "name": "LoginStatus",
+      "fields": {}
+    },
+    {
+      "name": "CartBadge",
+      "fields": {}
+    },
+    {
+      "name": "ThemeToggle",
+      "fields": {}
+    }
+  ]
+}

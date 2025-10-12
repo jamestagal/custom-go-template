@@ -1,0 +1,18 @@
+{
+  "components": [
+    {
+      "name": "hero",
+      "fields": {
+        "title": "About Us",
+        "description": "Learn more about our Go template engine"
+      }
+    },
+    {
+      "name": "team",
+      "fields": {
+        "author": "Jim Fisk",
+        "contact": "hello@example.com"
+      }
+    }
+  ]
+}

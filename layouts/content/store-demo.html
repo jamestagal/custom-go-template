@@ -1,0 +1,595 @@
+---
+import LoginStatus from '../components/LoginStatus.html'
+import CartBadge from '../components/CartBadge.html'
+import ThemeToggle from '../components/ThemeToggle.html'
+
+import store from './stores/auth.js'
+import store from './stores/cart.js'
+import store from './stores/theme.js'
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Global Store System - Component Demo</title>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+  </head>
+  <body
+    :style="`background-color: ${$store.theme.getCurrentColors().background}; color: ${$store.theme.getCurrentColors().text}; --code-bg: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#5a7ec5'}; transition: all 0.3s ease;`"
+  >
+    <div class="container">
+      <h1 :style="`color: ${$store.theme.getCurrentColors().text};`">
+        Global Store System - Component Demo
+      </h1>
+      <p
+        class="subtitle"
+        :style="`color: ${$store.theme.getCurrentColors().secondary};`"
+      >
+        Reusable components demonstrating the Global Store System
+      </p>
+
+      <!-- Header with Store Components -->
+      <div
+        class="header"
+        :style="`background: ${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+      >
+        <LoginStatus />
+        <CartBadge />
+        <ThemeToggle />
+      </div>
+
+      <!-- Interactive Demo Section -->
+      <div
+        class="demo-section"
+        :style="`background: ${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+      >
+        <h2>🧪 Try the Interactive Demo</h2>
+        <p>
+          These buttons modify the stores, and all components above update
+          automatically:
+        </p>
+
+        <!-- Auth Actions -->
+        <div
+          class="action-group"
+          :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+        >
+          <h3>Authentication Actions</h3>
+          <button @click="$store.auth.login()" class="btn btn-primary">
+            Login as Test User
+          </button>
+          <button @click="$store.auth.logout()" class="btn btn-secondary">
+            Logout
+          </button>
+        </div>
+
+        <!-- Cart Actions -->
+        <div
+          class="action-group"
+          :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+        >
+          <h3>Shopping Cart Actions</h3>
+          <button
+            @click="$store.cart.addItem({ name: 'Widget', price: 9.99 })"
+            class="btn btn-success"
+          >
+            Add Widget ($9.99)
+          </button>
+          <button
+            @click="$store.cart.addItem({ name: 'Gadget', price: 19.99 })"
+            class="btn btn-success"
+          >
+            Add Gadget ($19.99)
+          </button>
+          <button
+            @click="$store.cart.addItem({ name: 'Doohickey', price: 29.99 })"
+            class="btn btn-success"
+          >
+            Add Doohickey ($29.99)
+          </button>
+          <button @click="$store.cart.clear()" class="btn btn-danger">
+            Clear Cart
+          </button>
+        </div>
+
+        <!-- Theme Actions -->
+        <div
+          class="action-group"
+          :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+        >
+          <h3>Theme Actions</h3>
+          <p class="note">
+            The ThemeToggle component above provides its own buttons, but you
+            can also control the theme from anywhere in your app:
+          </p>
+          <button @click="$store.theme.setLight()" class="btn btn-light">
+            Set Light Mode
+          </button>
+          <button @click="$store.theme.setDark()" class="btn btn-dark">
+            Set Dark Mode
+          </button>
+          <div
+            style="
+              margin-top: 1rem;
+              padding: 1rem;
+              background: rgba(59, 130, 246, 0.1);
+              border-radius: 6px;
+              border-left: 4px solid #3b82f6;
+            "
+          >
+            <strong>Visual Feedback Test:</strong>
+            <p style="margin-top: 0.5rem; font-size: 0.95rem">
+              Click the theme buttons above and watch the entire page change
+              colors! Current mode: <strong x-text="$store.theme.mode"></strong>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Store State Display -->
+      <div
+        class="state-section"
+        :style="`background: ${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+      >
+        <h2>📊 Current Store State</h2>
+        <p>Real-time view of the store data:</p>
+
+        <div class="state-grid">
+          <!-- Auth Store State -->
+          <div
+            class="state-card store-card-hover"
+            :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+          >
+            <h3>🔐 Auth Store</h3>
+            {if $auth.isLoggedIn}
+            <p><strong>Status:</strong> ✅ Logged In</p>
+            <p><strong>User:</strong> {$auth.user.name}</p>
+            <p><strong>Email:</strong> {$auth.user.email}</p>
+            {else}
+            <p><strong>Status:</strong> ❌ Logged Out</p>
+            <p><em>Please log in to access your account</em></p>
+            {/if}
+            <small style="color: #6b7280">💡 Hover to see store object</small>
+            <div class="tech-details">
+              <pre
+                class="state-display"
+              >isLoggedIn: <span x-text="$store.auth.isLoggedIn" style="color: #10b981;"></span>
+user: <span x-text="$store.auth.user ? $store.auth.user.name : 'null'" style="color: #10b981;"></span></pre>
+            </div>
+          </div>
+
+          <!-- Cart Store State -->
+          <div
+            class="state-card store-card-hover"
+            :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+          >
+            <h3>🛒 Cart Store</h3>
+            {if $cart.items.length > 0}
+            <p><strong>Items:</strong> {$cart.items.length}</p>
+            <p><strong>Total:</strong> ${$cart.formattedTotal}</p>
+            <div class="cart-items-list">
+              <strong>Cart Contents:</strong>
+              <ul>
+                {for item in $cart.items}
+                <li>{item.name} - ${item.price}</li>
+                {/for}
+              </ul>
+            </div>
+            {else}
+            <p><strong>Items:</strong> 0</p>
+            <p><strong>Total:</strong> $0.00</p>
+            <p><em>Cart is empty</em></p>
+            {/if}
+            <small style="color: #6b7280">💡 Hover to see store object</small>
+            <div class="tech-details">
+              <pre
+                class="state-display"
+              >items: <span x-text="'[' + $store.cart.items.length + ' items]'" style="color: #10b981;"></span>
+total: $<span x-text="$store.cart.formattedTotal" style="color: #10b981;"></span></pre>
+            </div>
+          </div>
+
+          <!-- Theme Store State -->
+          <div
+            class="state-card store-card-hover"
+            :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+          >
+            <h3>🎨 Theme Store</h3>
+            {if $theme.mode === 'light'}
+            <p><strong>Mode:</strong> ☀️ Light</p>
+            {else}
+            <p><strong>Mode:</strong> 🌙 Dark</p>
+            {/if}
+            <p>
+              <strong>Background:</strong>
+              <span x-text="$store.theme.getCurrentColors().background"></span>
+            </p>
+            <p>
+              <strong>Text Color:</strong>
+              <span x-text="$store.theme.getCurrentColors().text"></span>
+            </p>
+            <small style="color: #6b7280">💡 Hover to see store object</small>
+            <div class="tech-details">
+              <pre
+                class="state-display"
+              >mode: "<span x-text="$store.theme.mode" style="color: #10b981;"></span>"
+background: "<span x-text="$store.theme.getCurrentColors().background" style="color: #10b981;"></span>"
+text: "<span x-text="$store.theme.getCurrentColors().text" style="color: #10b981;"></span>"</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documentation Section -->
+      <div
+        class="docs-section"
+        :style="`background: ${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+      >
+        <h2>📚 How It Works</h2>
+
+        <div
+          class="doc-card"
+          :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+        >
+          <h3>1. Store Files</h3>
+          <p>Stores are defined in <code>stores/</code> directory:</p>
+          <ul>
+            <li><code>stores/auth.js</code> - Authentication state</li>
+            <li><code>stores/cart.js</code> - Shopping cart state</li>
+            <li><code>stores/theme.js</code> - Theme preferences</li>
+          </ul>
+        </div>
+
+        <div
+          class="doc-card"
+          :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+        >
+          <h3>2. Components Reference Stores</h3>
+          <p>
+            Components declare which stores they use in their fence section:
+          </p>
+          <pre class="code-display">
+---
+import store from './stores/auth.js'
+---
+
+{if $auth.isLoggedIn}
+  Welcome, {$auth.user.name}!
+{/if}</pre
+          >
+        </div>
+
+        <div
+          class="doc-card"
+          :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+        >
+          <h3>3. Automatic Reactivity</h3>
+          <p>When any component modifies a store:</p>
+          <ol>
+            <li>Alpine.js detects the change</li>
+            <li>All components using that store automatically update</li>
+            <li>No manual event handling needed!</li>
+          </ol>
+        </div>
+
+        <div
+          class="doc-card"
+          :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
+        >
+          <h3>4. Global Scope</h3>
+          <p>Access stores anywhere with <code>$store.storeName</code>:</p>
+          <ul>
+            <li><code>@click="$store.auth.login()"</code> - Call methods</li>
+            <li><code>{$auth.isLoggedIn}</code> - Read properties</li>
+            <li>
+              <code>{if $cart.items.length > 0}</code> - Use in conditionals
+            </li>
+            <li><code>{for item in $cart.items}</code> - Iterate arrays</li>
+          </ul>
+        </div>
+
+        <div
+          class="doc-card"
+          :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'}; border-left: 4px solid #10b981;`"
+        >
+          <h3 style="color: #10b981">5. Theme Reactivity</h3>
+          <p>
+            Notice how all elements on this page use
+            <code>:style</code> bindings:
+          </p>
+          <pre class="code-display">
+:style="&#96;background: &#36;&#123;&#36;store.theme.getCurrentColors().background&#125;;
+         color: &#36;&#123;&#36;store.theme.getCurrentColors().text&#125;;&#96;"</pre
+          >
+          <p style="margin-top: 0.5rem">
+            This makes the entire page reactive to theme changes!
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+      Ubuntu, Cantarell, sans-serif;
+    line-height: 1.6;
+    padding: 2rem;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .subtitle {
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.75rem;
+    margin: 2rem 0 1rem;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Header with components */
+  .header {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid;
+    transition: all 0.3s ease;
+  }
+
+  /* Demo Section */
+  .demo-section {
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    border: 1px solid;
+    transition: all 0.3s ease;
+  }
+
+  .action-group {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid;
+    transition: all 0.3s ease;
+  }
+
+  .action-group h3 {
+    margin-bottom: 1rem;
+  }
+
+  .note {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-bottom: 1rem;
+    font-style: italic;
+  }
+
+  /* Buttons */
+  .btn {
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .btn-primary {
+    background: #2563eb;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+  }
+
+  .btn-secondary {
+    background: #6b7280;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #4b5563;
+  }
+
+  .btn-success {
+    background: #059669;
+    color: white;
+  }
+
+  .btn-success:hover {
+    background: #047857;
+  }
+
+  .btn-danger {
+    background: #dc2626;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #b91c1c;
+  }
+
+  .btn-light {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+  }
+
+  .btn-light:hover {
+    background: #e5e7eb;
+  }
+
+  .btn-dark {
+    background: #1f2937;
+    color: white;
+  }
+
+  .btn-dark:hover {
+    background: #111827;
+  }
+
+  /* State Section */
+  .state-section {
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    border: 1px solid;
+    transition: all 0.3s ease;
+  }
+
+  .state-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .state-card {
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid;
+    transition: all 0.3s ease;
+  }
+
+  .state-card h3 {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+
+  .state-display {
+    background: #1f2937;
+    color: #10b981;
+    padding: 1rem;
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 0.9rem;
+    overflow-x: auto;
+  }
+
+  /* Hover state for technical details */
+  .tech-details {
+    margin-top: 1rem;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.3s ease, max-height 0.3s ease;
+  }
+
+  .store-card-hover:hover .tech-details {
+    opacity: 1;
+    max-height: 200px;
+  }
+
+  .tech-details small {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-style: italic;
+  }
+
+  .cart-items-list {
+    font-size: 0.9rem;
+    margin-top: 1rem;
+  }
+
+  .cart-items-list ul {
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+  }
+
+  .cart-items-list li {
+    margin-bottom: 0.25rem;
+  }
+
+  /* Documentation Section */
+  .docs-section {
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid;
+    transition: all 0.3s ease;
+  }
+
+  .doc-card {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #2563eb;
+    border: 1px solid;
+    transition: all 0.3s ease;
+  }
+
+  .doc-card h3 {
+    margin-bottom: 0.75rem;
+    color: #2563eb;
+  }
+
+  .doc-card p {
+    margin-bottom: 0.75rem;
+  }
+
+  .doc-card ul,
+  .doc-card ol {
+    margin-left: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .doc-card li {
+    margin-bottom: 0.5rem;
+  }
+
+  .code-display {
+    background: #1f2937;
+    color: #10b981;
+    padding: 1rem;
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 0.85rem;
+    overflow-x: auto;
+    margin-top: 0.5rem;
+  }
+
+  code {
+    background: var(--code-bg);
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-family: "Courier New", monospace;
+    font-size: 0.9em;
+  }
+</style>

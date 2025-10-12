@@ -1,0 +1,178 @@
+---
+prop title = "Store System Test"
+
+store auth = {
+  isLoggedIn: false,
+  user: {
+    name: "Guest",
+    email: ""
+  },
+  login() {
+    this.isLoggedIn = true;
+    this.user.name = "John Doe";
+    this.user.email = "john@example.com";
+  },
+  logout() {
+    this.isLoggedIn = false;
+    this.user.name = "Guest";
+    this.user.email = "";
+  }
+}
+
+store cart = {
+  items: [],
+  total: 0,
+  itemCount: 0,
+  addItem(name, price) {
+    this.items.push({ name, price });
+    this.total += price;
+    this.itemCount = this.items.length;
+  },
+  clear() {
+    this.items = [];
+    this.total = 0;
+    this.itemCount = 0;
+  }
+}
+
+store theme = {
+  mode: "light",
+  toggle() {
+    this.mode = this.mode === "light" ? "dark" : "light";
+  }
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title}</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+    .section {
+      background: #f5f5f5;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border-radius: 8px;
+    }
+    .section h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    button {
+      background: #0066cc;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 0.5rem;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    .user-info {
+      background: white;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-top: 1rem;
+    }
+    .cart-item {
+      background: white;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      border-radius: 4px;
+    }
+    .status {
+      font-weight: bold;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+    }
+    .logged-in { background: #d4edda; color: #155724; }
+    .logged-out { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h1>{title}</h1>
+  <p>Testing Task 2.1: Store Expression Transformer</p>
+
+  <!-- Test 1: Store expressions in text content -->
+  <div class="section">
+    <h2>Test 1: Text Content with Store Expressions</h2>
+    <p>Auth Status: <span class="status">{$auth.isLoggedIn}</span></p>
+    <p>User Name: {$auth.user.name}</p>
+    <p>User Email: {$auth.user.email}</p>
+    <p>Cart Items: {$cart.itemCount}</p>
+    <p>Cart Total: ${$cart.total}</p>
+    <p>Current Theme: {$theme.mode}</p>
+  </div>
+
+  <!-- Test 2: Store expressions in attributes (Alpine directives) -->
+  <div class="section">
+    <h2>Test 2: Store Expressions in Attributes</h2>
+    <button @click="$store.auth.login()">Login</button>
+    <button @click="$store.auth.logout()">Logout</button>
+
+    <div class="user-info">
+      <p><strong>Logged In:</strong> <span>{$auth.isLoggedIn}</span></p>
+      <p><strong>Name:</strong> {$auth.user.name}</p>
+      <p><strong>Email:</strong> {$auth.user.email}</p>
+    </div>
+  </div>
+
+  <!-- Test 3: Cart functionality -->
+  <div class="section">
+    <h2>Test 3: Cart Store</h2>
+    <button @click="$store.cart.addItem('Widget', 9.99)">Add Widget ($9.99)</button>
+    <button @click="$store.cart.addItem('Gadget', 19.99)">Add Gadget ($19.99)</button>
+    <button @click="$store.cart.addItem('Doohickey', 29.99)">Add Doohickey ($29.99)</button>
+    <button @click="$store.cart.clear()">Clear Cart</button>
+
+    <div style="margin-top: 1rem;">
+      <p><strong>Items in cart:</strong> {$cart.itemCount}</p>
+      <p><strong>Total:</strong> ${$cart.total}</p>
+    </div>
+  </div>
+
+  <!-- Test 4: Theme toggle -->
+  <div class="section">
+    <h2>Test 4: Theme Store</h2>
+    <button @click="$store.theme.toggle()">Toggle Theme</button>
+    <p>Current theme mode: <strong>{$theme.mode}</strong></p>
+  </div>
+
+  <!-- Test 5: Multiple stores in one expression -->
+  <div class="section">
+    <h2>Test 5: Combined Store Data</h2>
+    <p>User {$auth.user.name} has {$cart.itemCount} items in cart using {$theme.mode} theme</p>
+  </div>
+
+  <!-- Debug Info -->
+  <div class="section" style="background: #fff3cd;">
+    <h2>Debug Info</h2>
+    <p><strong>What we're testing:</strong></p>
+    <ul>
+      <li>Store definitions in fence section parse correctly</li>
+      <li>Store expressions like {$auth.isLoggedIn} transform to Alpine.js syntax</li>
+      <li>Nested properties like {$auth.user.name} work</li>
+      <li>Store methods can be called from Alpine directives</li>
+    </ul>
+    <p><strong>Expected behavior:</strong></p>
+    <ul>
+      <li>Initial state shows "false", "Guest", empty cart</li>
+      <li>Login button updates auth store and displays user info</li>
+      <li>Add item buttons update cart count and total</li>
+      <li>Theme toggle switches between "light" and "dark"</li>
+    </ul>
+  </div>
+</body>
+</html>

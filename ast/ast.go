@@ -14,10 +14,13 @@ func (t *Template) NodeType() string { return "Template" }
 
 // FenceSection represents the fence section of a template
 type FenceSection struct {
-	Imports    []ImportNode
-	Props      []PropNode
-	Variables  []VariableNode // Assuming VariableNode exists or will be added
-	RawContent string         // Store raw JS content for now
+	Imports       []ImportNode
+	Props         []PropNode
+	ExportedProps []string           // Prop names that should come from content JSON (Svelte-style export let)
+	Variables     []VariableNode     // Assuming VariableNode exists or will be added
+	Functions     []FunctionNode     // Function declarations in the fence
+	Stores        map[string]string  // Store definitions: name -> object literal as string
+	RawContent    string             // Store raw JS content for now
 }
 
 func (f *FenceSection) NodeType() string { return "FenceSection" }
@@ -61,6 +64,17 @@ type VariableNode struct {
 
 func (v *VariableNode) NodeType() string { return "Variable" }
 
+// FunctionNode represents a function declaration in the fence
+// Supports both regular functions and getters
+type FunctionNode struct {
+	Name     string // Function name
+	Params   string // Function parameters as string (e.g., "str" or "role, fallback")
+	Body     string // Function body as string (complete function definition)
+	IsGetter bool   // true for "get name() {}", false for "function name() {}"
+}
+
+func (f *FunctionNode) NodeType() string { return "Function" }
+
 // Element represents an HTML element
 type Element struct {
 	TagName     string
@@ -102,6 +116,23 @@ type ExpressionNode struct {
 }
 
 func (e *ExpressionNode) NodeType() string { return "Expression" }
+
+// StoreExpressionNode represents a store reference like $storeName.property
+// This is used by the Global Store System for Alpine.js $store integration
+type StoreExpressionNode struct {
+	StoreName string // Name of the store (e.g., "auth", "cart")
+	Property  string // Property path (e.g., "user.name", can be empty for just $storeName)
+}
+
+func (s *StoreExpressionNode) NodeType() string { return "StoreExpression" }
+
+// String provides a debug representation of StoreExpressionNode
+func (s *StoreExpressionNode) String() string {
+	if s.Property == "" {
+		return "$" + s.StoreName
+	}
+	return "$" + s.StoreName + "." + s.Property
+}
 
 // Conditional represents an if/else if/else structure
 type Conditional struct {
@@ -150,12 +181,28 @@ func (d *DynamicComponentNode) String() string {
 	return "DynamicComponent{Path: " + d.PathExpression + ", Props: " + string(rune(len(d.Props))) + "}"
 }
 
+// DynamicComponentByNameNode represents <Component:dynamic name={expr} {...spread} prop={val} />
+// This enables Plenti-style component iteration where components are rendered dynamically by name.
+// Example: <Component:dynamic name={component.name} {...component.fields} allContent={allContent} />
+type DynamicComponentByNameNode struct {
+	NameExpression string          // Expression that evaluates to component name (e.g., "component.name")
+	Props          []ComponentProp // Regular props (name={value})
+	SpreadProps    []string        // Spread expressions ({...expr})
+	SelfClosing    bool            // true if ends with />
+}
+
+func (d *DynamicComponentByNameNode) NodeType() string {
+	return "DynamicComponentByName"
+}
+
 // ComponentProp represents a prop passed to a component
 type ComponentProp struct {
 	Name        string
 	Value       string // Store expression string or static value string
 	IsShorthand bool   // True for {prop} shorthand
 	IsDynamic   bool   // True for prop={expression}
+	IsSpread    bool   // True if this is a spread prop {...expr}
+	SpreadExpr  string // Expression for spread (e.g., "component.fields")
 }
 
 // --- Simple Directive Nodes ---
