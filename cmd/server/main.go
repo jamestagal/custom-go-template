@@ -928,9 +928,10 @@ func escapeXDataForAttr(value string) string {
 // registerComponents scans the components directory and registers each component
 // Now accepts storeRegistry to parse component fence sections with store imports
 // Also registers global layout components from layouts/global/
+// UPDATED: Now also registers content layouts from layouts/content/
 //
 // Pattern: File Discovery Pattern with Store Integration [Load: 15]
-// Cognitive Load: 15 (read 2 dirs: 4, iterate: 2, read file: 2, parse: 2, fence parsing: 2, register: 3)
+// Cognitive Load: 15 (read 3 dirs: 6, iterate: 2, read file: 2, parse: 2, fence parsing: 2, register: 3)
 func registerComponents(storeRegistry map[string]string) {
 	// Register regular components from layouts/components
 	componentDir := "layouts/components"
@@ -939,6 +940,10 @@ func registerComponents(storeRegistry map[string]string) {
 	// Register global layout components from layouts/global
 	globalDir := "layouts/global"
 	registerComponentsFromDir(globalDir, "../global/", storeRegistry)
+
+	// FIXED: Register content layouts from layouts/content (for _index, pages, etc.)
+	contentDir := "layouts/content"
+	registerComponentsFromDir(contentDir, "../content/", storeRegistry)
 }
 
 // registerComponentsFromDir registers all components from a directory
