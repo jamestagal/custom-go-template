@@ -2,6 +2,12 @@
 <!-- Root HTML Wrapper - Wraps all pages with global structure -->
 <!-- This is equivalent to Plenti's html.svelte -->
 
+<!-- Import global components (like Plenti's html.svelte) -->
+import Head from './head.html'
+import Nav from './nav.html'
+import Header from './header.html'
+import Footer from './footer.html'
+
 <!-- Props received from Plenti build system / Go server -->
 export let content, layout, allContent, allLayouts, env, user, shadowContent
 
