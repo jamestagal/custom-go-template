@@ -110,7 +110,7 @@ func main() {
 }
 
 // serveStaticFile handles serving static files from organized asset directories
-// Routes: /scripts/* → ./scripts/, /styles/* → ./styles/, /images/* → ./images/, /* → ./public/
+// Routes: /scripts/* → ./scripts/, /styles/* → ./styles/, /images/* → ./images/, /static/* → ./static/, /* → ./public/
 func serveStaticFile(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	var filePath string
@@ -122,6 +122,8 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/styles/"):
 		filePath = "." + path
 	case strings.HasPrefix(path, "/images/"):
+		filePath = "." + path
+	case strings.HasPrefix(path, "/static/"):
 		filePath = "." + path
 	default:
 		// Everything else goes to public directory
