@@ -29,7 +29,7 @@
 
 - [ ] 3. Update Route Handlers to Use Wrapper
   - [ ] 3.1 Write tests for all updated routes
-  - [ ] 3.2 Update "/" route to use renderWithWrapper("_index", w, r)
+  - [x] 3.2 Update "/" route to use renderWithWrapper("_index", w, r) - ✅ Complete
   - [ ] 3.3 Update "/comprehensive" route to use wrapper
   - [ ] 3.4 Update "/store-demo" route to use wrapper
   - [ ] 3.5 Update all remaining content routes
