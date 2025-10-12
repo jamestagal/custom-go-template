@@ -68,8 +68,11 @@ func main() {
 			return
 		}
 
-		// Render home page with export let content injection
-		renderTemplate("layouts/content/_index.html", w, r)
+		// NEW: Render home page with wrapper (Nav + Content + Footer)
+		if err := renderWithWrapper("_index", w, r); err != nil {
+			log.Printf("Error rendering home page: %v", err)
+			http.Error(w, "Failed to render page", http.StatusInternalServerError)
+		}
 	})
 
 	// Add comprehensive-simple page route (WORKING - no multi-line vars)
@@ -248,6 +251,291 @@ func getAllContent() map[string]interface{} {
 
 	log.Printf("getAllContent: Loaded %d content files", len(result))
 	return result
+}
+
+// renderWithWrapper renders a page with the html.html wrapper (Nav + Content + Footer)
+// This is the new unified rendering function that wraps all pages.
+//
+// Pattern: Wrapper Pattern with Props Injection [Load: 18]
+// Cognitive Load: 18 (content loading: 3, allContent: 3, allLayouts: 3, props building: 3, template rendering: 6)
+func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request) error {
+	log.Printf("[renderWithWrapper] Starting wrapper render for layout: %s, route: %s", layoutName, r.URL.Path)
+
+	// Step 1: Load content for this route (COGNITIVE LOAD RULE: wrapped error)
+	routePath := r.URL.Path
+	contentData, err := loadContentWithCache(routePath)
+	if err != nil {
+		// Content loading failure is not fatal - log warning and continue
+		log.Printf("[renderWithWrapper] Warning: failed to load content for route %s: %v", routePath, err)
+		contentData = make(map[string]interface{}) // Empty content
+	} else if len(contentData) > 0 {
+		log.Printf("[renderWithWrapper] Loaded content for route %s: %d top-level keys", routePath, len(contentData))
+	}
+
+	// Step 2: Generate allContent list (all available content files)
+	allContent := getAllContent()
+	log.Printf("[renderWithWrapper] Generated allContent: %d files", len(allContent))
+
+	// Step 3: Generate allLayouts list (all available layout components)
+	allLayoutsMap := transformer.GetAllComponentNames()
+	allLayouts := make([]string, 0, len(allLayoutsMap))
+	for name := range allLayoutsMap {
+		allLayouts = append(allLayouts, name)
+	}
+	sort.Strings(allLayouts) // Consistent ordering
+	log.Printf("[renderWithWrapper] Generated allLayouts: %d components", len(allLayouts))
+
+	// Step 4: Extract content.fields for wrapper to pass to dynamic component
+	// This handles the Plenti collection type structure
+	var contentFields map[string]interface{}
+	if loader.IsCollectionType(contentData) {
+		// For collection types, extract fields from first component
+		if componentsRaw, ok := contentData["components"]; ok {
+			if components, ok := componentsRaw.([]interface{}); ok && len(components) > 0 {
+				if firstComp, ok := components[0].(map[string]interface{}); ok {
+					if fields, ok := firstComp["fields"].(map[string]interface{}); ok {
+						contentFields = fields
+						log.Printf("[renderWithWrapper] Extracted fields from first component: %d fields", len(fields))
+					}
+				}
+			}
+		}
+	} else {
+		// For single type, use all content as fields
+		contentFields = contentData
+		log.Printf("[renderWithWrapper] Using full content as fields: %d keys", len(contentFields))
+	}
+
+	// If no fields extracted, use empty map
+	if contentFields == nil {
+		contentFields = make(map[string]interface{})
+	}
+
+	// Step 5: Build props map for wrapper
+	// The wrapper expects these props to pass to Component:dynamic
+	props := map[string]interface{}{
+		"layout":      layoutName,      // Name of the layout to render (e.g., "_index")
+		"content":     contentData,     // Full content object
+		"allContent":  allContent,      // All site content
+		"allLayouts":  allLayouts,      // All available layouts
+		"env":         make(map[string]interface{}), // Environment vars (TODO: populate if needed)
+		"user":        make(map[string]interface{}), // User data (TODO: populate if needed)
+		"shadowContent": make(map[string]interface{}), // Shadow content (TODO: populate if needed)
+	}
+
+	// Add content.fields as a separate prop for easier access
+	if len(contentFields) > 0 {
+		// Create a nested content structure with fields
+		contentWithFields := map[string]interface{}{
+			"fields": contentFields,
+		}
+		// Merge in other top-level content keys (like components)
+		for key, val := range contentData {
+			if key != "fields" {
+				contentWithFields[key] = val
+			}
+		}
+		props["content"] = contentWithFields
+	}
+
+	log.Printf("[renderWithWrapper] Built props map with %d keys", len(props))
+	log.Printf("[renderWithWrapper] Props keys: %v", getKeys(props))
+
+	// Step 6: Call renderTemplate with html.html wrapper and props
+	// We need to modify renderTemplate to accept props, so we'll call it directly
+	wrapperPath := "layouts/global/html.html"
+	log.Printf("[renderWithWrapper] Rendering wrapper template: %s", wrapperPath)
+
+	// Use renderTemplateWithProps (we'll create this helper)
+	err = renderTemplateWithProps(wrapperPath, props, w, r)
+	if err != nil {
+		return fmt.Errorf("renderWithWrapper: failed to render wrapper: %w", err)
+	}
+
+	log.Printf("[renderWithWrapper] Successfully rendered wrapper for layout: %s", layoutName)
+	return nil
+}
+
+// renderTemplateWithProps renders a template with explicitly provided props
+// This is a variant of renderTemplate that accepts pre-built props instead of extracting them from fence
+//
+// Pattern: Template Rendering with Props Injection [Load: 22]
+// Cognitive Load: 22 (read: 2, parse: 3, props merge: 4, fence processing: 3, transform: 3, store merge: 3, render: 2, inject: 2)
+func renderTemplateWithProps(entrypoint string, explicitProps map[string]interface{}, w http.ResponseWriter, r *http.Request) error {
+	startTime := time.Now()
+
+	// Read template file (COGNITIVE LOAD RULE: wrapped error)
+	templateContent, err := os.ReadFile(entrypoint)
+	if err != nil {
+		return fmt.Errorf("renderTemplateWithProps: failed to read template %s: %w", entrypoint, err)
+	}
+
+	// Parse template to extract fence data (COGNITIVE LOAD RULE: wrapped error)
+	template, err := parser.ParseTemplate(string(templateContent))
+	if err != nil {
+		return fmt.Errorf("renderTemplateWithProps: failed to parse template %s: %w", entrypoint, err)
+	}
+
+	// Extract fence section and parse with store registry if needed
+	var fenceWithStores *ast.FenceSection
+	for i, node := range template.RootNodes {
+		if fence, ok := node.(*ast.FenceSection); ok {
+			// Only re-parse if fence contains store imports
+			if strings.Contains(fence.RawContent, "import store from") {
+				// Parse fence content with store registry to resolve store imports
+				fenceWithStores = parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
+				// Replace the fence section in template
+				template.RootNodes[i] = fenceWithStores
+			} else {
+				// No store imports, use the already-parsed fence as-is
+				fenceWithStores = fence
+				template.RootNodes[i] = fenceWithStores
+			}
+			break
+		}
+	}
+
+	// Start with explicit props (these take precedence)
+	props := make(map[string]interface{})
+	for k, v := range explicitProps {
+		props[k] = v
+	}
+
+	// Extract props from fence section (as defaults if not in explicitProps)
+	if fenceWithStores != nil {
+		// Process variables
+		for _, variable := range fenceWithStores.Variables {
+			if _, exists := props[variable.Name]; !exists {
+				props[variable.Name] = parseValue(variable.Value)
+			}
+		}
+
+		// Process props with default values
+		for _, prop := range fenceWithStores.Props {
+			if _, exists := props[prop.Name]; !exists && prop.DefaultValue != "" {
+				props[prop.Name] = parseValue(prop.DefaultValue)
+			}
+		}
+
+		// Extract functions from FenceSection.Functions field
+		for _, function := range fenceWithStores.Functions {
+			if _, exists := props[function.Name]; !exists {
+				props[function.Name] = function.Body
+			}
+		}
+	}
+
+	// Add build time as a prop
+	buildTime := time.Since(startTime)
+	buildTimeMs := float64(buildTime.Microseconds()) / 1000.0
+	props["buildTime"] = fmt.Sprintf("%.2fms", buildTimeMs)
+
+	log.Printf("[renderTemplateWithProps] Final props for %s: %v", entrypoint, getKeys(props))
+
+	// Transform template (this tracks store references)
+	transformed := transformer.TransformAST(template, props)
+
+	// Get tracked stores from transformer
+	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
+	log.Printf("[renderTemplateWithProps] Referenced stores: %v", referencedStores)
+
+	referencedStoreDefs := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
+
+	// Merge with external stores if referenced but not defined
+	// Priority: Inline > Imported > External
+	finalStores := make(map[string]string)
+
+	// Add all referenced stores (inline + imported from fence)
+	for name, def := range referencedStoreDefs {
+		finalStores[name] = def
+	}
+
+	// Add external stores if referenced but not yet in finalStores
+	for _, storeName := range referencedStores {
+		if _, exists := finalStores[storeName]; !exists {
+			if externalDef, exists := storeRegistry[storeName]; exists {
+				finalStores[storeName] = externalDef
+				log.Printf("[renderTemplateWithProps] Added external store: %s", storeName)
+			}
+		}
+	}
+
+	// Render with stores
+	// CRITICAL: Pass original template AST and path for component style aggregation
+	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint)
+
+	// Build x-data from props
+	xDataValue := buildXDataFromProps(props)
+
+	// Build final HTML with x-data injected
+	finalHTML := markup
+
+	// Inject x-data into body tag (or html tag as fallback)
+	bodyTagRegex := regexp.MustCompile(`(?i)<body[^>]*>`)
+	if bodyTagRegex.MatchString(finalHTML) {
+		finalHTML = bodyTagRegex.ReplaceAllStringFunc(finalHTML, func(match string) string {
+			// Check if x-data already exists
+			if strings.Contains(match, "x-data") {
+				return match
+			}
+			// Remove the closing > and add x-data
+			tagWithoutClose := strings.TrimSuffix(match, ">")
+			return fmt.Sprintf(`%s x-data="%s">`, tagWithoutClose, escapeXDataForAttr(xDataValue))
+		})
+	} else {
+		// Fallback: add x-data to html tag if no body tag
+		htmlTagRegex := regexp.MustCompile(`(?i)<html[^>]*>`)
+		if htmlTagRegex.MatchString(finalHTML) {
+			finalHTML = htmlTagRegex.ReplaceAllStringFunc(finalHTML, func(match string) string {
+				if strings.Contains(match, "x-data") {
+					return match
+				}
+				tagWithoutClose := strings.TrimSuffix(match, ">")
+				return fmt.Sprintf(`%s x-data="%s">`, tagWithoutClose, escapeXDataForAttr(xDataValue))
+			})
+		}
+	}
+
+	// Inject styles into <head>
+	if style != "" {
+		headEndRegex := regexp.MustCompile(`(?i)</head>`)
+		finalHTML = headEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<style>\n%s\n</style></head>", style))
+	}
+
+	// Inject scripts before </body>
+	if script != "" {
+		bodyEndRegex := regexp.MustCompile(`(?i)</body>`)
+		finalHTML = bodyEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<script>\n%s\n</script></body>", script))
+	}
+
+	// Add Alpine.js CDN if not already present
+	if !strings.Contains(finalHTML, "alpinejs") {
+		headEndRegex := regexp.MustCompile(`(?i)</head>`)
+		finalHTML = headEndRegex.ReplaceAllString(finalHTML,
+			`<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script></head>`)
+	}
+
+	// Add build time comment
+	totalBuildTime := time.Since(startTime)
+	htmlComment := fmt.Sprintf("<!-- Build time: %v -->\n", totalBuildTime)
+	finalHTML = htmlComment + finalHTML
+
+	// Send response
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(finalHTML))
+
+	return nil
+}
+
+// getKeys extracts keys from a map for logging
+// Pattern: Helper Function [Load: 3]
+func getKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // renderTemplate is a unified handler for rendering template files with store support

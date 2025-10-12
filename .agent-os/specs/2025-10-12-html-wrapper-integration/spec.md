@@ -3,7 +3,7 @@
 **Date:** 2025-10-12
 **Status:** Planning
 **Goal:** Integrate `layouts/global/html.html` as the root wrapper for all pages
-
+**MANDATORY: Use go-backend agent for all Go implementation**
 ## Problem Statement
 
 Currently, the server renders content layouts directly (e.g., `layouts/content/_index.html`), which means:

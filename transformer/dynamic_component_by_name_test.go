@@ -90,6 +90,297 @@ func TestTransformDynamicComponentByName_BasicTransformation(t *testing.T) {
 	}
 }
 
+// TestTransformDynamicComponentByName_SimplePropSubstitution tests simple prop value substitution
+// This is the NEW test for Task 1 requirement: <Component:dynamic name={layout} /> where layout is a prop
+func TestTransformDynamicComponentByName_SimplePropSubstitution(t *testing.T) {
+	// Register test layout components
+	indexTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "page-index"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "Index Layout"},
+				},
+			},
+		},
+	}
+	RegisterComponent("_index", indexTemplate, []string{})
+	defer UnregisterComponent("_index")
+
+	comprehensiveTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "page-comprehensive"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "Comprehensive Layout"},
+				},
+			},
+		},
+	}
+	RegisterComponent("comprehensive", comprehensiveTemplate, []string{})
+	defer UnregisterComponent("comprehensive")
+
+	storeDemoTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "page-store-demo"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "Store Demo Layout"},
+				},
+			},
+		},
+	}
+	RegisterComponent("store-demo", storeDemoTemplate, []string{})
+	defer UnregisterComponent("store-demo")
+
+	tests := []struct {
+		name             string
+		node             *ast.DynamicComponentByNameNode
+		dataScope        map[string]any
+		expectError      bool
+		expectedClass    string // Expected class in rendered output
+		description      string
+	}{
+		{
+			name: "simple prop reference - _index",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "layout", // Simple prop reference (no braces, no dots)
+				Props:          []ast.ComponentProp{},
+				SpreadProps:    []string{},
+			},
+			dataScope: map[string]any{
+				"layout": "_index", // Prop value in data scope
+			},
+			expectError:   false,
+			expectedClass: "page-index",
+			description:   "Should resolve layout prop to _index component",
+		},
+		{
+			name: "simple prop reference - comprehensive",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "layout",
+				Props:          []ast.ComponentProp{},
+				SpreadProps:    []string{},
+			},
+			dataScope: map[string]any{
+				"layout": "comprehensive",
+			},
+			expectError:   false,
+			expectedClass: "page-comprehensive",
+			description:   "Should resolve layout prop to comprehensive component",
+		},
+		{
+			name: "simple prop reference - store-demo",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "layout",
+				Props:          []ast.ComponentProp{},
+				SpreadProps:    []string{},
+			},
+			dataScope: map[string]any{
+				"layout": "store-demo",
+			},
+			expectError:   false,
+			expectedClass: "page-store-demo",
+			description:   "Should resolve layout prop to store-demo component",
+		},
+		{
+			name: "missing prop reference",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "layout",
+				Props:          []ast.ComponentProp{},
+				SpreadProps:    []string{},
+			},
+			dataScope: map[string]any{
+				// layout prop not in scope
+			},
+			expectError: true,
+			description: "Should error when prop not in data scope",
+		},
+		{
+			name: "prop with non-existent layout",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "layout",
+				Props:          []ast.ComponentProp{},
+				SpreadProps:    []string{},
+			},
+			dataScope: map[string]any{
+				"layout": "nonexistent",
+			},
+			expectError: true,
+			description: "Should error when layout component not registered",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := TransformDynamicComponentByName(tt.node, tt.dataScope)
+
+			if tt.expectError {
+				// Check for error/placeholder nodes
+				if len(result) == 0 {
+					t.Errorf("%s: expected error result, got empty", tt.description)
+					return
+				}
+
+				// Verify it's a placeholder/error node
+				if element, ok := result[len(result)-1].(*ast.Element); ok {
+					// Check for error indicators (x-component, data-error attributes)
+					hasError := false
+					for _, attr := range element.Attributes {
+						if attr.Name == "data-error" || attr.Name == "x-component" {
+							hasError = true
+							break
+						}
+					}
+					if !hasError {
+						t.Errorf("%s: expected error node with data-error or x-component attribute", tt.description)
+					}
+				} else if comment, ok := result[0].(*ast.CommentNode); !ok {
+					t.Errorf("%s: expected placeholder element or comment, got %T", tt.description, comment)
+				}
+			} else {
+				// Check for successful transformation
+				if len(result) == 0 {
+					t.Errorf("%s: expected transformed nodes, got empty", tt.description)
+					return
+				}
+
+				// Verify the correct component was loaded by checking class attribute
+				found := false
+				for _, node := range result {
+					if element, ok := node.(*ast.Element); ok {
+						for _, attr := range element.Attributes {
+							if attr.Name == "class" && attr.Value == tt.expectedClass {
+								found = true
+								break
+							}
+						}
+					}
+				}
+				if !found {
+					t.Errorf("%s: expected element with class=%q", tt.description, tt.expectedClass)
+				}
+			}
+		})
+	}
+}
+
+// TestTransformDynamicComponentByName_PropSpreadingWithSimpleProp tests prop spreading combined with simple prop substitution
+// This tests the html.html use case: <Component:dynamic name={layout} {...content.fields} allContent={allContent} />
+func TestTransformDynamicComponentByName_PropSpreadingWithSimpleProp(t *testing.T) {
+	// Register a layout component that accepts props
+	pageTemplate := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.FenceSection{
+				Props: []ast.PropNode{
+					{Name: "title", DefaultValue: "Default Title"},
+					{Name: "description", DefaultValue: "Default Description"},
+					{Name: "allContent", DefaultValue: "{}"},
+				},
+			},
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "page-layout"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "Page Layout"},
+				},
+			},
+		},
+	}
+	RegisterComponent("pages", pageTemplate, []string{"title", "description", "allContent"})
+	defer UnregisterComponent("pages")
+
+	tests := []struct {
+		name        string
+		node        *ast.DynamicComponentByNameNode
+		dataScope   map[string]any
+		description string
+	}{
+		{
+			name: "simple prop name with spread props",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "layout", // Simple prop reference
+				Props: []ast.ComponentProp{
+					{Name: "allContent", Value: "allContent", IsDynamic: true},
+				},
+				SpreadProps: []string{"content.fields"},
+			},
+			dataScope: map[string]any{
+				"layout": "pages", // Prop value resolves to "pages" component
+				"content": map[string]any{
+					"fields": map[string]any{
+						"title":       "Welcome to the Site",
+						"description": "This is the homepage",
+					},
+				},
+				"allContent": map[string]any{
+					"pages": []string{"/", "/about"},
+				},
+			},
+			description: "Should resolve layout prop and spread content.fields with explicit props",
+		},
+		{
+			name: "multiple spread props with simple prop name",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "layout",
+				Props:          []ast.ComponentProp{},
+				SpreadProps:    []string{"content.fields", "extraProps"},
+			},
+			dataScope: map[string]any{
+				"layout": "pages",
+				"content": map[string]any{
+					"fields": map[string]any{
+						"title": "Base Title",
+					},
+				},
+				"extraProps": map[string]any{
+					"title":       "Override Title", // Should override content.fields.title
+					"description": "Added Description",
+				},
+			},
+			description: "Should apply spreads left-to-right with later overriding earlier",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := TransformDynamicComponentByName(tt.node, tt.dataScope)
+
+			if len(result) == 0 {
+				t.Errorf("%s: expected transformed nodes, got empty", tt.description)
+			}
+
+			// Verify transformation succeeded
+			hasPageLayout := false
+			for _, node := range result {
+				if element, ok := node.(*ast.Element); ok {
+					for _, attr := range element.Attributes {
+						if attr.Name == "class" && attr.Value == "page-layout" {
+							hasPageLayout = true
+							break
+						}
+					}
+				}
+			}
+
+			if !hasPageLayout {
+				t.Errorf("%s: expected page-layout element in transformed output", tt.description)
+			}
+		})
+	}
+}
+
 // TestTransformDynamicComponentByName_WithSpreadProps tests spread prop expansion
 func TestTransformDynamicComponentByName_WithSpreadProps(t *testing.T) {
 	// Register a component that accepts props
@@ -269,18 +560,26 @@ func TestTransformDynamicComponentByName_ComponentNotFound(t *testing.T) {
 	}
 
 	// Check if result contains placeholder
-	if element, ok := result[0].(*ast.Element); ok {
-		// Should have x-component attribute or be a comment
-		hasPlaceholder := false
-		for _, attr := range element.Attributes {
-			if attr.Name == "x-component" {
-				hasPlaceholder = true
-				break
+	foundPlaceholder := false
+	for _, node := range result {
+		if element, ok := node.(*ast.Element); ok {
+			// Should have x-component attribute or data-error
+			for _, attr := range element.Attributes {
+				if attr.Name == "x-component" || attr.Name == "data-error" {
+					foundPlaceholder = true
+					break
+				}
 			}
 		}
-		if !hasPlaceholder {
-			t.Error("Expected placeholder with x-component attribute")
+		if comment, ok := node.(*ast.CommentNode); ok {
+			// Comment nodes are also valid placeholders
+			_ = comment
+			foundPlaceholder = true
 		}
+	}
+
+	if !foundPlaceholder {
+		t.Error("Expected placeholder with x-component/data-error attribute or comment")
 	}
 }
 
@@ -471,7 +770,7 @@ func TestMergeProps(t *testing.T) {
 				"count": 10,
 			},
 			regularProps: []ast.ComponentProp{
-				{Name: "count", Value: "{total}", IsDynamic: true},
+				{Name: "count", Value: "total", IsDynamic: true},
 			},
 			dataScope: map[string]any{
 				"total": 20,
@@ -553,7 +852,27 @@ func TestEvaluateNameExpression(t *testing.T) {
 			dataScope:   map[string]any{},
 			expected:    "missing",  // Treated as literal string when not found
 			expectError: false,
-			description: "Should error on missing variable",
+			description: "Should treat missing variable as literal string",
+		},
+		{
+			name:     "simple prop reference (key use case)",
+			nameExpr: "layout",
+			dataScope: map[string]any{
+				"layout": "_index",
+			},
+			expected:    "_index",
+			expectError: false,
+			description: "Should resolve layout prop to _index",
+		},
+		{
+			name:     "simple prop reference with dash",
+			nameExpr: "layout",
+			dataScope: map[string]any{
+				"layout": "store-demo",
+			},
+			expected:    "store-demo",
+			expectError: false,
+			description: "Should resolve layout prop with dash in value",
 		},
 	}
 

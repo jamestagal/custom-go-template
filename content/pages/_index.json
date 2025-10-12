@@ -9,6 +9,11 @@
         "buttonText": "Book A Call",
         "buttonLink": "/contact"
       }
+    },
+    {
+      "name": "Hero2436",
+      "fields": {
+      }
     }
   ]
 }
