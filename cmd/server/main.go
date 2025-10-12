@@ -358,31 +358,47 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// TASK 5.4: Add magic variables to props
+	// TASK 5.4: Add magic variables to props (OPT-IN via export let)
+	// Only add magic variables if the template explicitly declares them in export let
+	exportedPropNames := make(map[string]bool)
+	if fenceWithStores != nil {
+		for _, propName := range fenceWithStores.ExportedProps {
+			exportedPropNames[propName] = true
+		}
+	}
+
 	if contentData != nil {
 		// Magic variable 1: components array from content JSON
-		if componentsRaw, ok := contentData["components"]; ok {
-			props["components"] = componentsRaw
-			log.Printf("Magic variable 'components' added to props")
+		if exportedPropNames["components"] {
+			if componentsRaw, ok := contentData["components"]; ok {
+				props["components"] = componentsRaw
+				log.Printf("Magic variable 'components' added to props (requested via export let)")
+			}
 		}
 
 		// Magic variable 2: content - full content object for this page
-		props["content"] = contentData
-		log.Printf("Magic variable 'content' added to props")
+		if exportedPropNames["content"] {
+			props["content"] = contentData
+			log.Printf("Magic variable 'content' added to props (requested via export let)")
+		}
 	}
 
-	// Magic variable 3: allContent - all site content
-	props["allContent"] = getAllContent()
-	log.Printf("Magic variable 'allContent' added to props")
-
-	// Magic variable 4: allLayouts - component registry names
-	// Extract just the component names from the registry
-	layoutNames := make(map[string]bool)
-	for name := range transformer.GetAllComponentNames() {
-		layoutNames[name] = true
+	// Magic variable 3: allContent - all site content (OPT-IN only)
+	if exportedPropNames["allContent"] {
+		props["allContent"] = getAllContent()
+		log.Printf("Magic variable 'allContent' added to props (requested via export let)")
 	}
-	props["allLayouts"] = layoutNames
-	log.Printf("Magic variable 'allLayouts' added to props (%d components)", len(layoutNames))
+
+	// Magic variable 4: allLayouts - component registry names (OPT-IN only)
+	if exportedPropNames["allLayouts"] {
+		// Convert to array of strings for proper JSON serialization
+		layoutNames := make([]string, 0)
+		for name := range transformer.GetAllComponentNames() {
+			layoutNames = append(layoutNames, name)
+		}
+		props["allLayouts"] = layoutNames
+		log.Printf("Magic variable 'allLayouts' added to props (%d components, requested via export let)", len(layoutNames))
+	}
 
 	// Add build time as a prop
 	buildTime := time.Since(startTime)
