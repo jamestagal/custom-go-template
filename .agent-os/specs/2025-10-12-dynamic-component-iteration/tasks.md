@@ -8,58 +8,58 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 
 ## Tasks
 
-- [ ] 1. AST Nodes & Data Structures
-  - [ ] 1.1 Write tests for DynamicComponentByNameNode
-  - [ ] 1.2 Create DynamicComponentByNameNode in ast/ast.go
-  - [ ] 1.3 Enhance ComponentProp with IsSpread and SpreadExpr fields
-  - [ ] 1.4 Add NodeType() method implementation
-  - [ ] 1.5 Verify all AST tests pass
-  - [ ] 1.6 **MANDATORY: Use go-backend agent for all Go implementation**
+- [x] 1. AST Nodes & Data Structures
+  - [x] 1.1 Write tests for DynamicComponentByNameNode
+  - [x] 1.2 Create DynamicComponentByNameNode in ast/ast.go
+  - [x] 1.3 Enhance ComponentProp with IsSpread and SpreadExpr fields
+  - [x] 1.4 Add NodeType() method implementation
+  - [x] 1.5 Verify all AST tests pass
+  - [x] 1.6 **MANDATORY: Use go-backend agent for all Go implementation**
 
-- [ ] 2. Parser Implementation
-  - [ ] 2.1 Write tests for ParseDynamicComponentByName (basic, spread, mixed props)
-  - [ ] 2.2 Create parser/dynamic_component_by_name.go
-  - [ ] 2.3 Implement ParseDynamicComponentByName function
-  - [ ] 2.4 Implement parseSpreadProp helper function
-  - [ ] 2.5 Add DynamicComponentByNameParser to AnyNodeParser parsers list
-  - [ ] 2.6 Handle Component:dynamic tag detection with colon
-  - [ ] 2.7 Parse name={} attribute (required)
-  - [ ] 2.8 Parse spread props {...expr}
-  - [ ] 2.9 Parse mixed regular and spread props
-  - [ ] 2.10 Verify all parser tests pass
-  - [ ] 2.11 **MANDATORY: Use go-backend agent for all Go implementation**
+- [x] 2. Parser Implementation
+  - [x] 2.1 Write tests for ParseDynamicComponentByName (basic, spread, mixed props)
+  - [x] 2.2 Create parser/dynamic_component_by_name.go
+  - [x] 2.3 Implement ParseDynamicComponentByName function
+  - [x] 2.4 Implement parseSpreadProp helper function
+  - [x] 2.5 Add DynamicComponentByNameParser to AnyNodeParser parsers list
+  - [x] 2.6 Handle Component:dynamic tag detection with colon
+  - [x] 2.7 Parse name={} attribute (required)
+  - [x] 2.8 Parse spread props {...expr}
+  - [x] 2.9 Parse mixed regular and spread props
+  - [x] 2.10 Verify all parser tests pass
+  - [x] 2.11 **MANDATORY: Use go-backend agent for all Go implementation**
 
-- [ ] 3. Transformer Implementation
-  - [ ] 3.1 Write tests for TransformDynamicComponentByName
-  - [ ] 3.2 Write tests for resolveSpreadProps
-  - [ ] 3.3 Write tests for prop merging/override logic
-  - [ ] 3.4 Create transformer/dynamic_component_by_name.go
-  - [ ] 3.5 Implement TransformDynamicComponentByName function
-  - [ ] 3.6 Implement resolveSpreadProps function
-  - [ ] 3.7 Implement expression evaluation for component name
-  - [ ] 3.8 Implement prop merging with right-to-left override
-  - [ ] 3.9 Add to main transformer switch statement
-  - [ ] 3.10 Verify all transformer tests pass
-  - [ ] 3.11 **MANDATORY: Use go-backend agent for all Go implementation**
+- [x] 3. Transformer Implementation
+  - [x] 3.1 Write tests for TransformDynamicComponentByName
+  - [x] 3.2 Write tests for resolveSpreadProps
+  - [x] 3.3 Write tests for prop merging/override logic
+  - [x] 3.4 Create transformer/dynamic_component_by_name.go
+  - [x] 3.5 Implement TransformDynamicComponentByName function
+  - [x] 3.6 Implement resolveSpreadProps function
+  - [x] 3.7 Implement expression evaluation for component name
+  - [x] 3.8 Implement prop merging with right-to-left override
+  - [x] 3.9 Add to main transformer switch statement
+  - [x] 3.10 Verify all transformer tests pass
+  - [x] 3.11 **MANDATORY: Use go-backend agent for all Go implementation**
 
-- [ ] 4. Renderer Implementation
-  - [ ] 4.1 Write tests for RenderDynamicComponentByName fallback
-  - [ ] 4.2 Create renderer/dynamic_component_by_name.go
-  - [ ] 4.3 Implement RenderDynamicComponentByName (fallback placeholder)
-  - [ ] 4.4 Add to renderer switch statement
-  - [ ] 4.5 Verify all renderer tests pass
-  - [ ] 4.6 **MANDATORY: Use go-backend agent for all Go implementation**
+- [x] 4. Renderer Implementation
+  - [x] 4.1 Write tests for RenderDynamicComponentByName fallback
+  - [x] 4.2 Create renderer/dynamic_component_by_name.go
+  - [x] 4.3 Implement RenderDynamicComponentByName (fallback placeholder)
+  - [x] 4.4 Add to renderer switch statement
+  - [x] 4.5 Verify all renderer tests pass
+  - [x] 4.6 **MANDATORY: Use go-backend agent for all Go implementation**
 
-- [ ] 5. Server Integration & Magic Variables
-  - [ ] 5.1 Write integration tests for getAllContent helper
-  - [ ] 5.2 Write integration tests for magic variables passing
-  - [ ] 5.3 Implement getAllContent() function in cmd/server/main.go
-  - [ ] 5.4 Update renderTemplate to pass magic variables (components, content, allContent, allLayouts)
-  - [ ] 5.5 Create layouts/content/pages.html with Component:dynamic iteration
-  - [ ] 5.6 Update route handlers to use template-based iteration
-  - [ ] 5.7 Remove renderPlentiPage function (superseded by template iteration)
-  - [ ] 5.8 Verify all integration tests pass
-  - [ ] 5.9 **MANDATORY: Use go-backend agent for all Go implementation**
+- [x] 5. Server Integration & Magic Variables
+  - [x] 5.1 Write integration tests for getAllContent helper
+  - [x] 5.2 Write integration tests for magic variables passing
+  - [x] 5.3 Implement getAllContent() function in cmd/server/main.go
+  - [x] 5.4 Update renderTemplate to pass magic variables (components, content, allContent, allLayouts)
+  - [x] 5.5 Create layouts/content/pages.html with Component:dynamic iteration
+  - [x] 5.6 Update route handlers to use template-based iteration
+  - [x] 5.7 Remove renderPlentiPage function (superseded by template iteration)
+  - [x] 5.8 Verify all integration tests pass
+  - [x] 5.9 **MANDATORY: Use go-backend agent for all Go implementation**
 
 - [ ] 6. End-to-End Testing
   - [ ] 6.1 Write E2E test for pages.html with multiple components

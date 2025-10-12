@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -30,6 +31,13 @@ var storeRegistry map[string]string
 var (
 	contentCache   = make(map[string]map[string]interface{})
 	contentCacheMu sync.RWMutex
+)
+
+// TASK 5.3: Cache for getAllContent to avoid repeated directory walks
+var (
+	allContentCache   map[string]interface{}
+	allContentCacheMu sync.RWMutex
+	allContentCached  bool
 )
 
 func main() {
@@ -60,8 +68,8 @@ func main() {
 			return
 		}
 
-		// Render home page using Plenti-style component iteration
-		renderPlentiPage(w, r)
+		// Render home page with export let content injection
+		renderTemplate("layouts/content/_index.html", w, r)
 	})
 
 	// Add comprehensive-simple page route (WORKING - no multi-line vars)
@@ -162,221 +170,88 @@ func invalidateContentCache() {
 	defer contentCacheMu.Unlock()
 
 	contentCache = make(map[string]map[string]interface{})
+
+	// Also invalidate allContent cache
+	allContentCacheMu.Lock()
+	allContentCached = false
+	allContentCache = nil
+	allContentCacheMu.Unlock()
+
 	log.Println("Content cache invalidated")
 }
 
-// renderPlentiPage renders a page using Plenti-style component iteration
-// This mimics Svelte's {#each components as {name, fields}} pattern but at the server level.
-// No template file is needed - components are rendered directly from the registry based on
-// the components array in the content JSON.
+// TASK 5.3: getAllContent loads all content JSON files from content/ directory
+// Returns map indexed by relative path: "pages/_index", "blog/post-1", etc.
 //
-// Pattern: Plenti Component Iteration [Load: 25]
-// Cognitive Load: 25 (content load: 3, component iteration: 5, component rendering: 8, assembly: 5, output: 4)
-func renderPlentiPage(w http.ResponseWriter, r *http.Request) {
-	startTime := time.Now()
-	routePath := r.URL.Path
+// Pattern: File Discovery Pattern with Caching [Load: 15]
+// Cognitive Load: 15 (directory walk: 5, file reading: 3, JSON parsing: 3, path formatting: 2, caching: 2)
+func getAllContent() map[string]interface{} {
+	// Check cache first
+	allContentCacheMu.RLock()
+	if allContentCached {
+		cached := allContentCache
+		allContentCacheMu.RUnlock()
+		return cached
+	}
+	allContentCacheMu.RUnlock()
 
-	// Load content JSON for this route
-	contentData, err := loadContentWithCache(routePath)
+	// Build fresh cache
+	result := make(map[string]interface{})
+	contentDir := "content"
+
+	// Walk content directory recursively (COGNITIVE LOAD RULE: wrapped error)
+	err := filepath.Walk(contentDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			// If content directory doesn't exist, just return empty map
+			return nil
+		}
+
+		// Skip directories and non-JSON files
+		if info.IsDir() || !strings.HasSuffix(path, ".json") {
+			return nil
+		}
+
+		// Load and parse JSON (COGNITIVE LOAD RULE: wrapped error)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			log.Printf("getAllContent: Warning: Failed to read %s: %v", path, err)
+			return nil // Continue walking
+		}
+
+		var content map[string]interface{}
+		if err := json.Unmarshal(data, &content); err != nil {
+			log.Printf("getAllContent: Warning: Invalid JSON in %s: %v", path, err)
+			return nil // Continue walking
+		}
+
+		// Calculate relative key: "content/pages/about.json" -> "pages/about"
+		relPath := strings.TrimPrefix(path, contentDir+string(filepath.Separator))
+		relPath = strings.TrimSuffix(relPath, ".json")
+		// Normalize path separators for cross-platform compatibility
+		relPath = filepath.ToSlash(relPath)
+
+		result[relPath] = content
+		return nil
+	})
+
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to load content: %v", err), http.StatusInternalServerError)
-		return
+		log.Printf("getAllContent: Warning: Error walking content directory: %v", err)
 	}
 
-	// Check if content has components array (Plenti format)
-	componentsRaw, hasComponents := contentData["components"]
-	if !hasComponents {
-		http.Error(w, "Content must have a 'components' array for Plenti-style rendering", http.StatusInternalServerError)
-		return
-	}
+	// Update cache
+	allContentCacheMu.Lock()
+	allContentCache = result
+	allContentCached = true
+	allContentCacheMu.Unlock()
 
-	// Type assert to array
-	components, ok := componentsRaw.([]interface{})
-	if !ok {
-		http.Error(w, fmt.Sprintf("Invalid components structure: expected array, got %T", componentsRaw), http.StatusInternalServerError)
-		return
-	}
-
-	log.Printf("renderPlentiPage: found %d components to render", len(components))
-
-	// Render each component and collect HTML/CSS/JS
-	var allMarkup strings.Builder
-	var allStyles strings.Builder
-	var allScripts strings.Builder
-	var allStores = make(map[string]string)
-
-	for i, compRaw := range components {
-		comp, ok := compRaw.(map[string]interface{})
-		if !ok {
-			log.Printf("Warning: component %d is not a map, skipping", i)
-			continue
-		}
-
-		// Extract component name
-		nameRaw, ok := comp["name"]
-		if !ok {
-			log.Printf("Warning: component %d has no name, skipping", i)
-			continue
-		}
-
-		name, ok := nameRaw.(string)
-		if !ok {
-			log.Printf("Warning: component %d name is not a string, skipping", i)
-			continue
-		}
-
-		// Extract component fields
-		fieldsRaw, ok := comp["fields"]
-		if !ok {
-			log.Printf("Warning: component %s has no fields, using empty map", name)
-			fieldsRaw = make(map[string]interface{})
-		}
-
-		fields, ok := fieldsRaw.(map[string]interface{})
-		if !ok {
-			log.Printf("Warning: component %s fields is not a map, using empty map", name)
-			fields = make(map[string]interface{})
-		}
-
-		log.Printf("Rendering component %s with %d fields", name, len(fields))
-
-		// Render the component with its fields
-		markup, script, style, stores := renderComponentWithFields(name, fields)
-
-		allMarkup.WriteString(markup)
-		allMarkup.WriteString("\n")
-
-		if style != "" {
-			allStyles.WriteString(style)
-			allStyles.WriteString("\n")
-		}
-
-		if script != "" {
-			allScripts.WriteString(script)
-			allScripts.WriteString("\n")
-		}
-
-		// Merge stores
-		for storeName, storeDef := range stores {
-			if _, exists := allStores[storeName]; !exists {
-				allStores[storeName] = storeDef
-			}
-		}
-	}
-
-	// Build final HTML page
-	finalHTML := buildHTMLPage(allMarkup.String(), allStyles.String(), allScripts.String(), allStores)
-
-	// Add build time comment
-	totalBuildTime := time.Since(startTime)
-	htmlComment := fmt.Sprintf("<!-- Build time: %v -->\n", totalBuildTime)
-	finalHTML = htmlComment + finalHTML
-
-	// Send response
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(finalHTML))
-}
-
-// renderComponentWithFields renders a single component with given fields as props
-// Returns: markup, script, style, stores
-func renderComponentWithFields(componentName string, fields map[string]interface{}) (string, string, string, map[string]string) {
-	// Look up component template
-	componentTemplate, exists := transformer.GetComponentTemplate(componentName)
-	if !exists {
-		log.Printf("Warning: Component %s not found in registry", componentName)
-		return fmt.Sprintf("<!-- Component %s not found -->", componentName), "", "", nil
-	}
-
-	// Build props map from fields
-	props := make(map[string]interface{})
-	for key, value := range fields {
-		props[key] = value
-	}
-
-	// Transform the component AST with props
-	transformed := transformer.TransformAST(componentTemplate.Template, props)
-
-	// Get stores from transformer
-	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
-	referencedStoreDefs := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
-
-	// Merge with external stores if needed
-	finalStores := make(map[string]string)
-	for name, def := range referencedStoreDefs {
-		finalStores[name] = def
-	}
-	for _, storeName := range referencedStores {
-		if _, exists := finalStores[storeName]; !exists {
-			if externalDef, exists := storeRegistry[storeName]; exists {
-				finalStores[storeName] = externalDef
-			}
-		}
-	}
-
-	// Render the component
-	markup, script, style := renderer.RenderWithStores(componentTemplate.Template, transformed, finalStores, "")
-
-	return markup, script, style, finalStores
-}
-
-// buildHTMLPage assembles the final HTML page from components
-func buildHTMLPage(markup, styles, scripts string, stores map[string]string) string {
-	var html strings.Builder
-
-	html.WriteString("<!DOCTYPE html>\n")
-	html.WriteString("<html lang=\"en\">\n")
-	html.WriteString("<head>\n")
-	html.WriteString("  <meta charset=\"UTF-8\">\n")
-	html.WriteString("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n")
-	html.WriteString("  <title>Page</title>\n")
-	html.WriteString("  <link rel=\"stylesheet\" href=\"/styles/style.css\">\n")
-
-	// Add styles
-	if styles != "" {
-		html.WriteString("  <style>\n")
-		html.WriteString(styles)
-		html.WriteString("  </style>\n")
-	}
-
-	// Add Alpine.js CDN
-	html.WriteString("  <script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script>\n")
-
-	html.WriteString("</head>\n")
-	html.WriteString("<body>\n")
-
-	// Add component markup
-	html.WriteString(markup)
-
-	// Add scripts (including store initializations)
-	if scripts != "" || len(stores) > 0 {
-		html.WriteString("  <script>\n")
-
-		// Add store initializations
-		if len(stores) > 0 {
-			html.WriteString("    // Initialize Alpine.js stores\n")
-			html.WriteString("    document.addEventListener('alpine:init', () => {\n")
-			for storeName, storeDef := range stores {
-				html.WriteString(fmt.Sprintf("      Alpine.store('%s', %s);\n", storeName, storeDef))
-			}
-			html.WriteString("    });\n")
-		}
-
-		if scripts != "" {
-			html.WriteString(scripts)
-		}
-
-		html.WriteString("  </script>\n")
-	}
-
-	html.WriteString("</body>\n")
-	html.WriteString("</html>\n")
-
-	return html.String()
+	log.Printf("getAllContent: Loaded %d content files", len(result))
+	return result
 }
 
 // renderTemplate is a unified handler for rendering template files with store support
 // Now integrates with the global store system (Task 3.5)
 // UPDATED: Now supports content injection (Task 4)
+// UPDATED: Now passes magic variables (Task 5.4)
 //
 // Pattern: Service Implementation Pattern with Store Integration [Load: 20]
 // Cognitive Load: 20 (read: 2, parse: 3, fence parsing: 3, content loading: 3, transform: 3, store merge: 3, render: 2, inject: 1)
@@ -482,6 +357,32 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 			props[function.Name] = function.Body
 		}
 	}
+
+	// TASK 5.4: Add magic variables to props
+	if contentData != nil {
+		// Magic variable 1: components array from content JSON
+		if componentsRaw, ok := contentData["components"]; ok {
+			props["components"] = componentsRaw
+			log.Printf("Magic variable 'components' added to props")
+		}
+
+		// Magic variable 2: content - full content object for this page
+		props["content"] = contentData
+		log.Printf("Magic variable 'content' added to props")
+	}
+
+	// Magic variable 3: allContent - all site content
+	props["allContent"] = getAllContent()
+	log.Printf("Magic variable 'allContent' added to props")
+
+	// Magic variable 4: allLayouts - component registry names
+	// Extract just the component names from the registry
+	layoutNames := make(map[string]bool)
+	for name := range transformer.GetAllComponentNames() {
+		layoutNames[name] = true
+	}
+	props["allLayouts"] = layoutNames
+	log.Printf("Magic variable 'allLayouts' added to props (%d components)", len(layoutNames))
 
 	// Add build time as a prop
 	buildTime := time.Since(startTime)
@@ -601,61 +502,6 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(finalHTML))
 }
 
-// extractFunctionsFromFence extracts function declarations from fence section content
-// Returns a map of function name -> function body
-//
-// DEPRECATED: This function is kept for backward compatibility but should not be needed
-// now that FenceSection.Functions exists. It will be removed in a future refactor.
-//
-// Pattern: Regex Extraction Pattern [Load: 10]
-// Cognitive Load: 10 (regex compile: 2, find all: 3, extract names: 2, map construction: 3)
-func extractFunctionsFromFence(content string) map[string]string {
-	functions := make(map[string]string)
-
-	// Regex to match function declarations:
-	// function name(...) { ... }
-	// Handles nested braces correctly
-	funcRegex := regexp.MustCompile(`function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{`)
-
-	// Find all function declarations
-	matches := funcRegex.FindAllStringSubmatchIndex(content, -1)
-
-	for _, match := range matches {
-		// match[0], match[1] are the full match indices
-		// match[2], match[3] are the function name indices
-		funcStart := match[0]
-		nameStart := match[2]
-		nameEnd := match[3]
-
-		funcName := content[nameStart:nameEnd]
-
-		// Find the matching closing brace for this function
-		braceStart := match[1] // End of the initial match (right after opening {)
-		braceDepth := 1
-		braceEnd := braceStart
-
-		for braceEnd < len(content) && braceDepth > 0 {
-			if content[braceEnd] == '{' {
-				braceDepth++
-			} else if content[braceEnd] == '}' {
-				braceDepth--
-			}
-			braceEnd++
-		}
-
-		if braceDepth == 0 {
-			// Successfully found the full function
-			funcBody := content[funcStart:braceEnd]
-			functions[funcName] = funcBody
-			log.Printf("[extractFunctionsFromFence] Found function: %s (%d chars)", funcName, len(funcBody))
-		} else {
-			log.Printf("[extractFunctionsFromFence] WARNING: Could not find closing brace for function %s", funcName)
-		}
-	}
-
-	return functions
-}
-
 // buildXDataFromProps creates an Alpine.js x-data attribute value from props
 // This builds a JavaScript object literal (NOT JSON) to support functions
 //
@@ -708,7 +554,8 @@ func buildXDataFromProps(props map[string]interface{}) string {
 		default:
 			// Complex types (arrays, objects) - use transformer's formatter
 			// This correctly formats maps as JavaScript object literals, not JSON strings
-			formattedValue = transformer.FormatGoValueToJS(v)		}
+			formattedValue = transformer.FormatGoValueToJS(v)
+		}
 
 		// Build key:value pair for JavaScript object literal
 		parts = append(parts, fmt.Sprintf("%s:%s", key, formattedValue))

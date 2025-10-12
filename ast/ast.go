@@ -181,12 +181,28 @@ func (d *DynamicComponentNode) String() string {
 	return "DynamicComponent{Path: " + d.PathExpression + ", Props: " + string(rune(len(d.Props))) + "}"
 }
 
+// DynamicComponentByNameNode represents <Component:dynamic name={expr} {...spread} prop={val} />
+// This enables Plenti-style component iteration where components are rendered dynamically by name.
+// Example: <Component:dynamic name={component.name} {...component.fields} allContent={allContent} />
+type DynamicComponentByNameNode struct {
+	NameExpression string          // Expression that evaluates to component name (e.g., "component.name")
+	Props          []ComponentProp // Regular props (name={value})
+	SpreadProps    []string        // Spread expressions ({...expr})
+	SelfClosing    bool            // true if ends with />
+}
+
+func (d *DynamicComponentByNameNode) NodeType() string {
+	return "DynamicComponentByName"
+}
+
 // ComponentProp represents a prop passed to a component
 type ComponentProp struct {
 	Name        string
 	Value       string // Store expression string or static value string
 	IsShorthand bool   // True for {prop} shorthand
 	IsDynamic   bool   // True for prop={expression}
+	IsSpread    bool   // True if this is a spread prop {...expr}
+	SpreadExpr  string // Expression for spread (e.g., "component.fields")
 }
 
 // --- Simple Directive Nodes ---

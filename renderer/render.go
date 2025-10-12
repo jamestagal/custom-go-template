@@ -643,6 +643,11 @@ func renderNode(sb *strings.Builder, node ast.Node) {
 		// For expression nodes, we need to render them in a way Alpine.js can understand
 		// Typically, this would be with x-text, but it depends on the context
 		sb.WriteString(fmt.Sprintf("<span x-text=\"%v\"></span>", n.Expression))
+	case *ast.DynamicComponentByNameNode:
+		// FALLBACK: Render diagnostic comment for unresolved dynamic component
+		// This should rarely happen since transformer resolves these nodes
+		// If we see this in output, it means transformation failed
+		sb.WriteString(RenderDynamicComponentByName(n))
 	default:
 		// Log unknown node types but don't treat as errors
 		log.Printf("Unknown node type: %T", n)

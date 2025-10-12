@@ -184,6 +184,12 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			dynComponentNodes := transformDynamicComponent(n, dataScope)
 			transformedNodes = append(transformedNodes, dynComponentNodes...)
 
+		case *ast.DynamicComponentByNameNode:
+			// Transform dynamic component by name nodes (<Component:dynamic> syntax)
+			log.Printf("transformNodes: Transforming DynamicComponentByName node: name=%s", n.NameExpression)
+			dynByNameNodes := TransformDynamicComponentByName(n, dataScope)
+			transformedNodes = append(transformedNodes, dynByNameNodes...)
+
 		case *ast.StyleSection, *ast.ScriptSection:
 			// Pass through style and script sections unchanged
 			// They will be extracted separately by the renderer

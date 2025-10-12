@@ -60,6 +60,19 @@ func GetAllRegisteredKeys() []string {
 	return keys
 }
 
+
+// GetAllComponentNames returns a map of all component names for magic variables
+// TASK 5.4: Support allLayouts magic variable
+//
+// Pattern: Helper Function [Load: 3]
+// Cognitive Load: 3 (iterate registry)
+func GetAllComponentNames() map[string]bool {
+	result := make(map[string]bool)
+	for key := range componentTemplateRegistry {
+		result[key] = true
+	}
+	return result
+}
 // isStructuralTag checks if a tag should skip x-data wrapping
 //
 // Pattern: Helper Function [Load: 3]

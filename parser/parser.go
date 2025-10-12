@@ -443,10 +443,11 @@ func AnyNodeParser(stop ...Parser) Parser {
 			Parser Parser
 		}{
 			{"Comment", CommentParser()},
-			{"BlockConditional", BlockConditionalParser()}, // Block-aware conditional parser
-			{"BlockLoop", BlockLoopParser()},               // Block-aware loop parser
-			{"DynamicComponent", DynamicComponentParser()}, // Try dynamic component (<= syntax) first
-			{"Component", ComponentParser()},               // Try component parser before element and expression
+			{"BlockConditional", BlockConditionalParser()},           // Block-aware conditional parser
+			{"BlockLoop", BlockLoopParser()},                         // Block-aware loop parser
+			{"DynamicComponent", DynamicComponentParser()},           // Try dynamic component (<= syntax) first
+			{"DynamicComponentByName", DynamicComponentByNameParser()}, // NEW: Component:dynamic parser (BEFORE ComponentParser)
+			{"Component", ComponentParser()},                         // Try component parser before element and expression
 			{"Element", ElementParser()},
 			{"Expression", ExpressionParser()},
 			{"Text", TextParser(delimiters...)}, // Text parser should be last

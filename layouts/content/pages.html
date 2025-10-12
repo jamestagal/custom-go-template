@@ -1,5 +1,5 @@
 ---
-export let components
+export let components, content, allContent, allLayouts
 ---
 
 <!DOCTYPE html>
@@ -7,12 +7,12 @@ export let components
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page</title>
+    <title>{content.title || 'Page'}</title>
     <link rel="stylesheet" href="/styles/style.css">
 </head>
 <body>
     {for component in components}
-        <{component.name} {...component.fields} />
+        <Component:dynamic name={component.name} {...component.fields} content={content} allContent={allContent} />
     {/for}
 </body>
 </html>
