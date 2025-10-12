@@ -194,6 +194,298 @@ func TestDynamicComponentByNameParser_WithSpread(t *testing.T) {
 	}
 }
 
+// TestDynamicComponentByNameParser_ShorthandProps tests Svelte-style shorthand props
+func TestDynamicComponentByNameParser_ShorthandProps(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		wantName       string
+		wantPropsCount int
+		wantProps      []struct {
+			name      string
+			value     string
+			isDynamic bool
+		}
+		wantSuccess bool
+	}{
+		{
+			name:           "single shorthand prop",
+			input:          `<Component:dynamic name={layout} {allContent} />`,
+			wantName:       "layout",
+			wantPropsCount: 1,
+			wantProps: []struct {
+				name      string
+				value     string
+				isDynamic bool
+			}{
+				{"allContent", "allContent", true},
+			},
+			wantSuccess: true,
+		},
+		{
+			name:           "multiple shorthand props",
+			input:          `<Component:dynamic name={layout} {allContent} {allLayouts} />`,
+			wantName:       "layout",
+			wantPropsCount: 2,
+			wantProps: []struct {
+				name      string
+				value     string
+				isDynamic bool
+			}{
+				{"allContent", "allContent", true},
+				{"allLayouts", "allLayouts", true},
+			},
+			wantSuccess: true,
+		},
+		{
+			name:           "mixed shorthand and regular props",
+			input:          `<Component:dynamic name={layout} {allContent} title="Hello" {env} />`,
+			wantName:       "layout",
+			wantPropsCount: 3,
+			wantProps: []struct {
+				name      string
+				value     string
+				isDynamic bool
+			}{
+				{"allContent", "allContent", true},
+				{"title", "Hello", false},
+				{"env", "env", true},
+			},
+			wantSuccess: true,
+		},
+		{
+			name:           "shorthand props with spread",
+			input:          `<Component:dynamic name={layout} {...content.fields} {allContent} {allLayouts} />`,
+			wantName:       "layout",
+			wantPropsCount: 2,
+			wantProps: []struct {
+				name      string
+				value     string
+				isDynamic bool
+			}{
+				{"allContent", "allContent", true},
+				{"allLayouts", "allLayouts", true},
+			},
+			wantSuccess: true,
+		},
+		{
+			name:           "shorthand with underscores",
+			input:          `<Component:dynamic name={x} {user_profile} {auth_token} />`,
+			wantName:       "x",
+			wantPropsCount: 2,
+			wantProps: []struct {
+				name      string
+				value     string
+				isDynamic bool
+			}{
+				{"user_profile", "user_profile", true},
+				{"auth_token", "auth_token", true},
+			},
+			wantSuccess: true,
+		},
+		{
+			name:           "shorthand with dollar sign (stores)",
+			input:          `<Component:dynamic name={x} {$auth} {$cart} />`,
+			wantName:       "x",
+			wantPropsCount: 2,
+			wantProps: []struct {
+				name      string
+				value     string
+				isDynamic bool
+			}{
+				{"$auth", "$auth", true},
+				{"$cart", "$cart", true},
+			},
+			wantSuccess: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DynamicComponentByNameParser()(tt.input)
+
+			if result.Successful != tt.wantSuccess {
+				t.Errorf("Success = %v, want %v. Error: %s", result.Successful, tt.wantSuccess, result.Error)
+				return
+			}
+
+			node, ok := result.Value.(*ast.DynamicComponentByNameNode)
+			if !ok {
+				t.Fatalf("Value is not *ast.DynamicComponentByNameNode, got %T", result.Value)
+			}
+
+			if node.NameExpression != tt.wantName {
+				t.Errorf("NameExpression = %q, want %q", node.NameExpression, tt.wantName)
+			}
+
+			if len(node.Props) != tt.wantPropsCount {
+				t.Errorf("Props count = %d, want %d", len(node.Props), tt.wantPropsCount)
+			}
+
+			for i, wantProp := range tt.wantProps {
+				if i >= len(node.Props) {
+					t.Errorf("Missing prop at index %d", i)
+					continue
+				}
+
+				gotProp := node.Props[i]
+				if gotProp.Name != wantProp.name {
+					t.Errorf("Props[%d].Name = %q, want %q", i, gotProp.Name, wantProp.name)
+				}
+				if gotProp.Value != wantProp.value {
+					t.Errorf("Props[%d].Value = %q, want %q", i, gotProp.Value, wantProp.value)
+				}
+				if gotProp.IsDynamic != wantProp.isDynamic {
+					t.Errorf("Props[%d].IsDynamic = %v, want %v", i, gotProp.IsDynamic, wantProp.isDynamic)
+				}
+			}
+		})
+	}
+}
+
+// TestDynamicComponentByNameParser_BindDirectives tests that bind: directives are skipped
+func TestDynamicComponentByNameParser_BindDirectives(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		wantName       string
+		wantPropsCount int
+		wantProps      []string
+		wantSuccess    bool
+	}{
+		{
+			name:           "bind directive with expression",
+			input:          `<Component:dynamic name={layout} bind:shadowContent={shadowContent} />`,
+			wantName:       "layout",
+			wantPropsCount: 0, // bind: directive should be skipped
+			wantSuccess:    true,
+		},
+		{
+			name:           "bind directive with regular props",
+			input:          `<Component:dynamic name={layout} title="Hello" bind:value={val} debug={true} />`,
+			wantName:       "layout",
+			wantPropsCount: 2, // Only title and debug, bind:value skipped
+			wantProps:      []string{"title", "debug"},
+			wantSuccess:    true,
+		},
+		{
+			name:           "bind directive with shorthand props",
+			input:          `<Component:dynamic name={layout} {allContent} bind:shadowContent={shadowContent} {env} />`,
+			wantName:       "layout",
+			wantPropsCount: 2, // Only allContent and env
+			wantProps:      []string{"allContent", "env"},
+			wantSuccess:    true,
+		},
+		{
+			name:           "multiple bind directives",
+			input:          `<Component:dynamic name={x} bind:value={v} bind:checked={c} />`,
+			wantName:       "x",
+			wantPropsCount: 0, // All bind: directives skipped
+			wantSuccess:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DynamicComponentByNameParser()(tt.input)
+
+			if result.Successful != tt.wantSuccess {
+				t.Errorf("Success = %v, want %v. Error: %s", result.Successful, tt.wantSuccess, result.Error)
+				return
+			}
+
+			node, ok := result.Value.(*ast.DynamicComponentByNameNode)
+			if !ok {
+				t.Fatalf("Value is not *ast.DynamicComponentByNameNode, got %T", result.Value)
+			}
+
+			if node.NameExpression != tt.wantName {
+				t.Errorf("NameExpression = %q, want %q", node.NameExpression, tt.wantName)
+			}
+
+			if len(node.Props) != tt.wantPropsCount {
+				t.Errorf("Props count = %d, want %d", len(node.Props), tt.wantPropsCount)
+			}
+
+			for i, wantName := range tt.wantProps {
+				if i >= len(node.Props) {
+					t.Errorf("Missing prop at index %d", i)
+					continue
+				}
+				if node.Props[i].Name != wantName {
+					t.Errorf("Props[%d].Name = %q, want %q", i, node.Props[i].Name, wantName)
+				}
+			}
+		})
+	}
+}
+
+// TestDynamicComponentByNameParser_RealWorldHtmlLayout tests the actual html.html layout
+func TestDynamicComponentByNameParser_RealWorldHtmlLayout(t *testing.T) {
+	// This is the actual Component:dynamic from html.html
+	input := `<Component:dynamic name={layout}
+		{...content.fields}
+		{allContent}
+		{allLayouts}
+		{content}
+		{env}
+		bind:shadowContent={shadowContent} />`
+
+	result := DynamicComponentByNameParser()(input)
+
+	if !result.Successful {
+		t.Fatalf("Parse failed: %s", result.Error)
+	}
+
+	node, ok := result.Value.(*ast.DynamicComponentByNameNode)
+	if !ok {
+		t.Fatalf("Value is not *ast.DynamicComponentByNameNode, got %T", result.Value)
+	}
+
+	// Check name
+	if node.NameExpression != "layout" {
+		t.Errorf("NameExpression = %q, want %q", node.NameExpression, "layout")
+	}
+
+	// Check spread props
+	if len(node.SpreadProps) != 1 {
+		t.Fatalf("SpreadProps count = %d, want 1", len(node.SpreadProps))
+	}
+	if node.SpreadProps[0] != "content.fields" {
+		t.Errorf("SpreadProps[0] = %q, want %q", node.SpreadProps[0], "content.fields")
+	}
+
+	// Check regular props (shorthand props should be expanded, bind: skipped)
+	wantProps := []struct {
+		name      string
+		value     string
+		isDynamic bool
+	}{
+		{"allContent", "allContent", true},
+		{"allLayouts", "allLayouts", true},
+		{"content", "content", true},
+		{"env", "env", true},
+		// bind:shadowContent should be skipped
+	}
+
+	if len(node.Props) != len(wantProps) {
+		t.Fatalf("Props count = %d, want %d", len(node.Props), len(wantProps))
+	}
+
+	for i, want := range wantProps {
+		got := node.Props[i]
+		if got.Name != want.name {
+			t.Errorf("Props[%d].Name = %q, want %q", i, got.Name, want.name)
+		}
+		if got.Value != want.value {
+			t.Errorf("Props[%d].Value = %q, want %q", i, got.Value, want.value)
+		}
+		if got.IsDynamic != want.isDynamic {
+			t.Errorf("Props[%d].IsDynamic = %v, want %v", i, got.IsDynamic, want.isDynamic)
+		}
+	}
+}
+
 // TestDynamicComponentByNameParser_MixedProps tests mixed spread and regular props
 func TestDynamicComponentByNameParser_MixedProps(t *testing.T) {
 	tests := []struct {

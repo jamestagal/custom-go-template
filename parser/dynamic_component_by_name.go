@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
@@ -22,6 +23,8 @@ import (
 //   - MUST require name={} attribute
 //   - Handles {...expr} spread props
 //   - Handles regular props (static and dynamic)
+//   - Handles shorthand props: {varName} → varName={varName}
+//   - Skips bind: directives (Svelte-specific, not supported in Alpine)
 //   - Preserves prop order for override logic
 func DynamicComponentByNameParser() Parser {
 	return func(input string) Result {
@@ -178,6 +181,8 @@ func parseNameAttribute(attrContent string) (string, string, error) {
 //
 // Handles mixed attributes like:
 //   {...component.fields} title="Hello" {...overrides} debug={true}
+//   {allContent} {allLayouts} - shorthand props (Svelte-style)
+//   bind:propName={value} - skipped (Svelte-specific, not supported)
 //
 // Order is preserved (important for override logic in transformer)
 func parseComponentAttributes(attrContent string) ([]string, []ast.ComponentProp, error) {
@@ -186,8 +191,30 @@ func parseComponentAttributes(attrContent string) ([]string, []ast.ComponentProp
 
 	remaining := strings.TrimSpace(attrContent)
 
+	// Compile regex for shorthand prop detection (COGNITIVE LOAD: 3)
+	// Pattern: {variableName} where variableName is a valid identifier
+	shorthandRegex := regexp.MustCompile(`^\{([a-zA-Z_$][a-zA-Z0-9_$]*)\}`)
+
 	for len(remaining) > 0 {
-		// Check if this is a spread prop: {...expr}
+		// STEP 1: Skip bind: directives (Svelte-specific, not supported) (COGNITIVE LOAD: 2)
+		if strings.HasPrefix(remaining, "bind:") {
+			log.Printf("[parseComponentAttributes] Skipping bind: directive (Svelte-specific, not supported in Alpine)")
+
+			// Find the end of this attribute (next space or end of string)
+			// bind:propName={value} or bind:propName="value"
+			endPos := findAttributeEnd(remaining)
+			if endPos <= 0 {
+				endPos = len(remaining)
+			}
+
+			skipped := remaining[:endPos]
+			log.Printf("[parseComponentAttributes] Skipped: %s", skipped)
+
+			remaining = strings.TrimLeft(remaining[endPos:], " \t\n\r")
+			continue
+		}
+
+		// STEP 2: Check for spread prop: {...expr} (COGNITIVE LOAD: 4)
 		if strings.HasPrefix(remaining, "{...") {
 			spreadExpr, rest, err := parseSpreadProp(remaining)
 			if err != nil {
@@ -201,7 +228,25 @@ func parseComponentAttributes(attrContent string) ([]string, []ast.ComponentProp
 			continue
 		}
 
-		// Otherwise, parse as regular prop
+		// STEP 3: Check for shorthand prop: {varName} (COGNITIVE LOAD: 5)
+		if matches := shorthandRegex.FindStringSubmatch(remaining); len(matches) > 1 {
+			varName := matches[1]
+
+			// Expand shorthand: {varName} → varName={varName}
+			prop := ast.ComponentProp{
+				Name:      varName,
+				Value:     varName,
+				IsDynamic: true, // Shorthand props are always dynamic
+			}
+
+			regularProps = append(regularProps, prop)
+			remaining = strings.TrimLeft(remaining[len(matches[0]):], " \t\n\r")
+
+			log.Printf("[parseComponentAttributes] Parsed shorthand prop: {%s} → %s=%s", varName, varName, varName)
+			continue
+		}
+
+		// STEP 4: Parse as regular prop (COGNITIVE LOAD: 8)
 		prop, rest, err := parseRegularProp(remaining)
 		if err != nil {
 			return nil, nil, fmt.Errorf("regular prop: %w", err)
@@ -214,6 +259,51 @@ func parseComponentAttributes(attrContent string) ([]string, []ast.ComponentProp
 	}
 
 	return spreadProps, regularProps, nil
+}
+
+// findAttributeEnd finds the end of an attribute (for skipping bind: directives)
+// Returns the position after the attribute value
+func findAttributeEnd(input string) int {
+	// Skip "bind:propName"
+	equalsPos := strings.Index(input, "=")
+	if equalsPos <= 0 {
+		// No value, just "bind:propName"
+		spacePos := strings.IndexAny(input, " \t\n\r")
+		if spacePos < 0 {
+			return len(input)
+		}
+		return spacePos
+	}
+
+	// Has value: bind:propName={value} or bind:propName="value"
+	afterEquals := strings.TrimLeft(input[equalsPos+1:], " \t\n\r")
+
+	if strings.HasPrefix(afterEquals, "{") {
+		// Expression value
+		closeBracePos := findMatchingCloseBrace(afterEquals, 0)
+		if closeBracePos > 0 {
+			return equalsPos + 1 + (len(input[equalsPos+1:]) - len(afterEquals)) + closeBracePos + 1
+		}
+	} else if strings.HasPrefix(afterEquals, "\"") {
+		// Quoted value
+		closeQuotePos := findMatchingQuote(afterEquals, 0, '"')
+		if closeQuotePos > 0 {
+			return equalsPos + 1 + (len(input[equalsPos+1:]) - len(afterEquals)) + closeQuotePos + 1
+		}
+	} else if strings.HasPrefix(afterEquals, "'") {
+		// Single quoted value
+		closeQuotePos := findMatchingQuote(afterEquals, 0, '\'')
+		if closeQuotePos > 0 {
+			return equalsPos + 1 + (len(input[equalsPos+1:]) - len(afterEquals)) + closeQuotePos + 1
+		}
+	}
+
+	// Couldn't find end, skip to next space
+	spacePos := strings.IndexAny(input, " \t\n\r")
+	if spacePos < 0 {
+		return len(input)
+	}
+	return spacePos
 }
 
 // parseSpreadProp parses {...expression} syntax
