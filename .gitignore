@@ -19,6 +19,12 @@ server_test
 # Backup files
 *.bak
 *.bak2
+*.backup
+*.backup[0-9]
+*.backup[0-9][0-9]
+*.debugbackup
+*.debugbackup[0-9]
+*.debugbackup[0-9][0-9]
 
 # Log files
 *.log
