@@ -1,0 +1,65 @@
+---
+<!-- Root HTML Wrapper - Wraps all pages with global structure -->
+<!-- This is equivalent to Plenti's html.svelte -->
+
+<!-- Props received from Plenti build system / Go server -->
+export let content, layout, allContent, allLayouts, env, user, shadowContent
+
+<!-- Default values for optional props -->
+prop title = "Plentico"
+prop description = "A Go template engine powered by Alpine.js"
+---
+
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Global Head Component -->
+<Head title={title} description={description} />
+
+<body>
+	<!-- User Menu (conditional - if authenticated) -->
+	<!-- {#if user && $user.isAuthenticated}
+		<UserMenu user={user} content={content} shadowContent={shadowContent} />
+	{/if} -->
+
+	<!-- Login Modal (conditional) -->
+	<!-- <LoginModal /> -->
+
+	<main>
+		<!-- Global Navigation -->
+		<Nav />
+
+		<!-- Global Header -->
+		<!-- <Header /> -->
+
+		<!-- ============================================ -->
+		<!-- DYNAMIC CONTENT LAYOUT INJECTION             -->
+		<!-- This is where page-specific layouts render  -->
+		<!-- For pages → renders layouts/content/pages.html -->
+		<!-- For courses → renders layouts/content/courses.html -->
+		<!-- ============================================ -->
+
+		<!-- Dynamic layout component injection -->
+		<!-- In Svelte this is: <svelte:component this={layout} {...content.fields} /> -->
+		<!-- In our Go template engine, this is handled by the server -->
+		<!-- The server will inject the appropriate layout based on the route -->
+
+		<!-- Slot for dynamic content - replaced by server with specific layout -->
+		<Component:dynamic name={layout}
+			{...content.fields}
+			{allContent}
+			{allLayouts}
+			{content}
+			{env}
+			bind:shadowContent={shadowContent} />
+
+		<!-- Newsletter Subscription (optional global component) -->
+		<!-- <Newsletter /> -->
+
+		<!-- Global Footer -->
+		<Footer />
+	</main>
+
+</body>
+
+</html>
