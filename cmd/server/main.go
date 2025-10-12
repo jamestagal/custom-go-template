@@ -256,8 +256,10 @@ func getAllContent() map[string]interface{} {
 // renderWithWrapper renders a page with the html.html wrapper (Nav + Content + Footer)
 // This is the new unified rendering function that wraps all pages.
 //
-// Pattern: Wrapper Pattern with Props Injection [Load: 18]
-// Cognitive Load: 18 (content loading: 3, allContent: 3, allLayouts: 3, props building: 3, template rendering: 6)
+// UPDATED: Now extracts first component fields and injects them as top-level props (temporary workaround)
+//
+// Pattern: Wrapper Pattern with Props Injection [Load: 20]
+// Cognitive Load: 20 (content loading: 3, allContent: 3, allLayouts: 3, props building: 5, template rendering: 6)
 func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request) error {
 	log.Printf("[renderWithWrapper] Starting wrapper render for layout: %s, route: %s", layoutName, r.URL.Path)
 
@@ -337,6 +339,21 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 			}
 		}
 		props["content"] = contentWithFields
+	}
+
+	// Step 5.5: TEMPORARY WORKAROUND - Extract first component fields as top-level props
+	// This allows _index.html to receive Hero2436 props directly until full Component:dynamic iteration is implemented
+	// TODO: Remove this workaround when implementing .agent-os/specs/2025-10-12-dynamic-component-iteration/
+	if components, ok := contentData["components"].([]interface{}); ok && len(components) > 0 {
+		if firstComp, ok := components[0].(map[string]interface{}); ok {
+			if fields, ok := firstComp["fields"].(map[string]interface{}); ok {
+				// Add each field as a top-level prop
+				for key, value := range fields {
+					props[key] = value
+				}
+				log.Printf("[renderWithWrapper] TEMPORARY WORKAROUND: Added %d fields from first component as top-level props", len(fields))
+			}
+		}
 	}
 
 	log.Printf("[renderWithWrapper] Built props map with %d keys (offered to wrapper)", len(props))
@@ -482,7 +499,13 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 
 	// Render with stores
 	// CRITICAL: Pass original template AST and path for component style aggregation
-	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint)
+	// Extract layout name from props for CSS aggregation
+	layoutName := ""
+	if layoutProp, ok := props["layout"].(string); ok {
+		layoutName = layoutProp
+	}
+
+	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint, layoutName)
 
 	// Build x-data from props
 	xDataValue := buildXDataFromProps(props)
@@ -763,7 +786,7 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 
 	// Render with stores (Task 3.5: Use RenderWithStores instead of Render)
 	// CRITICAL: Pass original template AST and path for component style aggregation
-	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint)
+	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint, "")
 
 	// CRITICAL: Generate x-data using transformer's alpineDataFormatter
 	// This function is not exported, so we need to call Transform to get the data scope

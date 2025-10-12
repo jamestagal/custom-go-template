@@ -1,359 +1,152 @@
 ---
-
+prop companyName = "Custom Template Co."
+prop year = new Date().getFullYear()
+prop links = [
+  { label: "Home", url: "/" },
+  { label: "About", url: "/about" },
+  { label: "Products", url: "/products" },
+  { label: "Contact", url: "/contact" },
+  { label: "Terms of Service", url: "/terms" },
+  { label: "Privacy Policy", url: "/privacy" }
+]
+prop socialLinks = [
+  { label: "Twitter", url: "#", icon: "🐦" },
+  { label: "Facebook", url: "#", icon: "📘" },
+  { label: "Instagram", url: "#", icon: "📷" },
+  { label: "GitHub", url: "#", icon: "🐙" }
+]
 ---
-<!-- ============================================ -->
-<!--                   Footer                     -->
-<!-- ============================================ -->
-
-<footer id="cs-footer-2440">
-    <div class="cs-container">
-        <div class="cs-top">
-            <div class="cs-logo-group">
-                <a class="cs-logo" aria-label="go back to home" href="">
-                    <img class="cs-logo-img" aria-hidden="true" loading="lazy" decoding="async" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/artistitch.svg" alt="logo" width="260" height="48">
-                </a>
-                <ul class="cs-contact-group">
-                    <li class="cs-contact-li">
-                        <img class="cs-contact-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-phone.svg" alt="phone icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true">
-                        <a class="cs-contact-link" href="tel:555-474-7386">555-474-7386</a>
-                    </li>
-                    <li class="cs-contact-li">
-                        <img class="cs-contact-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-email.svg" alt="email icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true">
-                        <a class="cs-contact-link" href="mailto:ArtiStitchart@gmail.com">ArtiStitchart@gmail.com</a>
-                    </li>
-                    <li class="cs-contact-li">
-                        <img class="cs-contact-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-location.svg" alt="location icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true">
-                        <a class="cs-contact-link" href="">555 Fake St, Portland, OR 97217, United States</a>
-                    </li>
-                </ul>
-            </div>
-            <!--Sitemap-->
-            <ul class="cs-ul">
-                <li class="cs-li">
-                    <span class="cs-header">Quick Links</span>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Home</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">About</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Services</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Artist</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">FAQ</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Contact</a>
-                </li>
-            </ul>
-            <ul class="cs-ul">
-                <li class="cs-li">
-                    <span class="cs-header">Our Services</span>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Custom UV Body Painting</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Spiritual & Symbolic Art</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Workshops & Education</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Body Art Reworks</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Live Event Painting</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Symbolic Expression Art</a>
-                </li>
-            </ul>
-            <div class="cs-subscribe-group">
-                <span class="cs-header">Sign up to receive the latest news and events from us.</span>
-                <form class="cs-form" name="Footer Subscribe" method="post">
-                    <input class="cs-input" aria-label="email" name="email" type="email" placeholder="Email Address" required>
-                    <button class="cs-button-solid" name="submit" type="submit" aria-label="submit">
-                        <img class="cs-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-upper-right-arrow.svg" alt="arrow icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true">
-                    </button>
-                </form>
-            </div>
-        </div>
-        <!--Bottom Copyright And Social-->
-        <div class="cs-bottom">
-            <div class="cs-flex">
-                <a href="" class="cs-link">Facebook</a>
-                <div class="cs-divider" aria-hidden="true"></div>
-                <a href="" class="cs-link">Instagram</a>
-                <div class="cs-divider" aria-hidden="true"></div>
-                <a href="" class="cs-link">Tiktok</a>
-                <div class="cs-divider" aria-hidden="true"></div>
-                <a href="" class="cs-link">Youtube</a>
-            </div>
-            <span class="cs-copyright-group">
-                <span class="cs-copyright">© Copyright 2025 -</span>
-                <a class="cs-link" href="">ArtiStitch</a>
-            </span>
-        </div>
-    </div>
-</footer>
 
 <style>
-    /*-- -------------------------- -->
-<---           Footer           -->
-<--- -------------------------- -*/
-
-/* Mobile */
-@media only screen and (min-width: 0rem) {
-  #cs-footer-2440 {
-    padding: var(--sectionPadding);
-    padding-bottom: 1.5rem;
-    background-color: #111418;
-    overflow: hidden;
+  .footer {
+    background-color: #f8f9fa;
+    padding: 2rem 0;
+    margin-top: 3rem;
+    border-top: 1px solid #e9ecef;
   }
-  #cs-footer-2440 .cs-container {
-    width: 100%;
-    max-width: 80rem;
-    margin: auto;
-  }
-  #cs-footer-2440 .cs-top {
-    display: flex;
-    flex-direction: column;
-    /* 16px - 80px */
-    column-gap: clamp(1rem, 6vw, 5rem);
-    row-gap: 2rem;
-  }
-  #cs-footer-2440 .cs-logo-group {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    /* 32px - 72px */
-    gap: clamp(2rem, 5vw, 4.5rem);
-  }
-  #cs-footer-2440 .cs-logo {
-    max-width: 12.8125rem;
-    height: auto;
-    display: block;
-  }
-  #cs-footer-2440 .cs-logo-img {
-    width: 100%;
-    height: auto;
-    display: block;
-  }
-  #cs-footer-2440 .cs-contact-group {
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.875rem;
-  }
-  #cs-footer-2440 .cs-contact-li {
-    display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  #cs-footer-2440 .cs-contact-icon {
-    width: 1.5rem;
-    height: auto;
-    display: block;
-  }
-  #cs-footer-2440 .cs-contact-link {
-    font-size: 1rem;
-    font-weight: 400;
-    line-height: 1.5em;
-    text-decoration: none;
-    color: var(--bodyTextColorWhite);
-    opacity: 0.8;
-  }
-  #cs-footer-2440 .cs-ul {
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  #cs-footer-2440 .cs-header {
-    font-size: 1.25rem;
-    font-weight: 700;
-    line-height: 1.2em;
-    margin: 0 0 0.75rem;
-    color: var(--bodyTextColorWhite);
-    display: block;
-  }
-  #cs-footer-2440 .cs-header .cs-link {
-    opacity: 1;
-  }
-  #cs-footer-2440 .cs-li {
-    font-size: 1rem;
-    line-height: 1.5em;
-    list-style: none;
-    margin: 0;
-  }
-  #cs-footer-2440 .cs-link {
-    text-decoration: none;
-    color: var(--bodyTextColorWhite);
-    opacity: 0.8;
-    transition: color 0.3s;
-  }
-  #cs-footer-2440 .cs-link:hover {
-    color: var(--primary);
-  }
-  #cs-footer-2440 .cs-subscribe-group {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  #cs-footer-2440 .cs-subscribe-group .cs-header {
-    margin: 0;
-  }
-  #cs-footer-2440 .cs-form {
-    width: 100%;
-    display: flex;
-    align-items: stretch;
-    gap: 1rem;
-  }
-  #cs-footer-2440 .cs-input {
-    width: 100%;
-    padding: 1rem;
-    background-color: transparent;
-    color: var(--bodyTextColorWhite);
-    border: none;
-    border-bottom: 1px solid #21252E;
-  }
-  #cs-footer-2440 .cs-button-solid {
-    font-size: 1rem;
-    font-weight: 700;
-    /* 46px - 56px */
-    line-height: clamp(2.875rem, 5.5vw, 3.5rem);
-    text-align: center;
-    text-decoration: none;
-    min-width: 9.375rem;
-    margin: 0;
+  
+  .footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 0 1rem;
-    background-color: var(--primary);
-    color: var(--bodyTextColorWhite);
-    display: inline-block;
-    position: relative;
-    z-index: 1;
   }
-  #cs-footer-2440 .cs-button-solid:before {
-    content: "";
-    width: 0%;
-    height: 100%;
-    background: #fff;
-    opacity: 1;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: -1;
-    transition: width 0.3s;
+  
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 2rem;
   }
-  #cs-footer-2440 .cs-button-solid:hover:before {
-    width: 100%;
+  
+  .footer-brand {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
   }
-  #cs-footer-2440 .cs-button-solid {
-    min-width: auto;
-    border: none;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  
+  .footer-description {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
   }
-  #cs-footer-2440 .cs-icon {
-    width: 1.25rem;
-    height: auto;
-    display: block;
+  
+  .footer-heading {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
   }
-  #cs-footer-2440 .cs-bottom {
-    /* 48px - 80px */
-    margin-top: clamp(3rem, 6vw, 5rem);
-    /* 24px - 40px */
-    padding-top: clamp(1.5rem, 3vw, 2.5rem);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.75rem;
-    position: relative;
-    z-index: 1;
-  }
-  #cs-footer-2440 .cs-bottom:before {
-    content: '';
-    width: 100%;
-    max-width: 80rem;
-    height: 1px;
-    background: #2D2F2E;
-    opacity: 1;
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  #cs-footer-2440 .cs-flex {
-    display: flex;
-    flex-flow: wrap row;
-    justify-content: center;
-    align-items: center;
-    column-gap: 0.75rem;
-    row-gap: 0.25rem;
-  }
-  #cs-footer-2440 .cs-divider {
-    width: 1px;
-    height: 0.8125rem;
-    background-color: var(--bodyTextColorWhite);
-    opacity: 0.8;
-    display: block;
-  }
-  #cs-footer-2440 .cs-copyright {
-    text-decoration: none;
-    color: var(--bodyTextColorWhite);
-    opacity: 0.8;
-    transition: color 0.3s;
-  }
-}
-/* Tablet - 768px */
-@media only screen and (min-width: 48rem) {
-  #cs-footer-2440 .cs-top {
-    flex-direction: row;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-  }
-  #cs-footer-2440 .cs-logo-group {
-    /* 285px - 316px */
-    max-width: clamp(17.8125rem, 22vw, 19.75rem);
-    margin-right: auto;
-  }
-  #cs-footer-2440 .cs-ul {
-    /* Add padding to offset the .cs-ul from the logo, which sits above the rest of the items */
-    padding-top: 5.25rem;
-    flex: none;
-  }
-  #cs-footer-2440 .cs-subscribe-group {
-    width: 100%;
-  }
-  #cs-footer-2440 .cs-bottom {
-    flex-direction: row;
-    justify-content: space-between;
-  }
-}
-/* Desktop - 1024px */
-@media only screen and (min-width: 64rem) {
-  #cs-footer-2440 .cs-top {
-    flex-wrap: nowrap;
-  }
-  #cs-footer-2440 .cs-ul {
+  
+  .footer-links {
+    list-style: none;
     padding: 0;
+    margin: 0;
   }
-  #cs-footer-2440 .cs-subscribe-group {
-    width: initial;
-    /* 281px - 372px */
-    max-width: clamp(17.5625rem, 26vw, 23.25rem);
+  
+  .footer-link {
+    margin-bottom: 0.5rem;
   }
-}
+  
+  .footer-link a {
+    color: #495057;
+    text-decoration: none;
+  }
+  
+  .footer-link a:hover {
+    color: #228be6;
+    text-decoration: underline;
+  }
+  
+  .social-links {
+    display: flex;
+    gap: 0.75rem;
+  }
+  
+  .social-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    background-color: #e9ecef;
+    border-radius: 50%;
+    text-decoration: none;
+    transition: background-color 0.2s;
+  }
+  
+  .social-link:hover {
+    background-color: #dee2e6;
+  }
+  
+  .copyright {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e9ecef;
+    color: #6c757d;
+  }
 </style>
+
+<footer class="footer">
+  <div class="footer-container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">{companyName}</div>
+        <p class="footer-description">
+          Our custom template engine makes building reactive web applications simple and efficient.
+          We focus on developer experience without sacrificing performance.
+        </p>
+        <div class="social-links">
+          {for social in socialLinks}
+            <a href="{social.url}" class="social-link" title="{social.label}">
+              {social.icon }
+            </a>
+          {/for}
+        </div>
+      </div>
+      
+      <div>
+        <h3 class="footer-heading">Quick Links</h3>
+        <ul class="footer-links">
+          {for link, index in links.slice(0, 3)}
+            <li class="footer-link">
+              <a href="{link.url}">{link.label}</a>
+            </li>
+          {/for}
+        </ul>
+      </div>
+      
+      <div>
+        <h3 class="footer-heading">Resources</h3>
+        <ul class="footer-links">
+          {for link, index in links.slice(3)}
+            <li class="footer-link">
+              <a href="{link.url}">{link.label}</a>
+            </li>
+          {/for}
+        </ul>
+      </div>
+    </div>
+    
+    <div class="copyright">
+      &copy; {year} {companyName}. All rights reserved.
+    </div>
+  </div>
+</footer>

@@ -74,7 +74,7 @@ store auth = {
 	}
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
 
 	// Verify all three components reference $store.auth
 	if !strings.Contains(markup, "x-text=\"$store.auth.user.name\"") {
@@ -145,7 +145,7 @@ store counter = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
 
 	// Verify event handlers use $store.counter
 	if !strings.Contains(markup, "@click=\"$store.counter.increment()\"") {
@@ -231,7 +231,7 @@ store cart = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
 
 	// Verify all four "components" reference the same store
 	// Component 1: Add button
@@ -373,7 +373,7 @@ store app = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
 
 	// Verify nested property access
 	if !strings.Contains(markup, "$store.app.user.profile.name") {

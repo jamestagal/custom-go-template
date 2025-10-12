@@ -47,7 +47,7 @@ store user = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
 
 	// Verify deeply nested property access
 	if !strings.Contains(markup, "x-text=\"$store.user.profile.contact.email\"") {
@@ -175,7 +175,7 @@ store app = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
 
 	// Verify nested property access in conditionals
 	if !strings.Contains(markup, "x-if=\"$store.app.settings.features.darkMode\"") {

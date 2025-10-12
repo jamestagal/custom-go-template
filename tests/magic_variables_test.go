@@ -45,7 +45,7 @@ export let components
 	transformed := transformer.TransformAST(tmpl, props)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
 
 	// Verify components array is accessible
 	if !strings.Contains(markup, "Components array exists") {
@@ -83,7 +83,7 @@ export let content
 	transformed := transformer.TransformAST(tmpl, props)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
 
 	// Verify content object is accessible
 	if !strings.Contains(markup, "x-text=\"content.title\"") {
@@ -125,7 +125,7 @@ export let allContent
 	transformed := transformer.TransformAST(tmpl, props)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
 
 	// Verify allContent map is accessible
 	if !strings.Contains(markup, "All content map exists") {
@@ -163,7 +163,7 @@ export let allLayouts
 	transformed := transformer.TransformAST(tmpl, props)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
 
 	// Verify allLayouts registry is accessible
 	if !strings.Contains(markup, "All layouts registry exists") {
@@ -240,7 +240,7 @@ export let components, content, allContent, allLayouts
 	transformed := transformer.TransformAST(tmpl, props)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
 
 	// Verify component rendered with magic variables
 	if !strings.Contains(markup, "test-component") {
@@ -321,7 +321,7 @@ export let components
 	transformed := transformer.TransformAST(tmpl, props)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
 
 	// Verify both components rendered
 	if !strings.Contains(markup, "comp1") {
@@ -411,7 +411,7 @@ export let components, content
 	transformed := transformer.TransformAST(tmpl, props)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
 
 	// Verify Hero2436 rendered with props
 	if !strings.Contains(markup, "hero-2436") {

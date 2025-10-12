@@ -73,6 +73,14 @@ func findComponentNodes(nodes []ast.Node) []string {
 				componentNames = append(componentNames, componentName)
 			}
 
+		case *ast.DynamicComponentByNameNode:
+			// BUGFIX: Handle <Component:dynamic name={var} /> nodes
+			// These appear in the ORIGINAL AST before transformation
+			// We can't resolve the name here (it's a variable), but we log it
+			log.Printf("[findComponentNodes] Found DynamicComponentByNameNode with nameExpr=%q (will be resolved in transformed AST)",
+				n.NameExpression)
+			// Don't add to componentNames - will be picked up from transformed AST
+
 		case *ast.Element:
 			// Recursively check children
 			componentNames = append(componentNames, findComponentNodes(n.Children)...)
@@ -94,7 +102,171 @@ func findComponentNodes(nodes []ast.Node) []string {
 	return componentNames
 }
 
+// AggregateComponentStylesWithTransformed aggregates styles from both original and transformed ASTs
+//
+// This function solves the "missing component CSS" problem by collecting components from:
+// 1. Original AST - for FenceSection imports (Hero2436, Services2437 in _index.html)
+// 2. Transformed AST - for dynamically resolved components (Component:dynamic → _index)
+// 3. Dynamic layout - when Component:dynamic resolves to a layout, collect that layout's imports
+//
+// Pattern: Style Aggregation Pattern [Load: 22]
+// Cognitive Load: 22 (traverse original: 5, traverse transformed: 5, dynamic layout: 4, merge: 3, dedupe: 4, format: 1)
+//
+// Example:
+//   html.html (original) imports: Nav, Head, Footer
+//   html.html (transformed) has: Nav, Head, Footer, + resolved _index component
+//   dynamicLayoutName: "_index"
+//   _index (original) imports: Hero2436, Services2437
+//   Result: Styles from Nav, Head, Footer, Hero2436, Services2437, _index
+func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transformedAST *ast.Template, componentName string, dynamicLayoutName string) string {
+	// Handle nil template gracefully
+	if originalAST == nil && transformedAST == nil {
+		return ""
+	}
+
+	// Track visited components to prevent infinite loops
+	visited := make(map[string]bool)
+
+	// Store style blocks by hash for deduplication
+	styleBlocks := make(map[string]*StyleBlock)
+
+	// Preserve insertion order for deterministic output
+	var orderedHashes []string
+
+	// Recursive collection function
+	var collectStyles func(template *ast.Template, name string)
+	collectStyles = func(template *ast.Template, name string) {
+		// Prevent infinite loops from circular dependencies
+		if visited[name] {
+			return
+		}
+		visited[name] = true
+
+		// Handle nil or empty RootNodes
+		if template == nil || template.RootNodes == nil {
+			return
+		}
+
+		// PHASE 1: Collect all component names from the tree
+		// This includes both FenceSection.Imports AND ComponentNode usage
+		var allComponentNames []string
+
+		// Find components used in the template body (ComponentNode)
+		allComponentNames = append(allComponentNames, findComponentNodes(template.RootNodes)...)
+
+		// Also add components from FenceSection imports
+		for _, node := range template.RootNodes {
+			if fence, ok := node.(*ast.FenceSection); ok {
+				if fence.Imports != nil {
+					for _, imp := range fence.Imports {
+						allComponentNames = append(allComponentNames, imp.Name)
+					}
+				}
+			}
+		}
+
+		// Deduplicate component names
+		seenComponents := make(map[string]bool)
+		var uniqueComponentNames []string
+		for _, compName := range allComponentNames {
+			if !seenComponents[compName] {
+				seenComponents[compName] = true
+				uniqueComponentNames = append(uniqueComponentNames, compName)
+			}
+		}
+
+		// Process all discovered components recursively (dependencies first)
+		for _, compName := range uniqueComponentNames {
+			if compTemplate, exists := transformer.GetComponentTemplate(compName); exists {
+				// Recursively collect styles from dependency
+				collectStyles(compTemplate.Template, compName)
+			}
+			// Gracefully skip missing components (no panic)
+		}
+
+		// PHASE 2: Process this component's styles
+		for _, node := range template.RootNodes {
+			if styleSection, ok := node.(*ast.StyleSection); ok {
+				// Skip empty or whitespace-only style blocks
+				trimmedContent := strings.TrimSpace(styleSection.Content)
+				if trimmedContent == "" {
+					continue
+				}
+
+				// Calculate SHA256 hash for deduplication
+				hash := fmt.Sprintf("%x", sha256.Sum256([]byte(trimmedContent)))
+
+				// Only add if not already present (deduplication)
+				if _, exists := styleBlocks[hash]; !exists {
+					styleBlocks[hash] = &StyleBlock{
+						Content: trimmedContent,
+						Source:  name,
+						Hash:    hash,
+					}
+					orderedHashes = append(orderedHashes, hash)
+				}
+			}
+		}
+	}
+
+	// CRITICAL FIX: Collect from BOTH original and transformed ASTs
+	// Step 1: Collect from original AST (gets FenceSection imports)
+	log.Printf("[AggregateComponentStyles] Phase 1: Collecting from original AST for: %s", componentName)
+	collectStyles(originalAST, componentName)
+
+	// Step 2: Collect from transformed AST (gets dynamically resolved components)
+	if transformedAST != nil {
+		log.Printf("[AggregateComponentStyles] Phase 2: Collecting from transformed AST for: %s", componentName)
+		// Find additional components in transformed AST (like resolved Component:dynamic)
+		transformedComponents := findComponentNodes(transformedAST.RootNodes)
+		log.Printf("[AggregateComponentStyles] Found %d components in transformed AST: %v",
+			len(transformedComponents), transformedComponents)
+
+		// Collect styles from these components
+		for _, compName := range transformedComponents {
+			if compTemplate, exists := transformer.GetComponentTemplate(compName); exists {
+				collectStyles(compTemplate.Template, compName)
+			}
+		}
+	}
+
+	// Step 3: NEW FIX - If a dynamic layout was resolved, collect its imports too
+	// This handles the case where Component:dynamic → _index, and _index imports Hero2436, Services2437
+	if dynamicLayoutName != "" {
+		log.Printf("[AggregateComponentStyles] Phase 3: Collecting from dynamic layout: %s", dynamicLayoutName)
+
+		// Get the layout's component template
+		if layoutTemplate, exists := transformer.GetComponentTemplate(dynamicLayoutName); exists {
+			log.Printf("[AggregateComponentStyles] Found dynamic layout template: %s", dynamicLayoutName)
+
+			// Collect styles from the layout itself and its imports
+			collectStyles(layoutTemplate.Template, dynamicLayoutName)
+		} else {
+			log.Printf("[AggregateComponentStyles] Warning: dynamic layout %s not found in component registry", dynamicLayoutName)
+		}
+	}
+
+	// Build aggregated CSS with source comments
+	var result strings.Builder
+
+	for _, hash := range orderedHashes {
+		block := styleBlocks[hash]
+
+		// Add source comment
+		result.WriteString(fmt.Sprintf("/* Styles from: %s */\n", block.Source))
+
+		// Add CSS content
+		result.WriteString(block.Content)
+		result.WriteString("\n\n")
+	}
+
+	return result.String()
+}
+
 // AggregateComponentStyles traverses the component tree and aggregates styles
+//
+// DEPRECATED: Use AggregateComponentStylesWithTransformed instead
+// This function only looks at the original AST and misses dynamically resolved components
 //
 // Algorithm:
 // 1. Use depth-first traversal to collect styles (dependencies first)
@@ -225,38 +397,47 @@ func AggregateComponentStyles(rootTemplate *ast.Template, componentName string) 
 
 // GetAggregatedStyles returns aggregated styles for a component, using cache when possible.
 //
+// UPDATED: Now accepts both original and transformed ASTs to handle dynamic components
+// UPDATED: Now accepts dynamicLayoutName to collect styles from dynamically resolved layouts
+//
 // On first call for a component, performs full aggregation and caches result.
 // Subsequent calls return cached result for significant performance improvement.
 //
 // Thread-safe for concurrent access.
 //
 // Example:
-//   styles := GetAggregatedStyles(template, "Header")
-//   // First call: cache miss, performs aggregation
-//   styles2 := GetAggregatedStyles(template, "Header")
+//   styles := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index")
+//   // First call: cache miss, performs aggregation including _index layout imports
+//   styles2 := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index")
 //   // Second call: cache hit, returns cached result instantly
-func GetAggregatedStyles(template *ast.Template, componentName string) string {
+func GetAggregatedStyles(originalAST *ast.Template, transformedAST *ast.Template, componentName string, dynamicLayoutName string) string {
+	// Build cache key that includes dynamic layout name
+	cacheKey := componentName
+	if dynamicLayoutName != "" {
+		cacheKey = fmt.Sprintf("%s:layout=%s", componentName, dynamicLayoutName)
+	}
+
 	if !cacheEnabled {
-		return AggregateComponentStyles(template, componentName)
+		return AggregateComponentStylesWithTransformed(originalAST, transformedAST, componentName, dynamicLayoutName)
 	}
 
 	// Try cache lookup (read lock for concurrent reads)
 	styleCacheMutex.RLock()
-	cached, exists := componentStyleCache[componentName]
+	cached, exists := componentStyleCache[cacheKey]
 	styleCacheMutex.RUnlock()
 
 	if exists {
-		log.Printf("[Style Cache] HIT for component: %s", componentName)
+		log.Printf("[Style Cache] HIT for component: %s (dynamic layout: %s)", componentName, dynamicLayoutName)
 		return cached
 	}
 
 	// Cache miss - perform aggregation
-	log.Printf("[Style Cache] MISS for component: %s - aggregating...", componentName)
-	aggregated := AggregateComponentStyles(template, componentName)
+	log.Printf("[Style Cache] MISS for component: %s (dynamic layout: %s) - aggregating...", componentName, dynamicLayoutName)
+	aggregated := AggregateComponentStylesWithTransformed(originalAST, transformedAST, componentName, dynamicLayoutName)
 
 	// Store in cache (write lock for exclusive write)
 	styleCacheMutex.Lock()
-	componentStyleCache[componentName] = aggregated
+	componentStyleCache[cacheKey] = aggregated
 	styleCacheMutex.Unlock()
 
 	return aggregated
