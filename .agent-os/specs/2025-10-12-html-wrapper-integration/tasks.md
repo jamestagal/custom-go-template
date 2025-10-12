@@ -24,8 +24,8 @@
   - [x] 2.4 Build props map with layout, content, allContent, allLayouts
   - [x] 2.5 Call renderTemplate with html.html wrapper and props
   - [x] 2.6 Add logging for wrapper rendering pipeline
-  - [x] 2.7 Test with single route (home page)
-  - [x] 2.8 Verify all tests pass (compilation successful, ready for manual testing)
+  - [x] 2.7 Test with single route (home page) - ✅ Nav + Footer rendering!
+  - [x] 2.8 Verify all tests pass - ✅ Fixed content layout registration
 
 - [ ] 3. Update Route Handlers to Use Wrapper
   - [ ] 3.1 Write tests for all updated routes

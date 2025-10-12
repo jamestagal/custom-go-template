@@ -312,14 +312,15 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 	}
 
 	// Step 5: Build props map for wrapper
-	// The wrapper expects these props to pass to Component:dynamic
+	// IMPORTANT: These are offered to the wrapper, but wrapper's export let controls which are actually used
+	// The opt-in filtering happens inside renderTemplateWithProps
 	props := map[string]interface{}{
-		"layout":      layoutName,      // Name of the layout to render (e.g., "_index")
-		"content":     contentData,     // Full content object
-		"allContent":  allContent,      // All site content
-		"allLayouts":  allLayouts,      // All available layouts
-		"env":         make(map[string]interface{}), // Environment vars (TODO: populate if needed)
-		"user":        make(map[string]interface{}), // User data (TODO: populate if needed)
+		"layout":        layoutName, // Name of the layout to render (e.g., "_index")
+		"content":       contentData, // Full content object
+		"allContent":    allContent,  // All site content
+		"allLayouts":    allLayouts,  // All available layouts
+		"env":           make(map[string]interface{}), // Environment vars (TODO: populate if needed)
+		"user":          make(map[string]interface{}), // User data (TODO: populate if needed)
 		"shadowContent": make(map[string]interface{}), // Shadow content (TODO: populate if needed)
 	}
 
@@ -338,15 +339,15 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 		props["content"] = contentWithFields
 	}
 
-	log.Printf("[renderWithWrapper] Built props map with %d keys", len(props))
+	log.Printf("[renderWithWrapper] Built props map with %d keys (offered to wrapper)", len(props))
 	log.Printf("[renderWithWrapper] Props keys: %v", getKeys(props))
 
 	// Step 6: Call renderTemplate with html.html wrapper and props
-	// We need to modify renderTemplate to accept props, so we'll call it directly
+	// renderTemplateWithProps will filter these based on wrapper's export let declarations
 	wrapperPath := "layouts/global/html.html"
 	log.Printf("[renderWithWrapper] Rendering wrapper template: %s", wrapperPath)
 
-	// Use renderTemplateWithProps (we'll create this helper)
+	// Use renderTemplateWithProps (with opt-in filtering)
 	err = renderTemplateWithProps(wrapperPath, props, w, r)
 	if err != nil {
 		return fmt.Errorf("renderWithWrapper: failed to render wrapper: %w", err)
@@ -358,6 +359,9 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 
 // renderTemplateWithProps renders a template with explicitly provided props
 // This is a variant of renderTemplate that accepts pre-built props instead of extracting them from fence
+//
+// UPDATED: Now implements magic variables opt-in system (commit 760ccb1)
+// Only props declared in fence's "export let" will be added to x-data scope
 //
 // Pattern: Template Rendering with Props Injection [Load: 22]
 // Cognitive Load: 22 (read: 2, parse: 3, props merge: 4, fence processing: 3, transform: 3, store merge: 3, render: 2, inject: 2)
@@ -395,10 +399,26 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 		}
 	}
 
-	// Start with explicit props (these take precedence)
+	// Build exportedPropNames map for opt-in filtering (Magic Variables Opt-In System)
+	exportedPropNames := make(map[string]bool)
+	if fenceWithStores != nil {
+		for _, propName := range fenceWithStores.ExportedProps {
+			exportedPropNames[propName] = true
+		}
+		log.Printf("[renderTemplateWithProps] Template %s exports: %v", entrypoint, fenceWithStores.ExportedProps)
+	}
+
+	// Filter explicit props based on export let declarations (OPT-IN ONLY)
+	// This prevents data bloat from unused magic variables
 	props := make(map[string]interface{})
 	for k, v := range explicitProps {
-		props[k] = v
+		// Only add prop if it's declared in export let
+		if exportedPropNames[k] {
+			props[k] = v
+			log.Printf("[renderTemplateWithProps] Added prop '%s' (declared in export let)", k)
+		} else {
+			log.Printf("[renderTemplateWithProps] Skipped prop '%s' (not in export let)", k)
+		}
 	}
 
 	// Extract props from fence section (as defaults if not in explicitProps)
