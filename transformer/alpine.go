@@ -341,6 +341,10 @@ func FormatGoValueToJS(value any) string {
 		// Regular string - add single quotes and escape (COGNITIVE LOAD RULE: proper escaping)
 		escaped := strings.ReplaceAll(v, `\`, `\\`)
 		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+		// CRITICAL: Escape newlines and other control characters for HTML attributes
+		escaped = strings.ReplaceAll(escaped, "\n", `\n`)
+		escaped = strings.ReplaceAll(escaped, "\r", `\r`)
+		escaped = strings.ReplaceAll(escaped, "\t", `\t`)
 		result := fmt.Sprintf(`'%s'`, escaped)
 		log.Printf("formatGoValueToJS: Regular string, quoting with single quotes: %s → %s", v, result)
 		return result
@@ -378,6 +382,20 @@ func FormatGoValueToJS(value any) string {
 	case float64:
 		return fmt.Sprintf("%v", v)
 
+	case []string:
+		// Array of strings - quote each element
+		elements := make([]string, 0, len(v))
+		for _, item := range v {
+			escaped := strings.ReplaceAll(item, `\`, `\\`)
+			escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+			// Escape newlines and control characters
+			escaped = strings.ReplaceAll(escaped, "\n", `\n`)
+			escaped = strings.ReplaceAll(escaped, "\r", `\r`)
+			escaped = strings.ReplaceAll(escaped, "\t", `\t`)
+			elements = append(elements, fmt.Sprintf(`'%s'`, escaped))
+		}
+		return "[" + strings.Join(elements, ",") + "]"
+
 	case []interface{}:
 		// Array - format elements (COGNITIVE LOAD RULE: preallocate slice)
 		elements := make([]string, 0, len(v))
@@ -394,22 +412,39 @@ func FormatGoValueToJS(value any) string {
 		}
 		return "[" + strings.Join(elements, ",") + "]"
 
-	case map[string]any:
+	case map[string]interface{}:
 		// Object - format key-value pairs (COGNITIVE LOAD RULE: sorted keys for consistency)
-		// Note: map[string]any is the same as map[string]interface{}
-		keys := make([]string, 0, len(v))
-		for key := range v {
+		// NOTE: map[string]any is an alias for map[string]interface{} in Go 1.18+
+		// This case handles both since they're the same underlying type
+		m := v
+
+		keys := make([]string, 0, len(m))
+		for key := range m {
 			keys = append(keys, key)
 		}
 		sort.Strings(keys)
 
-		pairs := make([]string, 0, len(v))
+		pairs := make([]string, 0, len(m))
 		for _, key := range keys {
-			value := v[key]
-			formattedValue := FormatGoValueToJS(value)
-			// Use unquoted keys for JavaScript object syntax
-			// Alpine.js accepts: {name: "John", age: 30}
-			pairs = append(pairs, fmt.Sprintf(`%s:%s`, key, formattedValue))
+			val := m[key]
+			formattedValue := FormatGoValueToJS(val)
+
+			// CRITICAL FIX: Quote keys that need quoting (contains special chars)
+			// Valid identifiers can be unquoted: {name: "John"}
+			// Special chars need quotes: {"pages/_index": "data", "my-key": "value"}
+			formattedKey := key
+			if !isValidJSIdentifier(key) {
+				// Quote the key with single quotes (for HTML attribute safety)
+				escaped := strings.ReplaceAll(key, `\`, `\\`)
+				escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+				// Escape newlines and control characters in keys
+				escaped = strings.ReplaceAll(escaped, "\n", `\n`)
+				escaped = strings.ReplaceAll(escaped, "\r", `\r`)
+				escaped = strings.ReplaceAll(escaped, "\t", `\t`)
+				formattedKey = fmt.Sprintf(`'%s'`, escaped)
+			}
+
+			pairs = append(pairs, fmt.Sprintf(`%s:%s`, formattedKey, formattedValue))
 		}
 		return "{" + strings.Join(pairs, ",") + "}"
 
@@ -421,6 +456,30 @@ func FormatGoValueToJS(value any) string {
 		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
 		return fmt.Sprintf(`'%s'`, escaped)
 	}
+}
+
+// isValidJSIdentifier checks if a string is a valid JavaScript identifier
+// Valid identifiers can be used as unquoted object keys
+// Pattern: ^[a-zA-Z_$][a-zA-Z0-9_$]*$
+func isValidJSIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	// First character must be letter, underscore, or dollar sign
+	first := rune(s[0])
+	if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_' || first == '$') {
+		return false
+	}
+
+	// Remaining characters can be letters, digits, underscore, or dollar sign
+	for _, ch := range s[1:] {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '$') {
+			return false
+		}
+	}
+
+	return true
 }
 
 // truncateString truncates a string to maxLen characters with ellipsis
@@ -758,9 +817,14 @@ func alpineDataFormatter(dataScope map[string]any) string {
 		// Format value based on type - handle dynamic expressions specially
 		var formattedValue string
 		if strVal, ok := value.(string); ok {
-			// Check if this is a dynamic expression (variable reference or expression)
-			// CRITICAL FIX: Pass dataScope to isDynamicExpression for scope checking
-			if isDynamicExpression(strVal, dataScope) {
+			// CRITICAL: Check if this has the __VAR_REF__ marker
+			// This indicates a variable reference that should be output without quotes
+			if strings.HasPrefix(strVal, "__VAR_REF__") {
+				// Strip the marker and output as unquoted variable reference
+				varName := strings.TrimPrefix(strVal, "__VAR_REF__")
+				formattedValue = varName
+				log.Printf("alpineDataFormatter: Stripped __VAR_REF__ marker, outputting variable reference: %s", varName)
+			} else if isDynamicExpression(strVal, dataScope) {
 				// Don't quote dynamic expressions - Alpine.js will evaluate them
 				formattedValue = strVal
 			} else {

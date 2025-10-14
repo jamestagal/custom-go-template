@@ -46,9 +46,27 @@ func UnregisterComponent(name string) {
 }
 
 // GetComponentTemplate retrieves a component template by name
+// Supports case-insensitive lookup to match JSON component names like "hero2436" with registered "Hero2436"
 func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
+	// Try exact match first (most common case)
 	template, exists := componentTemplateRegistry[name]
-	return template, exists
+	if exists {
+		return template, exists
+	}
+
+	// Try case-insensitive match by capitalizing first letter
+	// This handles: "hero2436" → "Hero2436", "footer" → "Footer"
+	if len(name) > 0 {
+		capitalizedName := strings.ToUpper(name[:1]) + name[1:]
+		template, exists = componentTemplateRegistry[capitalizedName]
+		if exists {
+			log.Printf("[GetComponentTemplate] Found component via case-insensitive match: %q → %q", name, capitalizedName)
+			return template, exists
+		}
+	}
+
+	// Not found with any strategy
+	return nil, false
 }
 
 // GetAllRegisteredKeys returns all registered component template keys for debugging
@@ -346,6 +364,7 @@ func formatComponentData(dataScope map[string]any) string {
 				continue
 			}
 
+
 			// Check if this is a dynamic expression (no quotes)
 			// We need to handle variable references without quotes
 			isDynamic := isDynamicExpression(cleanValue, dataScope)
@@ -538,7 +557,16 @@ func isDynamicExpression(value string, dataScope map[string]any) bool {
 		return true
 	}
 
+	// CRITICAL: Check for URL paths BEFORE arithmetic operators
+	// Paths like "/contact" or "/about" should NOT be treated as division!
+	// URL paths start with / and don't contain spaces or other operators
+	if strings.HasPrefix(trimmed, "/") && !strings.Contains(trimmed, " ") {
+		// This looks like a URL path, not a division expression
+		return false
+	}
+
 	// Arithmetic operators: age + 50, count * 2
+	// Note: Division (/) is checked above to avoid false positives with paths
 	if strings.Contains(trimmed, "+") ||
 		strings.Contains(trimmed, "-") ||
 		strings.Contains(trimmed, "*") ||
@@ -613,11 +641,19 @@ func extractPropValue(prop ast.ComponentProp, parentDataScope map[string]any) an
 		// Use a special prefix to mark it as a variable reference (not a string literal)
 		if isSimpleVariableReference(varName) {
 			// Check if the variable exists in parent scope
-			if _, exists := parentDataScope[varName]; exists {
-				// Return with special prefix to mark as variable reference
-				// This will be stripped in formatComponentData
-				log.Printf("extractPropValue: Passing variable reference '%s' (not resolved value)", varName)
-				return "__VAR_REF__" + varName
+			if value, exists := parentDataScope[varName]; exists {
+				// CRITICAL: Check if the parent's value is ALSO a __VAR_REF__
+				// If yes, keep it as a variable reference (for reactive variables)
+				// If no, return the actual value (for static data like JSON objects)
+				if strVal, ok := value.(string); ok && strings.HasPrefix(strVal, "__VAR_REF__") {
+					// Parent has a variable reference, keep the chain
+					log.Printf("extractPropValue: Passing variable reference '%s' (parent also has __VAR_REF__)", varName)
+					return "__VAR_REF__" + varName
+				} else {
+					// Parent has actual data, return it directly
+					log.Printf("extractPropValue: Resolving '%s' to actual value (type: %T)", varName, value)
+					return value
+				}
 			} else {
 				log.Printf("extractPropValue: Variable '%s' NOT FOUND in parent scope!", varName)
 			}

@@ -135,8 +135,10 @@ func AnyToSlice(value any) []any {
 func MakeGetter(comp_data map[string]any) string {
 	var comp_data_str string
 	for name, expr := range comp_data {
-		// expr is already the JS expression string or JS literal string
-		comp_data_str += fmt.Sprintf("get %s() { return %s },", name, expr)
+		// CRITICAL FIX: Use AnyToJSValue to properly format Go values as JavaScript
+		// This prevents Go's default map format (map[...]) from appearing in JS
+		formattedExpr := AnyToJSValue(expr)
+		comp_data_str += fmt.Sprintf("get %s() { return %s },", name, formattedExpr)
 	}
 	return "{" + strings.TrimSuffix(comp_data_str, ",") + "}"
 }
