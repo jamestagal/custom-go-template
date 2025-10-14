@@ -1,16 +1,24 @@
 ---
+let mobileMenuOpen = false
+
+function toggleMobileMenu() {
+    this.mobileMenuOpen = !this.mobileMenuOpen
+}
 ---
 <!-- ============================================ -->
 <!--                 Navigation                   -->
 <!-- ============================================ -->
 
-<header id="cs-navigation">
+<header id="cs-navigation" :class="{'cs-active': mobileMenuOpen}">
     <div class="cs-container">
         <div class="cs-top">
             <!--Navigation List-->
             <nav class="cs-nav" aria-label="main navigation">
                 <!--Mobile Nav Toggle-->
-                <button class="cs-toggle" aria-label="mobile menu toggle" aria-expanded="false" aria-controls="cs-ul-wrapper" aria-haspopup="menu">
+                <button class="cs-toggle"
+                @click="toggleMobileMenu()"
+                :aria-expanded="mobileMenuOpen" aria-label="mobile menu toggle" 
+                aria-controls="cs-ul-wrapper" aria-haspopup="menu">
                     <span class="cs-box" aria-hidden="true">
                         <span class="cs-line cs-line1"></span>
                         <span class="cs-line cs-line2"></span>

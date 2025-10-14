@@ -60,6 +60,9 @@ func main() {
 	// Register components (now with store registry available)
 	registerComponents(storeRegistry)
 
+	// Dynamically register routes for all content layouts
+	registerContentRoutes()
+
 	// Set up the HTTP server
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Serve static files from organized directories
@@ -73,34 +76,6 @@ func main() {
 			log.Printf("Error rendering home page: %v", err)
 			http.Error(w, "Failed to render page", http.StatusInternalServerError)
 		}
-	})
-
-	// Add comprehensive-simple page route (WORKING - no multi-line vars)
-	http.HandleFunc("/comprehensive-simple", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("layouts/content/comprehensive.html", w, r)
-	})
-
-	// Add comprehensive page route (HAS BUGS - multi-line var extraction broken)
-	http.HandleFunc("/comprehensive", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("layouts/content/comprehensive.html", w, r)
-	})
-
-	// Add store-test-minimal page route (Testing Task 2.1: Store Expression Transformer - no definitions)
-	http.HandleFunc("/store-test-minimal", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("layouts/content/store-test-minimal.html", w, r)
-	})
-
-	// Add store-test-with-theme page route (Testing visual theme switching with stores)
-	http.HandleFunc("/store-test-with-theme", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("layouts/content/store-test-with-theme.html", w, r)
-	})
-
-	// TASK 4.1 & 4.2: Store components demo page with content loading
-	http.HandleFunc("/store-components-demo", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("layouts/content/store-demo.html", w, r)
-	})
-	http.HandleFunc("/store-demo", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate("layouts/content/store-demo.html", w, r)
 	})
 
 	// Start the server
@@ -427,14 +402,32 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 
 	// Filter explicit props based on export let declarations (OPT-IN ONLY)
 	// This prevents data bloat from unused magic variables
+	// IMPORTANT: Props from content.fields are allowed to pass through even if not in wrapper's export let
+	// because they're meant for child components (via {...content.fields} spread)
 	props := make(map[string]interface{})
+
+	// Check if any props are from content.fields (for passthrough to children)
+	contentFieldsProps := make(map[string]bool)
+	if contentProp, ok := explicitProps["content"].(map[string]interface{}); ok {
+		if fields, ok := contentProp["fields"].(map[string]interface{}); ok {
+			for fieldName := range fields {
+				contentFieldsProps[fieldName] = true
+			}
+		}
+	}
+
 	for k, v := range explicitProps {
-		// Only add prop if it's declared in export let
+		// Allow prop if:
+		// 1. It's declared in export let, OR
+		// 2. It's from content.fields (passthrough for child components)
 		if exportedPropNames[k] {
 			props[k] = v
 			log.Printf("[renderTemplateWithProps] Added prop '%s' (declared in export let)", k)
+		} else if contentFieldsProps[k] {
+			props[k] = v
+			log.Printf("[renderTemplateWithProps] Added prop '%s' (from content.fields, passthrough to children)", k)
 		} else {
-			log.Printf("[renderTemplateWithProps] Skipped prop '%s' (not in export let)", k)
+			log.Printf("[renderTemplateWithProps] Skipped prop '%s' (not in export let or content.fields)", k)
 		}
 	}
 
@@ -958,12 +951,19 @@ func escapeStringForJS(s string) string {
 // Pattern: String Escaping Pattern [Load: 4]
 // Cognitive Load: 4 (replace operations: 4)
 func escapeXDataForAttr(value string) string {
-	// Escape HTML entities that would break the attribute
-	// Note: We're using double quotes for the attribute, so escape double quotes
-	value = strings.ReplaceAll(value, `&`, `&amp;`)
+	// CRITICAL FIX: Do NOT HTML-escape JavaScript code in x-data!
+	// The JavaScript object literal uses single quotes for strings,
+	// so only the double quote needs escaping for the HTML attribute delimiter.
+	//
+	// Example: x-data="{ name: 'John & Jane' }"
+	//   - The & stays as & (not &amp;) because it's inside JavaScript
+	//   - Only " needs to become &quot; to not break the attribute
+	//
+	// WRONG: x-data="{ name: 'John &amp; Jane' }"  ← JavaScript syntax error!
+	// RIGHT: x-data="{ name: 'John & Jane' }"      ← Valid JavaScript
+
+	// Only escape double quotes (the HTML attribute delimiter)
 	value = strings.ReplaceAll(value, `"`, `&quot;`)
-	value = strings.ReplaceAll(value, `<`, `&lt;`)
-	value = strings.ReplaceAll(value, `>`, `&gt;`)
 
 	return value
 }
@@ -1217,4 +1217,51 @@ func parseValue(value string) interface{} {
 
 	// Default to string
 	return value
+}
+
+// registerContentRoutes dynamically registers HTTP routes for all .html files in layouts/content/
+// This eliminates the need to manually add routes for each page.
+//
+// Pattern: Dynamic Route Registration [Load: 12]
+// Cognitive Load: 12 (directory read: 3, file filtering: 2, route creation: 4, logging: 3)
+func registerContentRoutes() {
+	contentDir := "layouts/content"
+
+	// Read all files in the content directory
+	files, err := os.ReadDir(contentDir)
+	if err != nil {
+		log.Printf("Warning: Failed to read content directory %s: %v", contentDir, err)
+		return
+	}
+
+	routeCount := 0
+	for _, file := range files {
+		// Skip directories and non-HTML files
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".html") {
+			continue
+		}
+
+		// Extract route name from filename (e.g., "store-demo.html" → "store-demo")
+		routeName := strings.TrimSuffix(file.Name(), ".html")
+
+		// Skip _index.html (handled separately by the root "/" route)
+		if routeName == "_index" {
+			continue
+		}
+
+		// Build file path
+		filePath := filepath.Join(contentDir, file.Name())
+
+		// Register route (capture filePath in closure)
+		route := "/" + routeName
+		currentFilePath := filePath // Capture for closure
+		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
+			renderTemplate(currentFilePath, w, r)
+		})
+
+		routeCount++
+		log.Printf("Registered route: %s → %s", route, filePath)
+	}
+
+	log.Printf("Registered %d dynamic content routes", routeCount)
 }
