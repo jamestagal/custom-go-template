@@ -443,7 +443,7 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 		// Process variables
 		for _, variable := range fenceWithStores.Variables {
 			if _, exists := props[variable.Name]; !exists {
-				props[variable.Name] = parseValue(variable.Value)
+				props[variable.Name] = variable.Value
 			}
 		}
 
@@ -674,7 +674,7 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	if fenceWithStores != nil {
 		// Process variables
 		for _, variable := range fenceWithStores.Variables {
-			props[variable.Name] = parseValue(variable.Value)
+			props[variable.Name] = variable.Value
 		}
 
 		// Process props with default values
