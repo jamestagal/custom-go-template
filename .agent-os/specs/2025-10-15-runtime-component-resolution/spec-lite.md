@@ -1,0 +1,3 @@
+# Spec Summary (Lite)
+
+Implement runtime component resolution to enable dynamic component iteration where component names are loop variables (e.g., `{for component in components} <Component:dynamic name={component.name} /> {/for}`). The system currently fails because it attempts build-time resolution of runtime-only variables. Solution adds scope tracking to detect loop variables, emits Alpine.js runtime wrappers for runtime expressions, creates client-side component registry and $renderDynamicComponent magic, and supports both runtime rendering (browser) and server-side loop expansion (static builds).

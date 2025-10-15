@@ -1,0 +1,19 @@
+{
+  "title": "Dynamic Component Test",
+  "components": [
+    {
+      "name": "hero2436",
+      "fields": {
+        "topper": "Dynamic Test",
+        "title": "Testing Dynamic Components",
+        "description": "This should be rendered via Component:dynamic loop",
+        "buttonText": "Test Button",
+        "buttonLink": "/test"
+      }
+    },
+    {
+      "name": "services2437",
+      "fields": {}
+    }
+  ]
+}

@@ -71,8 +71,8 @@ func main() {
 			return
 		}
 
-		// NEW: Render home page with wrapper (Nav + Content + Footer)
-		if err := renderWithWrapper("_index", w, r); err != nil {
+		// TEST: Use pages.html layout to test dynamic component iteration
+		if err := renderWithWrapper("pages", w, r); err != nil {
 			log.Printf("Error rendering home page: %v", err)
 			http.Error(w, "Failed to render page", http.StatusInternalServerError)
 		}
@@ -231,7 +231,7 @@ func getAllContent() map[string]interface{} {
 // renderWithWrapper renders a page with the html.html wrapper (Nav + Content + Footer)
 // This is the new unified rendering function that wraps all pages.
 //
-// UPDATED: Now extracts first component fields and injects them as top-level props (temporary workaround)
+// UPDATED: Now extracts components array as top-level prop for pages.html iteration
 //
 // Pattern: Wrapper Pattern with Props Injection [Load: 20]
 // Cognitive Load: 20 (content loading: 3, allContent: 3, allLayouts: 3, props building: 5, template rendering: 6)
@@ -299,6 +299,13 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 		"env":           make(map[string]interface{}), // Environment vars (TODO: populate if needed)
 		"user":          make(map[string]interface{}), // User data (TODO: populate if needed)
 		"shadowContent": make(map[string]interface{}), // Shadow content (TODO: populate if needed)
+	}
+
+	// Step 5.1: Extract components array as top-level prop
+	// This is needed for pages.html which uses: {for component in components}
+	if componentsRaw, ok := contentData["components"]; ok {
+		props["components"] = componentsRaw
+		log.Printf("[renderWithWrapper] Extracted components array as top-level prop")
 	}
 
 	// Add content.fields as a separate prop for easier access
