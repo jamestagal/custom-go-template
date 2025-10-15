@@ -1,11 +1,13 @@
 package transformer
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
+	"github.com/jimafisk/custom_go_template/analyzer"
 )
 
 // TransformDynamicComponentByName transforms <Component:dynamic> nodes into rendered components
@@ -15,20 +17,29 @@ import (
 //
 // This function implements the dynamic component rendering feature for Plenti-style iteration:
 //
-// PHASE 1: Evaluate name expression (COGNITIVE LOAD: 6)
+// PHASE 1: Scope Analysis (COGNITIVE LOAD: 4) - NEW in Phase 2
+//   Initialize ScopeAnalyzer to distinguish build-time vs runtime expressions
+//
+// PHASE 2: Evaluate name expression (COGNITIVE LOAD: 6)
 //   Example: "component.name" → resolve from dataScope → "Hero2436"
 //
-// PHASE 2: Look up component template (COGNITIVE LOAD: 5)
+// PHASE 3: Build-time vs Runtime Decision (COGNITIVE LOAD: 5) - NEW in Phase 2
+//   if analyzer.IsRuntimeExpression(node.NameExpression):
+//     → emit runtime wrapper (Task 2.3)
+//   else:
+//     → proceed with build-time resolution
+//
+// PHASE 4: Look up component template (COGNITIVE LOAD: 5)
 //   componentTemplate := GetComponentTemplate(resolvedName)
 //   If not found: return placeholder with warning
 //
-// PHASE 3: Build component props (COGNITIVE LOAD: 8)
+// PHASE 5: Build component props (COGNITIVE LOAD: 8)
 //   a. Start with empty props map
 //   b. Process spread props (left to right)
 //   c. Process regular props (left to right)
 //   d. Later props override earlier
 //
-// PHASE 4: Transform component (COGNITIVE LOAD: 6)
+// PHASE 6: Transform component (COGNITIVE LOAD: 6)
 //   return transformComponent(componentTemplate, mergedProps, dataScope)
 //
 // Example transformation:
@@ -38,7 +49,17 @@ func TransformDynamicComponentByName(node *ast.DynamicComponentByNameNode, dataS
 	log.Printf("TransformDynamicComponentByName: nameExpr=%q, spreadProps=%d, regularProps=%d",
 		node.NameExpression, len(node.SpreadProps), len(node.Props))
 
-	// PHASE 1: Evaluate name expression (COGNITIVE LOAD: 6)
+	// PHASE 1: Initialize Scope Analyzer (COGNITIVE LOAD: 4) - NEW in Phase 2
+	scopeAnalyzer := analyzer.NewScopeAnalyzer(dataScope)
+
+	// PHASE 2: Check if this is a runtime-only expression (COGNITIVE LOAD: 5) - NEW in Phase 2
+	if scopeAnalyzer.IsRuntimeExpression(node.NameExpression) {
+		log.Printf("TransformDynamicComponentByName: detected RUNTIME expression: %q", node.NameExpression)
+		// Emit runtime wrapper for Alpine.js to resolve at runtime
+		return emitRuntimeWrapper(node, dataScope)
+	}
+
+	// PHASE 3: Evaluate name expression (COGNITIVE LOAD: 6)
 	componentName, err := evaluateNameExpression(node.NameExpression, dataScope)
 	if err != nil {
 		log.Printf("TransformDynamicComponentByName: failed to evaluate name expression %q: %v",
@@ -48,14 +69,14 @@ func TransformDynamicComponentByName(node *ast.DynamicComponentByNameNode, dataS
 
 	log.Printf("TransformDynamicComponentByName: resolved component name: %q", componentName)
 
-	// PHASE 2: Look up component template (COGNITIVE LOAD: 5)
+	// PHASE 4: Look up component template (COGNITIVE LOAD: 5)
 	_, exists := GetComponentTemplate(componentName)
 	if !exists {
 		log.Printf("TransformDynamicComponentByName: component %q not found in registry", componentName)
 		return createDynamicByNamePlaceholder(node, fmt.Sprintf("Component '%s' not found", componentName))
 	}
 
-	// PHASE 3: Build component props (COGNITIVE LOAD: 8)
+	// PHASE 5: Build component props (COGNITIVE LOAD: 8)
 	// Step 1: Resolve spread props (left to right)
 	spreadPropsMap := resolveSpreadProps(node.SpreadProps, dataScope)
 	log.Printf("TransformDynamicComponentByName: resolved %d spread props", len(spreadPropsMap))
@@ -64,7 +85,7 @@ func TransformDynamicComponentByName(node *ast.DynamicComponentByNameNode, dataS
 	mergedProps := mergeProps(spreadPropsMap, node.Props, dataScope)
 	log.Printf("TransformDynamicComponentByName: merged props: %d total", len(mergedProps))
 
-	// PHASE 4: Transform component (COGNITIVE LOAD: 6)
+	// PHASE 6: Transform component (COGNITIVE LOAD: 6)
 	// Create a regular ComponentNode to reuse existing transformation logic
 	componentNode := &ast.ComponentNode{
 		Name:  componentName,
@@ -75,6 +96,111 @@ func TransformDynamicComponentByName(node *ast.DynamicComponentByNameNode, dataS
 		componentName, len(componentNode.Props))
 
 	return transformComponent(componentNode, dataScope)
+}
+
+// emitRuntimeWrapper emits a runtime wrapper element for dynamic components
+// that cannot be resolved at build-time.
+//
+// Pattern: Helper Function [Load: 12]
+// Cognitive Load: 12 (element creation: 3, JSON serialization: 5, attribute construction: 4)
+//
+// This function creates an Alpine.js-compatible wrapper that will be resolved
+// at runtime by the $renderDynamicComponent magic function.
+//
+// Runtime Wrapper Structure:
+//   <div class="dyn-comp-runtime"
+//        x-data="{compName: component.name, compProps: {...}}"
+//        x-init="$renderDynamicComponent($el, compName, compProps)">
+//   </div>
+//
+// Example:
+//   Input:  nameExpression="component.name", props={theme: "dark"}, spread={...component.fields}
+//   Output: <div class="dyn-comp-runtime" x-data="{compName: component.name, compProps: {theme: 'dark', ...}}" x-init="...">
+//
+// IMPORTANT: The wrapper has NO children - Alpine.js will populate it at runtime
+func emitRuntimeWrapper(node *ast.DynamicComponentByNameNode, dataScope map[string]any) []ast.Node {
+	log.Printf("emitRuntimeWrapper: creating runtime wrapper for nameExpr=%q", node.NameExpression)
+
+	// PHASE 1: Resolve props for runtime (COGNITIVE LOAD: 5)
+	// Merge spread props and regular props
+	spreadPropsMap := resolveSpreadProps(node.SpreadProps, dataScope)
+	mergedProps := mergeProps(spreadPropsMap, node.Props, dataScope)
+
+	// Serialize props to JSON
+	propsJSON := serializePropsForRuntime(mergedProps)
+
+	// PHASE 2: Build x-data attribute value (COGNITIVE LOAD: 4)
+	// Format: {compName: expression, compProps: {...}}
+	xDataValue := fmt.Sprintf("{compName: %s, compProps: %s}",
+		node.NameExpression, // Keep expression as-is for Alpine to evaluate
+		propsJSON,           // Serialized props object
+	)
+
+	// PHASE 3: Create wrapper element (COGNITIVE LOAD: 3)
+	wrapper := &ast.Element{
+		TagName: "div",
+		Attributes: []ast.Attribute{
+			{
+				Name:  "class",
+				Value: "dyn-comp-runtime",
+			},
+			{
+				Name:       "x-data",
+				Value:      xDataValue,
+				Dynamic:    true,
+				IsAlpine:   true,
+				AlpineType: "data",
+			},
+			{
+				Name:       "x-init",
+				Value:      "$renderDynamicComponent($el, compName, compProps)",
+				Dynamic:    true,
+				IsAlpine:   true,
+				AlpineType: "init",
+			},
+		},
+		Children:    []ast.Node{}, // Empty - runtime will populate
+		SelfClosing: false,
+	}
+
+	log.Printf("emitRuntimeWrapper: created wrapper with x-data=%q", xDataValue)
+
+	return []ast.Node{wrapper}
+}
+
+// serializePropsForRuntime serializes props map to JSON string for x-data attribute
+//
+// Pattern: Helper Function [Load: 10]
+// Cognitive Load: 10 (JSON marshaling: 4, error handling: 2, string formatting: 4)
+//
+// This function converts a map of props into a JSON string suitable for embedding
+// in an HTML attribute (x-data). It properly handles nested objects, arrays,
+// and all JSON types.
+//
+// Example:
+//   Input:  map[string]interface{}{"title": "Hello", "count": 42, "active": true}
+//   Output: `{"title":"Hello","count":42,"active":true}`
+//
+// IMPORTANT: The output is valid JSON but Alpine expressions (x-text, x-bind values)
+// should NOT be escaped as they need to be evaluated by Alpine.js at runtime.
+func serializePropsForRuntime(props map[string]interface{}) string {
+	if len(props) == 0 {
+		return "{}"
+	}
+
+	// Use json.Marshal for proper JSON serialization
+	jsonBytes, err := json.Marshal(props)
+	if err != nil {
+		log.Printf("serializePropsForRuntime: failed to marshal props: %v", err)
+		return "{}"
+	}
+
+	// Convert to string
+	jsonStr := string(jsonBytes)
+
+	log.Printf("serializePropsForRuntime: serialized %d props to JSON: %s", len(props), jsonStr)
+
+	return jsonStr
 }
 
 // evaluateNameExpression evaluates the name expression to get component name
