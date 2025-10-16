@@ -1350,3 +1350,77 @@ func TestSerializePropsForRuntime(t *testing.T) {
 		})
 	}
 }
+
+// TestRuntimePropsSerialization tests that props are kept as Alpine expressions for runtime components
+// This addresses the bug where content={content} was being resolved to null instead of kept as an expression
+func TestRuntimePropsSerialization(t *testing.T) {
+	// Test data: simulate a loop with component variable
+	dataScope := map[string]any{
+		"component": nil, // Loop variable marker (nil value indicates runtime variable)
+		"content": map[string]any{
+			"title": "Test Title",
+		},
+		"allContent": map[string]any{
+			"pages": []string{"/", "/about"},
+		},
+	}
+
+	// Create dynamic component node with runtime name and props
+	node := &ast.DynamicComponentByNameNode{
+		NameExpression: "component.name",
+		Props: []ast.ComponentProp{
+			{Name: "content", Value: "{content}", IsDynamic: true},
+			{Name: "allContent", Value: "{allContent}", IsDynamic: true},
+		},
+		SpreadProps: []string{},
+	}
+
+	// Transform (should emit runtime wrapper)
+	result := TransformDynamicComponentByName(node, dataScope)
+
+	// Verify we got a runtime wrapper
+	if len(result) != 1 {
+		t.Fatalf("Expected 1 node, got %d", len(result))
+	}
+
+	elem, ok := result[0].(*ast.Element)
+	if !ok {
+		t.Fatalf("Expected *ast.Element, got %T", result[0])
+	}
+
+	// Find x-data attribute
+	var xDataValue string
+	for _, attr := range elem.Attributes {
+		if attr.Name == "x-data" {
+			xDataValue = attr.Value
+			break
+		}
+	}
+
+	if xDataValue == "" {
+		t.Fatal("x-data attribute not found")
+	}
+
+	t.Logf("x-data value: %s", xDataValue)
+
+	// CRITICAL: Verify that props are kept as Alpine expressions, not resolved to values
+	// Expected: {compName: component.name, compProps: {content: content, allContent: allContent}}
+	// NOT: {compName: component.name, compProps: {content: null, allContent: {...}}}
+
+	if !strings.Contains(xDataValue, "content: content") {
+		t.Errorf("x-data should contain 'content: content' (Alpine expression), got: %s", xDataValue)
+	}
+
+	if !strings.Contains(xDataValue, "allContent: allContent") {
+		t.Errorf("x-data should contain 'allContent: allContent' (Alpine expression), got: %s", xDataValue)
+	}
+
+	// Verify it does NOT contain the resolved values
+	if strings.Contains(xDataValue, "content: null") {
+		t.Errorf("x-data should NOT contain 'content: null' (resolved value), got: %s", xDataValue)
+	}
+
+	if strings.Contains(xDataValue, "allContent: {") {
+		t.Errorf("x-data should NOT contain 'allContent: {' (resolved object), got: %s", xDataValue)
+	}
+}

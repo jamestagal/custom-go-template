@@ -71,10 +71,27 @@ Template Source → Parser → AST → Transformer → Rendered HTML/CSS/JS
    - Used by the export let system to inject content from JSON files
    - See: `.agent-os/specs/2025-10-11-export-let-content-injection/` for full details
 
-7. **`cmd/server/`** - Development server
+7. **`analyzer/`** - Runtime vs build-time expression analysis
+   - `scope.go` - ScopeAnalyzer for distinguishing runtime-only from build-resolvable expressions
+   - `IsRuntimeExpression()` - Detects loop variables, Alpine stores, operators
+   - Checks dataScope for nil-valued entries (loop variable markers)
+   - Used by runtime component resolution system
+   - See: `.agent-os/specs/2025-10-15-runtime-component-resolution/` for full details
+
+8. **`builder/`** - Component registry generation
+   - `registry_generator.go` - Converts component ASTs to JavaScript template functions
+   - `GenerateComponentRegistry()` - Creates ES module with all component templates
+   - Converts `{expr}` to `${props.expr}` for JavaScript template literals
+   - Preserves Alpine.js directives (x-text, x-if, etc.)
+   - Context tracking for literal content blocks (style/script tags)
+   - Auto-generates `static/js/component-registry.js` on server startup
+
+9. **`cmd/server/`** - Development server
    - Serves templates at http://localhost:3000
    - Registers components from `examples/components/`
    - Extracts props, variables, and functions from fence sections
+   - Auto-generates component registry on startup (65 components)
+   - Serves runtime JavaScript: `/js/component-registry.js`, `/js/runtime-components.js`
 
 ## Template Syntax
 
@@ -107,6 +124,59 @@ Transforms to `<template x-for="item in items">`
 <ComponentName prop1="value" prop2={dynamicValue} />
 ```
 Components are imported from `examples/components/` and registered automatically.
+
+### Runtime Component Resolution
+
+The system supports **dynamic component resolution** for components whose names are only known at runtime (e.g., in loops).
+
+**Syntax:**
+```html
+{for component in components}
+  <Component:dynamic name={component.name} {...component.fields} />
+{/for}
+```
+
+**How It Works:**
+
+1. **Scope Analysis** (`analyzer/scope.go`):
+   - Detects if component name is runtime-only (loop variable, Alpine store, operator)
+   - Checks dataScope for nil-valued entries (loop variable markers)
+   - Example: `component.name` has `component` marked as `nil` in dataScope → runtime
+
+2. **Build-Time vs Runtime:**
+   - **Build-Time**: String literals like `"Hero2436"` → component inlined directly
+   - **Runtime**: Loop variables like `component.name` → runtime wrapper emitted
+
+3. **Runtime Wrapper** (emitted for runtime expressions):
+   ```html
+   <template x-for="(component, ) in components">
+     <div class="dyn-comp-runtime"
+          x-data="{compName: component.name, compProps: {...}}"
+          x-init="$renderDynamicComponent($el, compName, compProps)">
+     </div>
+   </template>
+   ```
+
+4. **Client-Side Resolution** (`static/js/runtime-components.js`):
+   - Alpine.js magic: `$renderDynamicComponent(el, name, props)`
+   - Loads component registry from `/js/component-registry.js`
+   - Renders component template function with props
+   - Re-initializes Alpine directives with `Alpine.initTree(el)`
+
+5. **Component Registry** (`static/js/component-registry.js`):
+   - Auto-generated on server startup (65 components)
+   - ES module format: `export default { 'Hero2436': (props) => \`...\`, ... }`
+   - Template functions convert `{expr}` to `${props.expr}`
+   - Alpine directives preserved for client-side hydration
+
+**Key Files:**
+- `analyzer/scope.go` - Runtime expression detection
+- `transformer/dynamic_component_by_name.go` - Routing and wrapper emission
+- `builder/registry_generator.go` - Component registry generation
+- `static/js/runtime-components.js` - Alpine.js magic function
+- `static/js/component-registry.js` - Auto-generated component templates
+
+**See:** `.agent-os/specs/2025-10-15-runtime-component-resolution/` for full implementation details
 
 ### Fence Section
 Front matter between `---` markers containing:

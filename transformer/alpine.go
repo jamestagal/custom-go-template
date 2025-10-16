@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
@@ -449,12 +450,22 @@ func FormatGoValueToJS(value any) string {
 		return "{" + strings.Join(pairs, ",") + "}"
 
 	default:
-		// Fallback for unknown types - convert to string and quote with SINGLE quotes
-		// This should rarely be hit in normal operation
-		str := fmt.Sprintf("%v", value)
-		escaped := strings.ReplaceAll(str, `\`, `\\`)
-		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
-		return fmt.Sprintf(`'%s'`, escaped)
+		// CRITICAL FIX: Use JSON encoding for unknown types instead of fmt.Sprintf("%v")
+		// This prevents Go map syntax (map[key:value]) from appearing in output
+		log.Printf("FormatGoValueToJS: WARNING - Unhandled type %T, using JSON encoding", value)
+		jsonBytes, err := json.Marshal(value)
+		if err != nil {
+			log.Printf("FormatGoValueToJS: ERROR - Failed to marshal %T: %v", value, err)
+			// Fallback to string conversion as last resort
+			str := fmt.Sprintf("%v", value)
+			escaped := strings.ReplaceAll(str, `\`, `\\`)
+			escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+			return fmt.Sprintf(`'%s'`, escaped)
+		}
+		// Convert double quotes to single quotes for HTML attribute safety
+		result := strings.ReplaceAll(string(jsonBytes), `"`, `'`)
+		log.Printf("FormatGoValueToJS: JSON-encoded %T to: %s", value, truncateString(result, 100))
+		return result
 	}
 }
 

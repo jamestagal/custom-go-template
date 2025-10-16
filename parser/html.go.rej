@@ -1,0 +1,34 @@
+@@ -584,23 +584,30 @@
+ 	for i < len(remaining) {
+ 		char := remaining[i]
+ 
++		// CRITICAL FIX: Check for closing quote FIRST, before processing inner quotes
++		// This prevents the closing quote from being mistakenly treated as an inner quote
++		if char == quoteChar && !inSingleQuote && !inDoubleQuote && !escaped {
++			// Found closing quote
++			break
++		}
++
+ 		if escaped {
+ 			valueBuilder.WriteByte(char)
+ 			escaped = false
+ 		} else if char == '\\' {
+ 			escaped = true
++			valueBuilder.WriteByte(char)
+ 		} else if char == '\'' && !inDoubleQuote {
++			// Track single quotes inside the value (only if outer quote is not single)
+ 			inSingleQuote = !inSingleQuote
+ 			valueBuilder.WriteByte(char)
+ 		} else if char == '"' && !inSingleQuote {
++			// Track double quotes inside the value (only if outer quote is not double)
+ 			inDoubleQuote = !inDoubleQuote
+ 			valueBuilder.WriteByte(char)
+ 		} else if char == '{' && !inSingleQuote && !inDoubleQuote {
+ 			braceCount++
+ 			valueBuilder.WriteByte(char)
+ 		} else if char == '}' && !inSingleQuote && !inDoubleQuote {
+ 			braceCount--
+ 			valueBuilder.WriteByte(char)
+-		} else if char == quoteChar && !inSingleQuote && !inDoubleQuote && !escaped {
+-			// Found closing quote
+-			break

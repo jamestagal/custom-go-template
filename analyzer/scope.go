@@ -87,13 +87,14 @@ func (s *ScopeAnalyzer) TrackExportedProp(name string) {
 
 // IsRuntimeExpression determines if an expression requires runtime resolution
 //
-// Pattern: Decision Function [Load: 15]
-// Cognitive Load: 15 (string parsing: 5, store detection: 3, variable lookup: 4, operator check: 3)
+// Pattern: Decision Function [Load: 18]
+// Cognitive Load: 18 (string parsing: 5, store detection: 3, variable lookup: 7, operator check: 3)
 //
 // Returns TRUE if expression contains:
 //   - Loop variables (component, item, index)
 //   - Alpine store references ($store.*, $auth.*)
 //   - Operators (+, -, *, /, etc.) - for safety
+//   - Variables in dataScope with nil value (loop variable markers)
 //
 // Returns FALSE if expression is:
 //   - String literal ("ComponentName", 'Hero2436')
@@ -136,7 +137,18 @@ func (s *ScopeAnalyzer) IsRuntimeExpression(expr string) bool {
 		}
 	}
 
-	// 6. If all variables are in buildVars or unknown, it's build-time
+	// 6. Check if variable is in dataScope with nil value (loop variable marker) (COGNITIVE LOAD: 4)
+	// Loop variables are added to dataScope with nil value in transformLoop
+	// See transformer/loops.go lines 46-51: loopBodyScope[itemVar] = nil
+	if s.dataScope != nil {
+		for _, variable := range variables {
+			if val, exists := s.dataScope[variable]; exists && val == nil {
+				return true // Loop variables have nil values in dataScope
+			}
+		}
+	}
+
+	// 7. If all variables are in buildVars or unknown, it's build-time
 	// Unknown variables default to build-time for backwards compatibility
 	return false
 }

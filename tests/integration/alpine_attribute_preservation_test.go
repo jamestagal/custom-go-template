@@ -125,7 +125,7 @@ store cart = {
 			storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 			// Render to HTML
-			markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
+			markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
 			// Check that expected strings are in the output
 			for _, expected := range tt.shouldContain {

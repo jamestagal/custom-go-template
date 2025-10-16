@@ -364,3 +364,133 @@ func TestScopeAnalyzer_DataScopeIntegration(t *testing.T) {
 		t.Error("component.name should be runtime after tracking component as loop var")
 	}
 }
+
+// TestIsRuntimeExpression_LoopVariablesInDataScope tests the critical bug fix
+// for detecting loop variables stored in dataScope with nil values.
+//
+// Pattern: Regression Test [Load: 6]
+// Cognitive Load: 6 (setup: 3, assertions: 3)
+//
+// This test ensures that loop variables stored in dataScope with nil values
+// are correctly identified as runtime expressions, even without explicit
+// TrackLoopVariable() calls.
+//
+// Context:
+//   - transformLoop in transformer/loops.go adds loop vars with nil values
+//   - ScopeAnalyzer must detect these nil-valued entries as runtime markers
+//   - Bug: IsRuntimeExpression("component.name") returned false
+//   - Fix: Check dataScope for nil values in step 6 of IsRuntimeExpression
+func TestIsRuntimeExpression_LoopVariablesInDataScope(t *testing.T) {
+	// Setup: dataScope with loop variable (nil value)
+	dataScope := map[string]any{
+		"component": nil,  // Loop variable marker (set in transformer/loops.go:47)
+		"item":      nil,  // Another loop variable
+		"title":     "Static Value", // Build-time value (non-nil)
+	}
+
+	analyzer := NewScopeAnalyzer(dataScope)
+
+	tests := []struct {
+		expr     string
+		expected bool
+		reason   string
+	}{
+		{
+			expr:     "component.name",
+			expected: true,
+			reason:   "Loop variable property access should be runtime",
+		},
+		{
+			expr:     "item.field",
+			expected: true,
+			reason:   "Loop variable property access should be runtime",
+		},
+		{
+			expr:     "component",
+			expected: true,
+			reason:   "Loop variable itself should be runtime",
+		},
+		{
+			expr:     "title",
+			expected: false,
+			reason:   "Build-time variable (non-nil value) should be build-time",
+		},
+		{
+			expr:     "unknown",
+			expected: false,
+			reason:   "Unknown variables default to build-time for backwards compat",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			result := analyzer.IsRuntimeExpression(tt.expr)
+			if result != tt.expected {
+				t.Errorf("IsRuntimeExpression(%q) = %v, want %v - %s",
+					tt.expr, result, tt.expected, tt.reason)
+			}
+		})
+	}
+}
+
+// TestIsRuntimeExpression_NilValueMarkerPriority tests that nil-valued loop variables
+// are detected even when other tracking methods are used.
+//
+// Pattern: Integration Test [Load: 8]
+func TestIsRuntimeExpression_NilValueMarkerPriority(t *testing.T) {
+	// Setup: Mix of nil-valued (loop vars) and build-time props
+	dataScope := map[string]any{
+		"component": nil,         // Loop variable (nil marker)
+		"title":     "Welcome",   // Build-time content prop
+		"count":     42,          // Build-time variable
+	}
+
+	analyzer := NewScopeAnalyzer(dataScope)
+
+	// Also track title as content prop explicitly
+	analyzer.TrackContentProp("title")
+
+	tests := []struct {
+		expr     string
+		expected bool
+	}{
+		{"component.name", true},  // Nil marker → runtime
+		{"title", false},          // Non-nil value + tracked → build-time
+		{"count", false},          // Non-nil value, not tracked → build-time (default)
+		{"component", true},       // Nil marker → runtime
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			result := analyzer.IsRuntimeExpression(tt.expr)
+			if result != tt.expected {
+				t.Errorf("IsRuntimeExpression(%q) = %v, want %v",
+					tt.expr, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestIsRuntimeExpression_NoDataScope tests that analyzer works without dataScope
+//
+// Pattern: Edge Case Test [Load: 4]
+func TestIsRuntimeExpression_NoDataScope(t *testing.T) {
+	// Nil dataScope should not cause panics
+	analyzer := NewScopeAnalyzer(nil)
+
+	// Without explicit tracking, variables default to build-time
+	if analyzer.IsRuntimeExpression("component.name") {
+		t.Error("Without dataScope or tracking, expressions should default to build-time")
+	}
+
+	// But Alpine stores are always runtime
+	if !analyzer.IsRuntimeExpression("$store.auth") {
+		t.Error("Alpine stores should always be runtime")
+	}
+
+	// Track variable explicitly - should work without dataScope
+	analyzer.TrackLoopVariable("component")
+	if !analyzer.IsRuntimeExpression("component.name") {
+		t.Error("Explicitly tracked loop variables should be runtime")
+	}
+}

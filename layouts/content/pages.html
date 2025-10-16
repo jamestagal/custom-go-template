@@ -1,18 +1,6 @@
----
-export let components, content, allContent, allLayouts
----
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{content.title || 'Page'}</title>
-    <link rel="stylesheet" href="/styles/style.css">
-</head>
-<body>
-    {for component in components}
-        <Component:dynamic name={component.name} {...component.fields} content={content} allContent={allContent} />
-    {/for}
-</body>
-</html>
+<!-- Pages Layout - Renders dynamic components from content JSON -->
+<!-- NOTE: <head> provided by wrapper layout (includes Alpine.js + runtime-components.js) -->
+<!-- NOTE: No fence section - uses variables from parent scope (html.html wrapper) -->
+{for component in content.components}
+    <Component:dynamic name={component.name} {...component.fields} content={content} allContent={allContent} />
+{/for}

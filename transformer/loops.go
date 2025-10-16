@@ -37,9 +37,10 @@ func transformLoop(node *ast.Loop, dataScope map[string]any) []ast.Node {
 		itemVar = node.Value
 		indexVar = node.Iterator
 	} else {
-		// This is {for} syntax: Iterator=item, Value=index (or empty)
-		itemVar = node.Iterator
-		indexVar = node.Value
+		// This is {for} syntax: Value=item, Iterator=index (or empty)
+		// FIXED: The parser sets Value=item and Iterator=index for BOTH syntaxes
+		itemVar = node.Value
+		indexVar = node.Iterator
 	}
 
 	// Add variables to loop body scope (makes them available for expressions inside loop)

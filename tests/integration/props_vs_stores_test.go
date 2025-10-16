@@ -43,7 +43,7 @@ store session = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
 	// Verify props use x-text without $store prefix
 	if !strings.Contains(markup, "x-text=\"userName\"") {
@@ -103,7 +103,7 @@ store config = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
 	// Verify prop uses local scope
 	if !strings.Contains(markup, "x-text=\"config.version\"") {
@@ -198,7 +198,7 @@ store auth = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
 	// Verify prop conditional uses local scope
 	if !strings.Contains(markup, "x-if=\"isAdmin\"") {

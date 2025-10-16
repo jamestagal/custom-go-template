@@ -16,6 +16,7 @@ import (
 
 	// Import the new renderer package
 	"github.com/jimafisk/custom_go_template/ast"
+	"github.com/jimafisk/custom_go_template/builder"
 	"github.com/jimafisk/custom_go_template/loader"
 	"github.com/jimafisk/custom_go_template/parser"
 	"github.com/jimafisk/custom_go_template/renderer"
@@ -60,6 +61,12 @@ func main() {
 	// Register components (now with store registry available)
 	registerComponents(storeRegistry)
 
+	// Generate component registry for runtime components
+	if err := generateComponentRegistry(); err != nil {
+		log.Printf("WARNING: Failed to generate component registry: %v", err)
+		log.Printf("Runtime component resolution may not work correctly")
+	}
+
 	// Dynamically register routes for all content layouts
 	registerContentRoutes()
 
@@ -72,7 +79,7 @@ func main() {
 		}
 
 		// TEST: Use pages.html layout to test dynamic component iteration
-		if err := renderWithWrapper("pages", w, r); err != nil {
+		if err := renderWithWrapper("Pages", w, r); err != nil {
 			log.Printf("Error rendering home page: %v", err)
 			http.Error(w, "Failed to render page", http.StatusInternalServerError)
 		}
@@ -88,7 +95,7 @@ func main() {
 }
 
 // serveStaticFile handles serving static files from organized asset directories
-// Routes: /scripts/* → ./scripts/, /styles/* → ./styles/, /images/* → ./images/, /static/* → ./static/, /* → ./public/
+// Routes: /scripts/* → ./scripts/, /styles/* → ./styles/, /images/* → ./images/, /js/* → ./static/js/, /static/* → ./static/, /* → ./public/
 func serveStaticFile(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	var filePath string
@@ -101,6 +108,10 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request) {
 		filePath = "." + path
 	case strings.HasPrefix(path, "/images/"):
 		filePath = "." + path
+	case strings.HasPrefix(path, "/js/"):
+		// Map /js/* to ./static/js/*
+		filePath = "./static" + path
+		log.Printf("[serveStaticFile] /js/ route: %s → %s", path, filePath)
 	case strings.HasPrefix(path, "/static/"):
 		filePath = "." + path
 	default:
@@ -109,6 +120,7 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Serve the file
+	log.Printf("[serveStaticFile] Serving: %s from %s", path, filePath)
 	http.ServeFile(w, r, filePath)
 }
 
@@ -323,20 +335,14 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 		props["content"] = contentWithFields
 	}
 
-	// Step 5.5: TEMPORARY WORKAROUND - Extract first component fields as top-level props
-	// This allows _index.html to receive Hero2436 props directly until full Component:dynamic iteration is implemented
-	// TODO: Remove this workaround when implementing .agent-os/specs/2025-10-12-dynamic-component-iteration/
-	if components, ok := contentData["components"].([]interface{}); ok && len(components) > 0 {
-		if firstComp, ok := components[0].(map[string]interface{}); ok {
-			if fields, ok := firstComp["fields"].(map[string]interface{}); ok {
-				// Add each field as a top-level prop
-				for key, value := range fields {
-					props[key] = value
-				}
-				log.Printf("[renderWithWrapper] TEMPORARY WORKAROUND: Added %d fields from first component as top-level props", len(fields))
-			}
-		}
-	}
+	// REMOVED: TEMPORARY WORKAROUND that was adding component fields as top-level props
+	// This workaround was causing the "this." prefix bug - field names were being added to dataScope
+	// and then replaceVarRefsWithThis was prefixing them.
+	//
+	// Now that runtime component resolution is working (go-backend agent fix on 2025-10-16),
+	// components receive their props via the spread operator: {...component.fields}
+	//
+	// See: .agent-os/specs/2025-10-15-runtime-component-resolution/ for the proper implementation
 
 	log.Printf("[renderWithWrapper] Built props map with %d keys (offered to wrapper)", len(props))
 	log.Printf("[renderWithWrapper] Props keys: %v", getKeys(props))
@@ -615,6 +621,14 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 		contentData = nil // No content injection
 	} else if len(contentData) > 0 {
 		log.Printf("Loaded content for route %s: %d top-level keys", routePath, len(contentData))
+		// DEBUG: Log content keys to find where this. prefix is added
+		if components, ok := contentData["components"].([]interface{}); ok && len(components) > 0 {
+			if comp, ok := components[0].(map[string]interface{}); ok {
+				if fields, ok := comp["fields"].(map[string]interface{}); ok {
+					log.Printf("DEBUG: First component fields keys: %v", getKeys(fields))
+				}
+			}
+		}
 	}
 
 	// Extract fence section and parse with store registry ONLY if needed (Task 3.5 integration)
@@ -713,6 +727,14 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 		if exportedPropNames["content"] {
 			props["content"] = contentData
 			log.Printf("Magic variable 'content' added to props (requested via export let)")
+			// DEBUG: Check content keys right after adding to props
+			if components, ok := contentData["components"].([]interface{}); ok && len(components) > 0 {
+				if comp, ok := components[0].(map[string]interface{}); ok {
+					if fields, ok := comp["fields"].(map[string]interface{}); ok {
+						log.Printf("DEBUG: Content fields keys AFTER adding to props: %v", getKeys(fields))
+					}
+				}
+			}
 		}
 	}
 
@@ -991,9 +1013,106 @@ func registerComponents(storeRegistry map[string]string) {
 	globalDir := "layouts/global"
 	registerComponentsFromDir(globalDir, "../global/", storeRegistry)
 
-	// FIXED: Register content layouts from layouts/content (for _index, pages, etc.)
+	// Register content layouts from layouts/content
+	// All layouts need to be registered (matching Plenti's architecture where pages.svelte is a component)
+	// Components without fence sections won't get x-data wrapping (handled by transformer)
 	contentDir := "layouts/content"
 	registerComponentsFromDir(contentDir, "../content/", storeRegistry)
+}
+
+// registerContentLayoutsSelectively registers content layouts from layouts/content/
+// but SKIPS layouts that match the "component iterator" pattern.
+//
+// Component iterator layouts (like pages.html with Plenti pattern) should NOT be registered
+// as components because they act as entry points that iterate over dynamic components.
+//
+// Pattern Detection:
+// - Contains: {for component in content.components} or {for component in components}
+// - Contains: <Component:dynamic
+//
+// Pattern: Selective Component Registration [Load: 15]
+// Cognitive Load: 15 (read dir: 2, read file: 3, pattern detection: 5, registration: 5)
+func registerContentLayoutsSelectively(dir string, pathPrefix string, storeRegistry map[string]string) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		log.Printf("Warning: Failed to read directory %s: %v", dir, err)
+		return
+	}
+
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".html") {
+			componentPath := fmt.Sprintf("%s/%s", dir, file.Name())
+
+			// Read file content to detect patterns
+			componentContent, err := os.ReadFile(componentPath)
+			if err != nil {
+				log.Printf("Warning: Failed to read %s: %v", componentPath, err)
+				continue
+			}
+
+			contentStr := string(componentContent)
+
+			// Check if this is a component iterator layout (like Plenti's pages.svelte pattern)
+			isComponentIterator := isComponentIteratorLayout(contentStr)
+
+			if isComponentIterator {
+				log.Printf("Skipping component iterator layout: %s (follows Plenti pattern)", file.Name())
+				continue
+			}
+
+			// Register as normal component
+			baseName := strings.TrimSuffix(file.Name(), ".html")
+			componentName := strings.ToUpper(baseName[:1]) + baseName[1:]
+			log.Printf("Registering content layout as component: %s from %s", componentName, componentPath)
+
+			// Parse and register (same logic as registerComponentsFromDir)
+			componentAST, err := parser.ParseTemplate(contentStr)
+			if err != nil {
+				log.Printf("Warning: Failed to parse component %s: %v", componentPath, err)
+				continue
+			}
+
+			// Handle store imports if present
+			for i, node := range componentAST.RootNodes {
+				if fence, ok := node.(*ast.FenceSection); ok {
+					if strings.Contains(fence.RawContent, "import store from") {
+						fenceWithStores := parser.ParseFenceContentWithStores(fence.RawContent, storeRegistry)
+						componentAST.RootNodes[i] = fenceWithStores
+						log.Printf("Re-parsed fence with stores for %s", componentName)
+					}
+					break
+				}
+			}
+
+			// Extract props and register
+			componentProps := extractComponentProps(componentAST)
+			transformer.RegisterComponent(componentName, componentAST, componentProps)
+
+			// Also register with path prefix for import resolution
+			pathWithPrefix := fmt.Sprintf("%s%s", pathPrefix, file.Name())
+			transformer.RegisterComponent(pathWithPrefix, componentAST, componentProps)
+		}
+	}
+}
+
+// isComponentIteratorLayout detects if a layout follows the "component iterator" pattern
+// used in Plenti (e.g., pages.svelte that iterates over content.components)
+//
+// Pattern: Layout Pattern Detection [Load: 8]
+// Cognitive Load: 8 (pattern matching: 5, string checks: 3)
+func isComponentIteratorLayout(content string) bool {
+	// Pattern 1: Contains loop over components array
+	hasComponentLoop := strings.Contains(content, "{for component in content.components}") ||
+		strings.Contains(content, "{for component in components}") ||
+		strings.Contains(content, "{#each components as") || // Svelte syntax
+		strings.Contains(content, "{#each content.components as") // Svelte syntax
+
+	// Pattern 2: Contains dynamic component rendering
+	hasDynamicComponent := strings.Contains(content, "<Component:dynamic") ||
+		strings.Contains(content, "<svelte:component") // Svelte syntax
+
+	// Must have BOTH patterns to be considered a component iterator layout
+	return hasComponentLoop && hasDynamicComponent
 }
 
 // registerComponentsFromDir registers all components from a directory
@@ -1101,6 +1220,52 @@ func registerStores() map[string]string {
 	}
 
 	return stores
+}
+
+// generateComponentRegistry generates the JavaScript component registry file
+// for runtime component resolution
+//
+// Pattern: Code Generation Pattern [Load: 12]
+// Cognitive Load: 12 (get components: 3, generate registry: 5, write file: 4)
+func generateComponentRegistry() error {
+	log.Println("Generating component registry...")
+
+	// Get all registered component keys from transformer
+	componentKeys := transformer.GetAllRegisteredKeys()
+	log.Printf("Found %d registered components", len(componentKeys))
+
+	// Convert transformer.ComponentTemplate to builder.ComponentTemplate
+	builderComponents := make([]builder.ComponentTemplate, 0, len(componentKeys))
+	for _, key := range componentKeys {
+		tmpl, exists := transformer.GetComponentTemplate(key)
+		if !exists {
+			log.Printf("WARNING: Component %s not found in registry", key)
+			continue
+		}
+
+		builderComponents = append(builderComponents, builder.ComponentTemplate{
+			Name: key,
+			AST:  tmpl.Template,
+		})
+	}
+
+	// Generate the registry JavaScript
+	registryJS := builder.GenerateComponentRegistry(builderComponents)
+
+	// Ensure the static/js directory exists
+	jsDir := "static/js"
+	if err := os.MkdirAll(jsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", jsDir, err)
+	}
+
+	// Write the registry file
+	registryPath := filepath.Join(jsDir, "component-registry.js")
+	if err := os.WriteFile(registryPath, []byte(registryJS), 0644); err != nil {
+		return fmt.Errorf("failed to write registry file: %w", err)
+	}
+
+	log.Printf("✓ Component registry generated: %s (%d components)", registryPath, len(builderComponents))
+	return nil
 }
 
 func extractComponentProps(template *ast.Template) []string {

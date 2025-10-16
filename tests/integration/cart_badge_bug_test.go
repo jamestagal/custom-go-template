@@ -56,7 +56,7 @@ store cart = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "CartBadge.html", "", "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "CartBadge.html", "")
 
 	// CRITICAL CHECKS - The bug is that toFixed(2) becomes toFixed
 	criticalChecks := []struct {
@@ -138,7 +138,7 @@ store cart = {
 	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
 	// The x-text attribute should be completely preserved
 	if !strings.Contains(markup, `x-text="'Total: $' + $store.cart.total.toFixed(2)"`) {

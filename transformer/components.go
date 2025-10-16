@@ -268,6 +268,8 @@ func formatComponentData(dataScope map[string]any) string {
 	// Add each key-value pair
 	first := true
 	for key, value := range dataScope {
+		// DEBUG: Log the type of each value
+		log.Printf("[formatComponentData] key=%q, type=%T, value preview=%v", key, value, truncateString(fmt.Sprintf("%v", value), 100))
 		// Skip internal Alpine.js variables
 		if strings.HasPrefix(key, "$") {
 			continue
