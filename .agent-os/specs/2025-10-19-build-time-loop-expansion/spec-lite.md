@@ -1,0 +1,3 @@
+# Spec Summary (Lite)
+
+Implement build-time loop expansion to fix component name resolution failures in dynamic component templates. When templates use `{for component in components}`, the current transformer creates Alpine x-for templates (runtime), but tries to resolve `component.name` at build time when the loop variable doesn't exist yet. The solution is to expand loops in Go during transformation (like Svelte does), adding loop variables to dataScope for each iteration so component names can be resolved successfully. This eliminates the need for runtime component registries and produces fully expanded HTML output.

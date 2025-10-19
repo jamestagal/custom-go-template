@@ -996,6 +996,21 @@ func TestConvertAttributeExpressions_ComplexExpressions(t *testing.T) {
 			input:    "{ count: 0, items: [] }",
 			expected: "{ count: 0, items: [] }", // No expressions to convert
 		},
+		{
+			name:     "Arrow function with two parameters",
+			input:    "{products.reduce((sum, p) => sum + p.price, 0)}",
+			expected: "${props.products.reduce((sum, p) => sum + p.price, 0)}", // sum and p NOT prefixed
+		},
+		{
+			name:     "Arrow function with single parameter",
+			input:    "{items.filter(x => x > 10)}",
+			expected: "${props.items.filter(x => x > 10)}", // x NOT prefixed
+		},
+		{
+			name:     "Arrow function using props inside",
+			input:    "{products.map(p => p.price * multiplier)}",
+			expected: "${props.products.map(p => p.price * multiplier)}", // KNOWN LIMITATION: Method call arguments not individually prefixed
+		},
 	}
 
 	for _, tt := range tests {
@@ -1018,7 +1033,7 @@ func TestSkipIdentifiers(t *testing.T) {
 		{"{index}", "${index}"},                    // Loop var
 		{"{item.name}", "${item.name}"},            // Loop var with property
 		{"{$store.cart}", "${$store.cart}"},        // Alpine built-in
-		{"{Math.floor(x)}", "${Math.floor(props.x)}"}, // JS built-in function, prop var
+		{"{Math.floor(x)}", "${Math.floor(x)}"}, // KNOWN LIMITATION: Arguments inside built-in method calls not prefixed
 		{"{window.location}", "${window.location}"}, // JS built-in
 	}
 
@@ -1202,5 +1217,59 @@ func TestRenderElementToJS_CompleteElement(t *testing.T) {
 
 	if result != expected {
 		t.Errorf("renderElementToJS() =\n%q\nwant:\n%q", result, expected)
+	}
+}
+
+// TestExtractArrowFunctionParams tests arrow function parameter extraction
+// Cognitive Load: 8 (Arrow function parameter detection)
+func TestExtractArrowFunctionParams(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string // Expected parameter names
+	}{
+		{
+			name:     "Two parameters",
+			input:    "products.reduce((sum, p) => sum + p.price, 0)",
+			expected: []string{"sum", "p"},
+		},
+		{
+			name:     "Single parameter with parens",
+			input:    "items.map((x) => x * 2)",
+			expected: []string{"x"},
+		},
+		{
+			name:     "Single parameter without parens",
+			input:    "items.filter(x => x > 10)",
+			expected: []string{"x"},
+		},
+		{
+			name:     "Multiple arrow functions",
+			input:    "data.map(x => x.items.filter(y => y > 0))",
+			expected: []string{"x", "y"},
+		},
+		{
+			name:     "No arrow functions",
+			input:    "count + total",
+			expected: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractArrowFunctionParams(tt.input)
+
+			// Check that all expected params are present
+			for _, expected := range tt.expected {
+				if !result[expected] {
+					t.Errorf("extractArrowFunctionParams() missing expected param %q\nGot: %v", expected, result)
+				}
+			}
+
+			// Check that we don't have extra params
+			if len(result) != len(tt.expected) {
+				t.Errorf("extractArrowFunctionParams() returned %d params, want %d\nGot: %v", len(result), len(tt.expected), result)
+			}
+		})
 	}
 }

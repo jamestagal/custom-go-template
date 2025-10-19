@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session Management
+
+**IMPORTANT - Context Usage Warning**: Always warn the user about remaining context tokens before starting a new task to ensure there is enough context left to complete the task. If context is running low (below 30-40%), ask the user to use `/compact` before proceeding with complex tasks.
+
+**Context Guidelines**:
+- ✅ **>50% remaining**: Sufficient for most tasks
+- ⚠️ **30-50% remaining**: Good for small-to-medium tasks; warn before large implementations
+- 🔴 **<30% remaining**: Should compact before starting new complex work
+
 ## Project Overview
 
 This is a custom Go template engine that transforms Svelte-inspired template syntax into Alpine.js-compatible HTML. The engine parses custom template syntax, transforms it through an AST, and renders reactive HTML components.

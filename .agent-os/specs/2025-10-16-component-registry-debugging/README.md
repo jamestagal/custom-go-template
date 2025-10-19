@@ -9,6 +9,9 @@ This directory contains comprehensive documentation of all troubleshooting effor
 
 ## Quick Navigation
 
+### 🔴 CRITICAL UPDATE (2025-10-17 01:10)
+👉 **READ THIS FIRST**: [CRITICAL_BLOCKER_UPDATE.md](./CRITICAL_BLOCKER_UPDATE.md) - **Components STILL not rendering, regex approach insufficient**
+
 ### For Immediate Help
 👉 **Start here**: [CURRENT_STATUS.md](./CURRENT_STATUS.md) - Current state and decision points
 

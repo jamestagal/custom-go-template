@@ -112,9 +112,13 @@ func renderNodeToJS(node ast.Node, sb *strings.Builder, ctx *RenderContext) {
 			sb.WriteString(n.Expression)
 			sb.WriteString("}")
 		} else {
+			// Use identifier-level prefixing to handle complex expressions
+			// ARROW FUNCTION FIX: Extract arrow function parameters before prefixing
+			arrowParams := extractArrowFunctionParams(n.Expression)
+			converted := prefixIdentifiersInExpression(n.Expression, arrowParams)
 			// Normal content - transform {variable} to ${props.variable}
-			sb.WriteString("${props.")
-			sb.WriteString(n.Expression)
+			sb.WriteString("${")
+			sb.WriteString(converted)
 			sb.WriteString("}")
 		}
 
@@ -191,8 +195,6 @@ var skipIdentifiers = map[string]bool{
 	"item":      true,
 	"todo":      true,
 	"component": true,
-	"value":     true,
-	"key":       true,
 
 	// Alpine.js built-ins (magic properties)
 	"$store":    true,
@@ -228,6 +230,11 @@ var expressionPattern = regexp.MustCompile(`\{([^{}]+)\}`)
 // Important: This uses negative lookbehind/lookahead to avoid matching property access
 var identifierPattern = regexp.MustCompile(`(?:^|[^a-zA-Z0-9_$.\]])([a-zA-Z_$][\w]*)(?:$|[^a-zA-Z0-9_$.])`)
 
+// arrowFunctionPattern matches arrow function parameter patterns
+// Pattern: (param1, param2) => or param =>
+// Cognitive Load: 4 (Arrow function parameter detection)
+var arrowFunctionPattern = regexp.MustCompile(`\(([^)]+)\)\s*=>|([a-zA-Z_$][\w]*)\s*=>`)
+
 // convertAttributeExpressions converts {expression} patterns in attribute values to ${props.expression}
 // Cognitive Load: 14 (Regex replacement with skip list, property chain handling, and object literal handling)
 // Pattern: String transformation with identifier-level prefixing
@@ -240,69 +247,197 @@ var identifierPattern = regexp.MustCompile(`(?:^|[^a-zA-Z0-9_$.\]])([a-zA-Z_$][\
 // - Simple identifiers: {count} → ${props.count}
 // - Complex expressions: {(start * 1) + index} → ${(props.start * 1) + index}
 // - Property access: {item.name} → ${item.name} (entire chain preserved)
+// - Method calls: {$store.theme.getCurrentColors().background} → ${$store.theme.getCurrentColors().background}
 // - Alpine object literals: { count: {count} } → { count: ${props.count} }
-// - Skip list: Loop variables, Alpine built-ins, JS built-ins are NOT prefixed
+// - Arrow functions: {products.reduce((sum, p) => sum + p)} → ${props.products.reduce((sum, p) => sum + p)}
+// - Skip list: Loop variables, Alpine built-ins, JS built-ins, arrow function params are NOT prefixed
 func convertAttributeExpressions(attrValue string) string {
 	// Find all {expression} patterns
 	return expressionPattern.ReplaceAllStringFunc(attrValue, func(match string) string {
 		// Extract the expression without braces
 		expr := match[1 : len(match)-1] // Remove { and }
 
-		// Check if this is an Alpine object literal: { key: value }
-		if isAlpineObjectLiteral(expr) {
+		// Check if this looks like an Alpine object literal content (after braces are stripped)
+		// An object literal contains : for key-value pairs
+		if strings.Contains(expr, ":") {
 			// Check if it actually contains any template expressions (nested {})
-			hasNestedExpressions := false
-			depth := 0
-			for _, ch := range expr {
-				if ch == '{' {
-					depth++
-					if depth > 1 { // More than the outer braces
-						hasNestedExpressions = true
-						break
-					}
-				} else if ch == '}' {
-					depth--
-				}
-			}
-
-			if !hasNestedExpressions {
-				// Pure object literal like { count: 0 } - don't convert
+			if !strings.Contains(expr, "{") {
+				// Pure object literal like " count: 0, message: 'hello' " - don't convert
 				return match
 			}
 			// Process object literal with nested expressions
-			return convertObjectLiteralExpressions(expr)
+			return "{" + convertObjectLiteralExpressions(expr) + "}"
 		}
 
+		// Detect arrow function parameters and add to skip list
+		arrowParams := extractArrowFunctionParams(expr)
+
 		// For other expressions, prefix each identifier with props.
-		// We need to be careful about property access chains
-		converted := prefixIdentifiersInExpression(expr)
+		// We need to be careful about property access chains and method calls
+		converted := prefixIdentifiersInExpression(expr, arrowParams)
 
 		return "${" + converted + "}"
 	})
 }
 
-// prefixIdentifiersInExpression prefixes standalone identifiers with props. while preserving property chains
-// Cognitive Load: 12 (Complex string traversal with state tracking)
-func prefixIdentifiersInExpression(expr string) string {
-	// Use a more sophisticated approach: split by operators and process each token
+// extractArrowFunctionParams extracts parameter names from arrow functions in an expression
+// Returns a map of parameter names to skip during identifier prefixing
+// Cognitive Load: 10 (Regex matching with parameter extraction and cleanup)
+// Pattern: Arrow function parameter detection
+func extractArrowFunctionParams(expr string) map[string]bool {
+	params := make(map[string]bool)
+
+	// Find all arrow function patterns
+	matches := arrowFunctionPattern.FindAllStringSubmatch(expr, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			// match[1] is for (param1, param2) => pattern
+			// match[2] is for param => pattern
+			if match[1] != "" {
+				// Multiple parameters: (param1, param2) =>
+				// The captured group may contain extra parens from nested calls like .reduce((sum, p)
+				// We need to clean these up
+				paramStr := match[1]
+
+				// Remove leading parentheses that might be from method calls
+				paramStr = strings.TrimPrefix(paramStr, "(")
+
+				// Split by comma
+				paramList := strings.Split(paramStr, ",")
+				for _, param := range paramList {
+					param = strings.TrimSpace(param)
+
+					// Remove any remaining parens or whitespace
+					param = strings.Trim(param, "() \t")
+
+					// Extract just the identifier (in case of destructuring like {x, y})
+					// For now, we only support simple identifiers
+					if param != "" && isSimpleIdentifier(param) {
+						params[param] = true
+					}
+				}
+			} else if match[2] != "" {
+				// Single parameter: param =>
+				param := strings.TrimSpace(match[2])
+				if param != "" {
+					params[param] = true
+				}
+			}
+		}
+	}
+
+	return params
+}
+
+// isSimpleIdentifier checks if a string is a valid JavaScript identifier
+// Cognitive Load: 3 (Simple validation)
+func isSimpleIdentifier(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	// First character must be letter, underscore, or dollar sign
+	first := s[0]
+	if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_' || first == '$') {
+		return false
+	}
+	// Remaining characters can also be digits
+	for i := 1; i < len(s); i++ {
+		ch := s[i]
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '$') {
+			return false
+		}
+	}
+	return true
+}
+
+// prefixIdentifiersInExpression prefixes standalone identifiers with props. while preserving property chains and method calls
+// Cognitive Load: 18 (Complex string traversal with parentheses tracking for method calls vs grouping)
+// ARROW FUNCTION FIX: Now accepts arrowParams map to skip arrow function parameters
+func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool) string {
+	// Merge arrow params with skip list
+	combinedSkip := make(map[string]bool)
+	for k, v := range skipIdentifiers {
+		combinedSkip[k] = v
+	}
+	if arrowParams != nil {
+		for k, v := range arrowParams {
+			combinedSkip[k] = v
+		}
+	}
+
+	// Use a context-aware tokenizer that distinguishes method calls from grouping parens
 	var result strings.Builder
 	var currentToken strings.Builder
+	parenDepth := 0 // Track parentheses depth
+	isMethodCall := false // Track if current parens are for a method call
 
 	for i := 0; i < len(expr); i++ {
 		ch := expr[i]
 
-		// Check if this is an operator or delimiter
-		if isOperatorOrDelimiter(ch) {
+		if ch == '(' {
+			// Check if this is a method call (preceded by identifier/property chain)
+			// vs grouping parentheses (preceded by operator/whitespace)
+			if currentToken.Len() > 0 {
+				lastChar := currentToken.String()[currentToken.Len()-1]
+				// If preceded by identifier character, it's a method call
+				isMethodCall = (lastChar >= 'a' && lastChar <= 'z') ||
+					(lastChar >= 'A' && lastChar <= 'Z') ||
+					(lastChar >= '0' && lastChar <= '9') ||
+					lastChar == '_' || lastChar == '$' || lastChar == ')'
+			} else {
+				// Preceded by nothing or operator - grouping parens
+				isMethodCall = false
+			}
+
+			if isMethodCall {
+				// Method call - include in current token
+				currentToken.WriteByte(ch)
+				parenDepth++
+			} else {
+				// Grouping parens - process accumulated token and keep paren as operator
+				if currentToken.Len() > 0 {
+					token := currentToken.String()
+					result.WriteString(processToken(token, combinedSkip))
+					currentToken.Reset()
+				}
+				result.WriteByte(ch)
+				parenDepth++
+			}
+		} else if ch == ')' {
+			if parenDepth > 0 && isMethodCall {
+				// End of method call - include in current token
+				currentToken.WriteByte(ch)
+				parenDepth--
+				if parenDepth == 0 {
+					isMethodCall = false
+				}
+			} else {
+				// End of grouping parens - process token and keep paren as operator
+				if currentToken.Len() > 0 {
+					token := currentToken.String()
+					result.WriteString(processToken(token, combinedSkip))
+					currentToken.Reset()
+				}
+				result.WriteByte(ch)
+				parenDepth--
+			}
+		} else if parenDepth > 0 && isMethodCall {
+			// Inside method call parentheses - include in current token
+			currentToken.WriteByte(ch)
+		} else if ch == '.' {
+			// Property access - keep as part of token
+			currentToken.WriteByte(ch)
+		} else if isOperatorOrDelimiter(ch) {
 			// Process accumulated token
 			if currentToken.Len() > 0 {
 				token := currentToken.String()
-				result.WriteString(processToken(token))
+				result.WriteString(processToken(token, combinedSkip))
 				currentToken.Reset()
 			}
 			// Add the operator/delimiter
 			result.WriteByte(ch)
 		} else {
-			// Accumulate identifier/property chain
+			// Accumulate identifier/property chain/method call
 			currentToken.WriteByte(ch)
 		}
 	}
@@ -310,7 +445,7 @@ func prefixIdentifiersInExpression(expr string) string {
 	// Process final token
 	if currentToken.Len() > 0 {
 		token := currentToken.String()
-		result.WriteString(processToken(token))
+		result.WriteString(processToken(token, combinedSkip))
 	}
 
 	return result.String()
@@ -318,36 +453,39 @@ func prefixIdentifiersInExpression(expr string) string {
 
 // isOperatorOrDelimiter checks if a character is an operator or delimiter
 // Cognitive Load: 3 (Simple character check)
+// Note: Parentheses and dot are NOT treated as delimiters here - they're handled specially
 func isOperatorOrDelimiter(ch byte) bool {
 	return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%' ||
-		ch == '(' || ch == ')' || ch == '[' || ch == ']' ||
+		ch == '[' || ch == ']' ||
 		ch == ',' || ch == '?' || ch == ':' || ch == '!' ||
 		ch == '>' || ch == '<' || ch == '=' || ch == '&' || ch == '|' ||
 		ch == ' ' || ch == '\t' || ch == '\n'
 }
 
-// processToken processes a single token (identifier or property chain)
-// Cognitive Load: 8 (Token classification and prefix logic)
-func processToken(token string) string {
+// processToken processes a single token (identifier, property chain, or method call)
+// Cognitive Load: 10 (Token classification with method call handling)
+// ARROW FUNCTION FIX: Now accepts skipList parameter
+func processToken(token string, skipList map[string]bool) string {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return token
 	}
 
-	// Check if it's a property access chain (contains .)
-	if strings.Contains(token, ".") {
+	// Check if it's a property access chain or method call (contains . or ())
+	if strings.Contains(token, ".") || strings.Contains(token, "(") {
+		// Split by dot to find the root identifier
 		parts := strings.Split(token, ".")
 		firstPart := parts[0]
 
 		// Only prefix if the first part is not in skip list and not already "props"
-		if !skipIdentifiers[firstPart] && firstPart != "props" {
+		if !skipList[firstPart] && firstPart != "props" {
 			return "props." + token
 		}
 		return token
 	}
 
 	// Check if it's in skip list
-	if skipIdentifiers[token] {
+	if skipList[token] {
 		return token
 	}
 
@@ -400,7 +538,7 @@ func isAlpineObjectLiteral(expr string) bool {
 }
 
 // convertObjectLiteralExpressions processes object literals to convert nested expressions
-// Example: "{ count: {count}, message: '{message}' }" → " count: ${props.count}, message: '${props.message}' "
+// Example: " count: {count}, message: '{message}' " → " count: ${props.count}, message: '${props.message}' "
 // Cognitive Load: 8 (Nested expression conversion)
 func convertObjectLiteralExpressions(objLiteral string) string {
 	// Match {identifier} patterns but NOT at the start/end (those are object literal braces)
