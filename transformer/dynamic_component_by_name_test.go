@@ -1326,7 +1326,7 @@ func TestSerializePropsForRuntime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := serializePropsForRuntime(tt.props)
+			result := serializePropsForRuntime(tt.props, map[string]any{})
 
 			// Check that result is valid (non-empty)
 			if result == "" {

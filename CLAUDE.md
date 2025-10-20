@@ -388,6 +388,72 @@ Components are defined in `examples/components/` as `.html` files. Each componen
 - Props are extracted via `extractComponentProps()` in `cmd/server/main.go`
 - Component AST is stored and reused when component is referenced
 
+## Build-Time Loop Expansion
+
+The template engine expands loops at build time (like Svelte) instead of generating runtime Alpine.js x-for templates. This allows loop variables to be available during transformation, enabling dynamic component name resolution.
+
+### How It Works
+
+**Template:**
+```html
+---
+export let components
+---
+
+{for component in components}
+  <Component:dynamic name={component.name} {...component.fields} />
+{/for}
+```
+
+**Build Process:**
+1. Loop transformer resolves `components` array from dataScope (from JSON)
+2. For each component, creates iteration scope with actual component data
+3. Transforms body nodes with iteration scope (component.name resolves!)
+4. Appends transformed nodes to output
+5. Result: Fully expanded HTML, no x-for templates
+
+**Output (2 components in array):**
+```html
+<div class="hero" x-data='{"title":"Welcome"}'>
+  <h1 x-text="title">Welcome</h1>
+</div>
+
+<div class="services" x-data='{"title":"Our Services"}'>
+  <h2 x-text="title">Our Services</h2>
+</div>
+```
+
+### Hybrid Approach
+
+The system uses **build-time expansion when possible**, **runtime fallback when needed**:
+
+**Build-Time Expansion** (when collection resolvable):
+- Regular arrays in dataScope: `items`, `components`, `users`
+- Collections from JSON content files
+- Produces fully expanded HTML (no x-for)
+
+**Runtime Fallback** (when collection not resolvable):
+- Store collections: `$store.cart.items`
+- Complex expressions: `Array(count)`, `filteredItems`
+- Generates Alpine x-for template for runtime evaluation
+
+### Benefits
+
+1. **Component Name Resolution** - Loop variables available during transformation
+2. **Better SEO** - Fully expanded HTML in server-rendered output
+3. **Svelte Compatibility** - Matches Svelte's build-time expansion behavior
+4. **Performance** - No runtime loop evaluation needed for static content
+5. **Flexibility** - Runtime fallback for dynamic content
+
+### Implementation Files
+
+- `transformer/loops.go` - Build-time loop expansion logic
+- `transformer/scope.go` - Scope cloning utilities (`cloneScope`, `resolveCollectionFromScope`)
+- `transformer/component_loop_integration_test.go` - Integration tests
+- `tests/build_time_loop_expansion/` - Output validation tests
+
+**See:** `.agent-os/specs/2025-10-19-build-time-loop-expansion/` for full specification
+
 ## Alpine.js Integration
 
 The engine targets Alpine.js 3.x. Key integration points:

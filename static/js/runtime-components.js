@@ -145,7 +145,19 @@ async function renderDynamicComponent(el, componentName, props) {
         }
 
         // STEP 2: Get component template function (COGNITIVE LOAD: 2)
-        const templateFn = registry[componentName];
+        // Try exact match first, then case-insensitive match
+        let templateFn = registry[componentName];
+
+        if (!templateFn) {
+            // Try case-insensitive lookup
+            // This handles cases where JSON has 'hero2436' but registry has 'Hero2436'
+            const lowerName = componentName.toLowerCase();
+            const registryKey = Object.keys(registry).find(key => key.toLowerCase() === lowerName);
+            if (registryKey) {
+                templateFn = registry[registryKey];
+                console.log(`[Runtime Components] Case-insensitive match: '${componentName}' → '${registryKey}'`);
+            }
+        }
 
         if (!templateFn) {
             // Component not found - graceful degradation
@@ -162,11 +174,22 @@ async function renderDynamicComponent(el, componentName, props) {
             throw new Error(`Invalid component template for '${componentName}': expected function, got ${typeof templateFn}`);
         }
 
+        // STEP 2.5: Normalize props - strip 'this.' prefix from keys
+        // The server-side replaceVarRefsWithThis adds 'this.' prefix to field names
+        // but component templates expect clean prop names (props.title not props['this.title'])
+        const normalizedProps = {};
+        if (props) {
+            for (const [key, value] of Object.entries(props)) {
+                const cleanKey = key.startsWith('this.') ? key.substring(5) : key;
+                normalizedProps[cleanKey] = value;
+            }
+        }
+
         // STEP 3: Render component (COGNITIVE LOAD: 3)
         let html;
         try {
-            // Call template function with props
-            html = templateFn(props || {});
+            // Call template function with normalized props
+            html = templateFn(normalizedProps);
         } catch (error) {
             // Template error - show error in dev mode
             const errorMsg = `Template error in '${componentName}': ${error.message}`;

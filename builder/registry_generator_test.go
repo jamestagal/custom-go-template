@@ -1009,7 +1009,7 @@ func TestConvertAttributeExpressions_ComplexExpressions(t *testing.T) {
 		{
 			name:     "Arrow function using props inside",
 			input:    "{products.map(p => p.price * multiplier)}",
-			expected: "${props.products.map(p => p.price * multiplier)}", // KNOWN LIMITATION: Method call arguments not individually prefixed
+			expected: "${props.products.map(p => p.price * props.multiplier)}", // IMPROVED: Method call arguments ARE now prefixed (multiplier is a prop, not arrow param)
 		},
 	}
 
@@ -1033,7 +1033,7 @@ func TestSkipIdentifiers(t *testing.T) {
 		{"{index}", "${index}"},                    // Loop var
 		{"{item.name}", "${item.name}"},            // Loop var with property
 		{"{$store.cart}", "${$store.cart}"},        // Alpine built-in
-		{"{Math.floor(x)}", "${Math.floor(x)}"}, // KNOWN LIMITATION: Arguments inside built-in method calls not prefixed
+		{"{Math.floor(x)}", "${Math.floor(props.x)}"}, // IMPROVED: Arguments inside method calls ARE now prefixed (x is a prop)
 		{"{window.location}", "${window.location}"}, // JS built-in
 	}
 
@@ -1271,5 +1271,359 @@ func TestExtractArrowFunctionParams(t *testing.T) {
 				t.Errorf("extractArrowFunctionParams() returned %d params, want %d\nGot: %v", len(result), len(tt.expected), result)
 			}
 		})
+	}
+}
+
+// TestArrowFunctionBugFix tests the specific bug case from the issue
+// Bug: .reduce((sum, p) => was incorrectly extracting "props.sum" instead of "sum"
+// Cognitive Load: 6 (Specific regression test)
+func TestArrowFunctionBugFix(t *testing.T) {
+	// This is the EXACT case from the bug report
+	input := "{formatPrice(products.reduce((sum, p) => sum + p.price, 0) / products.length)}"
+
+	// Expected: Arrow function params (sum, p) should NOT get props. prefix
+	expected := "${props.formatPrice(props.products.reduce((sum, p) => sum + p.price, 0) / props.products.length)}"
+
+	result := convertAttributeExpressions(input)
+
+	if result != expected {
+		t.Errorf("Arrow function parameter extraction failed!\nInput:    %s\nExpected: %s\nGot:      %s",
+			input, expected, result)
+
+		// Extract params to show what went wrong
+		params := extractArrowFunctionParams("products.reduce((sum, p) => sum + p.price, 0)")
+		t.Logf("Extracted arrow params: %v", params)
+	}
+
+	// Verify the specific parameters were correctly identified
+	params := extractArrowFunctionParams("products.reduce((sum, p) => sum + p.price, 0)")
+	if !params["sum"] {
+		t.Error("Failed to extract 'sum' parameter from arrow function")
+	}
+	if !params["p"] {
+		t.Error("Failed to extract 'p' parameter from arrow function")
+	}
+
+	// Verify they're not prefixed in the output
+	if !contains(result, "(sum, p)") {
+		t.Errorf("Arrow function parameters were incorrectly modified. Expected '(sum, p)' in output, got: %s", result)
+	}
+}
+
+// Helper function for test
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+		len(s) > len(substr)+1 && strings.Contains(s, substr)))
+}
+
+// TestStringLiteralHandling tests the string literal fix (NEW)
+// Cognitive Load: 8 (String literal detection and preservation)
+// CRITICAL FIX TEST: This test verifies the fix for string literals inside expressions
+func TestStringLiteralHandling(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected string
+	}{
+		{
+			name:     "single quoted string",
+			expr:     "task.completed ? '✓ Done' : '○ Pending'",
+			expected: "props.task.completed ? '✓ Done' : '○ Pending'",
+		},
+		{
+			name:     "double quoted string",
+			expr:     `title + " - " + description`,
+			expected: `props.title + " - " + props.description`,
+		},
+		{
+			name:     "escaped quotes",
+			expr:     `message + ' can\'t ' + suffix`,
+			expected: `props.message + ' can\'t ' + props.suffix`,
+		},
+		{
+			name:     "nested quotes",
+			expr:     `outer + ' "inner" ' + end`,
+			expected: `props.outer + ' "inner" ' + props.end`,
+		},
+		{
+			name:     "ternary with strings",
+			expr:     "status === 'active' ? 'Yes' : 'No'",
+			expected: "props.status === 'active' ? 'Yes' : 'No'",
+		},
+		{
+			name:     "string with numbers",
+			expr:     "count + ' items'",
+			expected: "props.count + ' items'",
+		},
+		{
+			name:     "empty string",
+			expr:     "name || ''",
+			expected: "props.name || ''",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := prefixIdentifiersInExpression(tt.expr, nil)
+			if result != tt.expected {
+				t.Errorf("String literal handling failed\nExpression: %s\nExpected:   %s\nGot:        %s",
+					tt.expr, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestStringLiteralInAttributes tests string literals in attribute expressions (NEW)
+// Cognitive Load: 9 (End-to-end test with attribute conversion)
+func TestStringLiteralInAttributes(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "ternary with string literals",
+			input:    "{task.completed ? '✓ Done' : '○ Pending'}",
+			expected: "${props.task.completed ? '✓ Done' : '○ Pending'}",
+		},
+		{
+			name:     "string concatenation",
+			input:    "{firstName + ' ' + lastName}",
+			expected: "${props.firstName + ' ' + props.lastName}",
+		},
+		{
+			name:     "string comparison",
+			input:    "{status === 'active' ? 'Yes' : 'No'}",
+			expected: "${props.status === 'active' ? 'Yes' : 'No'}",
+		},
+		{
+			name:     "empty string fallback",
+			input:    "{message || ''}",
+			expected: "${props.message || ''}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertAttributeExpressions(tt.input)
+			if result != tt.expected {
+				t.Errorf("String literal in attribute failed\nInput:    %s\nExpected: %s\nGot:      %s",
+					tt.input, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestStringLiteralInComponentRegistry tests the complete pipeline (NEW)
+// Cognitive Load: 12 (Full integration test)
+func TestStringLiteralInComponentRegistry(t *testing.T) {
+	component := ComponentTemplate{
+		Name: "TodoItem",
+		AST: &ast.Template{
+			RootNodes: []ast.Node{
+				&ast.Element{
+					TagName: "div",
+					Attributes: []ast.Attribute{
+						{
+							Name:  "x-text",
+							Value: "{task.completed ? '✓ Done' : '○ Pending'}",
+						},
+					},
+					Children: []ast.Node{},
+				},
+			},
+		},
+	}
+
+	result := GenerateComponentRegistry([]ComponentTemplate{component})
+
+	// Should contain the ternary with string literals preserved
+	expected := `x-text="${props.task.completed ? '✓ Done' : '○ Pending'}"`
+	if !strings.Contains(result, expected) {
+		t.Errorf("String literal handling in component registry failed\nExpected to contain: %s\nGot: %s",
+			expected, result)
+	}
+
+	// Should NOT contain broken syntax like "props.'✓"
+	if strings.Contains(result, "props.'") {
+		t.Errorf("Found broken syntax with props. prefix inside string literal:\n%s", result)
+	}
+}
+
+// TestMethodChainingBugFix tests the Bug #2: Method chaining after method calls
+// Cognitive Load: 8 (Method chain preservation)
+// BUG: .split('').reverse().join('') was producing invalid syntax
+func TestMethodChainingBugFix(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected string
+	}{
+		{
+			name:     "method chain with empty args",
+			expr:     "animal.split('').reverse().join('')",
+			expected: "props.animal.split('').reverse().join('')",
+		},
+		{
+			name:     "method chain with args",
+			expr:     "str.replace('a', 'b').toUpperCase()",
+			expected: "props.str.replace('a', 'b').toUpperCase()",
+		},
+		{
+			name:     "nested method chains",
+			expr:     "data.items.filter(x => x.active).map(x => x.id)",
+			expected: "props.data.items.filter(x => x.active).map(x => x.id)",
+		},
+		{
+			name:     "triple method chain",
+			expr:     "text.trim().toLowerCase().split(' ')",
+			expected: "props.text.trim().toLowerCase().split(' ')",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := prefixIdentifiersInExpression(tt.expr, nil)
+			if result != tt.expected {
+				t.Errorf("Method chaining failed\nExpression: %s\nExpected:   %s\nGot:        %s",
+					tt.expr, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestQuoteEscapingBugFix tests Bug #1: Unescaped quotes in attribute values
+// Cognitive Load: 9 (Quote escaping in attributes)
+// BUG: x-if="animal == "cat"" was causing JavaScript syntax errors
+func TestQuoteEscapingBugFix(t *testing.T) {
+	tests := []struct {
+		name     string
+		attr     string
+		expected string
+	}{
+		{
+			name:     "double quotes in condition",
+			attr:     `{animal == "cat"}`,
+			expected: `{animal == "cat"}`, // Quotes inside {} should NOT be escaped
+		},
+		{
+			name:     "single quotes preserved",
+			attr:     `{animal == 'cat'}`,
+			expected: `{animal == 'cat'}`,
+		},
+		{
+			name:     "quotes outside expression",
+			attr:     `Say "hello" to {name}`,
+			expected: `Say \"hello\" to {name}`, // Quotes OUTSIDE {} should be escaped
+		},
+		{
+			name:     "mixed quotes",
+			attr:     `{status == "active"} and "text"`,
+			expected: `{status == "active"} and \"text\"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := escapeQuotesInAttributeValue(tt.attr)
+			if result != tt.expected {
+				t.Errorf("Quote escaping failed\nInput:    %s\nExpected: %s\nGot:      %s",
+					tt.attr, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestQuoteEscapingInFullPipeline tests Bug #1 through the complete attribute rendering pipeline
+// Cognitive Load: 12 (Integration test)
+func TestQuoteEscapingInFullPipeline(t *testing.T) {
+	tests := []struct {
+		name     string
+		attr     ast.Attribute
+		expected string
+	}{
+		{
+			name: "x-if with double quotes in condition",
+			attr: ast.Attribute{
+				Name:  "x-if",
+				Value: `{animal == "cat"}`,
+			},
+			expected: `x-if="${props.animal == "cat"}"`, // Quotes preserved inside ${}
+		},
+		{
+			name: "x-if with single quotes",
+			attr: ast.Attribute{
+				Name:  "x-if",
+				Value: `{animal == 'cat'}`,
+			},
+			expected: `x-if="${props.animal == 'cat'}"`,
+		},
+		{
+			name: "complex condition",
+			attr: ast.Attribute{
+				Name:  "x-if",
+				Value: `{status == "active" && count > 0}`,
+			},
+			expected: `x-if="${props.status == "active" && props.count > 0}"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var sb strings.Builder
+			ctx := &RenderContext{}
+			renderAttributeToJS(tt.attr, &sb, ctx, nil)
+			result := sb.String()
+
+			if result != tt.expected {
+				t.Errorf("Full pipeline quote escaping failed\nInput:    %s\nExpected: %s\nGot:      %s",
+					tt.attr.Value, tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestMethodChainingInComponentRegistry tests Bug #2 through component registry generation
+// Cognitive Load: 13 (Full integration test)
+func TestMethodChainingInComponentRegistry(t *testing.T) {
+	component := ComponentTemplate{
+		Name: "StringManipulator",
+		AST: &ast.Template{
+			RootNodes: []ast.Node{
+				&ast.Element{
+					TagName: "div",
+					Attributes: []ast.Attribute{
+						{
+							Name:  "x-text",
+							Value: `{animal.split('').reverse().join('')}`,
+						},
+					},
+					Children: []ast.Node{},
+				},
+			},
+		},
+	}
+
+	result := GenerateComponentRegistry([]ComponentTemplate{component})
+
+	// Should contain properly chained methods
+	expected := `x-text="${props.animal.split('').reverse().join('')}"`
+	if !strings.Contains(result, expected) {
+		t.Errorf("Method chaining in component registry failed\nExpected to contain: %s\nGot: %s",
+			expected, result)
+	}
+
+	// Should NOT contain broken syntax
+	broken := []string{
+		"props..reverse()",       // Double dot
+		"split('')props.",        // props. in wrong place
+		"props.reverse()",        // Missing chain
+	}
+
+	for _, bad := range broken {
+		if strings.Contains(result, bad) {
+			t.Errorf("Found broken method chain syntax: %s\nFull output: %s", bad, result)
+		}
 	}
 }

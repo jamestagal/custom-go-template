@@ -137,9 +137,22 @@ func renderNodeToJS(node ast.Node, sb *strings.Builder, ctx *RenderContext) {
 		sb.WriteString(escapeTemplateLiteral(n.Content))
 		sb.WriteString("-->")
 
-	// Ignore fence/script/style sections - they're not part of component markup
-	case *ast.FenceSection, *ast.ScriptSection, *ast.StyleSection:
-		// Skip metadata sections
+	case *ast.StyleSection:
+		// Render <style> tags with CSS content
+		// This is critical for component-specific styling
+		sb.WriteString("<style>")
+		sb.WriteString(escapeTemplateLiteral(n.Content))
+		sb.WriteString("</style>")
+
+	case *ast.ScriptSection:
+		// Render <script> tags with JavaScript content
+		sb.WriteString("<script>")
+		sb.WriteString(escapeTemplateLiteral(n.Content))
+		sb.WriteString("</script>")
+
+	// Ignore fence sections - they're metadata, not component markup
+	case *ast.FenceSection:
+		// Skip fence section (props, variables, etc.)
 
 	default:
 		// Unknown node types are silently skipped
@@ -230,11 +243,6 @@ var expressionPattern = regexp.MustCompile(`\{([^{}]+)\}`)
 // Important: This uses negative lookbehind/lookahead to avoid matching property access
 var identifierPattern = regexp.MustCompile(`(?:^|[^a-zA-Z0-9_$.\]])([a-zA-Z_$][\w]*)(?:$|[^a-zA-Z0-9_$.])`)
 
-// arrowFunctionPattern matches arrow function parameter patterns
-// Pattern: (param1, param2) => or param =>
-// Cognitive Load: 4 (Arrow function parameter detection)
-var arrowFunctionPattern = regexp.MustCompile(`\(([^)]+)\)\s*=>|([a-zA-Z_$][\w]*)\s*=>`)
-
 // convertAttributeExpressions converts {expression} patterns in attribute values to ${props.expression}
 // Cognitive Load: 14 (Regex replacement with skip list, property chain handling, and object literal handling)
 // Pattern: String transformation with identifier-level prefixing
@@ -259,7 +267,7 @@ func convertAttributeExpressions(attrValue string) string {
 
 		// Check if this looks like an Alpine object literal content (after braces are stripped)
 		// An object literal contains : for key-value pairs
-		if strings.Contains(expr, ":") {
+		if strings.Contains(expr, ":") && !strings.Contains(expr, "?") {
 			// Check if it actually contains any template expressions (nested {})
 			if !strings.Contains(expr, "{") {
 				// Pure object literal like " count: 0, message: 'hello' " - don't convert
@@ -282,51 +290,109 @@ func convertAttributeExpressions(attrValue string) string {
 
 // extractArrowFunctionParams extracts parameter names from arrow functions in an expression
 // Returns a map of parameter names to skip during identifier prefixing
-// Cognitive Load: 10 (Regex matching with parameter extraction and cleanup)
+// Cognitive Load: 12 (Improved regex with state tracking)
 // Pattern: Arrow function parameter detection
+//
+// CRITICAL FIX: This function now properly handles nested method calls
+// Example: ".reduce((sum, p) => ..." now correctly extracts ["sum", "p"]
+// Previous bug: Would capture "(" from ".reduce(" leading to invalid param names
 func extractArrowFunctionParams(expr string) map[string]bool {
 	params := make(map[string]bool)
 
-	// Find all arrow function patterns
-	matches := arrowFunctionPattern.FindAllStringSubmatch(expr, -1)
-	for _, match := range matches {
-		if len(match) > 1 {
-			// match[1] is for (param1, param2) => pattern
-			// match[2] is for param => pattern
-			if match[1] != "" {
-				// Multiple parameters: (param1, param2) =>
-				// The captured group may contain extra parens from nested calls like .reduce((sum, p)
-				// We need to clean these up
-				paramStr := match[1]
+	// Pattern: Find all "=>" occurrences and work backwards to find params
+	// This approach is more reliable than trying to match the full pattern
 
-				// Remove leading parentheses that might be from method calls
-				paramStr = strings.TrimPrefix(paramStr, "(")
+	offset := 0
+	for {
+		// Find next =>
+		arrowIndex := strings.Index(expr[offset:], "=>")
+		if arrowIndex == -1 {
+			break
+		}
+		arrowIndex += offset // Adjust to absolute position
 
-				// Split by comma
-				paramList := strings.Split(paramStr, ",")
-				for _, param := range paramList {
-					param = strings.TrimSpace(param)
+		// Look backwards from => to find the parameter list
+		// Skip whitespace before =>
+		paramEnd := arrowIndex - 1
+		for paramEnd >= 0 && (expr[paramEnd] == ' ' || expr[paramEnd] == '\t') {
+			paramEnd--
+		}
 
-					// Remove any remaining parens or whitespace
-					param = strings.Trim(param, "() \t")
+		if paramEnd < 0 {
+			offset = arrowIndex + 2
+			continue
+		}
 
-					// Extract just the identifier (in case of destructuring like {x, y})
-					// For now, we only support simple identifiers
-					if param != "" && isSimpleIdentifier(param) {
-						params[param] = true
-					}
+		// Check if params are in parens: (sum, p) =>
+		if expr[paramEnd] == ')' {
+			// Find matching opening paren by tracking depth
+			parenDepth := 1
+			paramStart := paramEnd - 1
+			for paramStart >= 0 && parenDepth > 0 {
+				if expr[paramStart] == ')' {
+					parenDepth++
+				} else if expr[paramStart] == '(' {
+					parenDepth--
 				}
-			} else if match[2] != "" {
-				// Single parameter: param =>
-				param := strings.TrimSpace(match[2])
-				if param != "" {
-					params[param] = true
+				paramStart--
+			}
+
+			if parenDepth == 0 {
+				// Extract params between parens
+				paramStr := expr[paramStart+2 : paramEnd] // +2 to skip opening (
+				extractParamNames(paramStr, params)
+			}
+		} else {
+			// Single param without parens: item =>
+			// Work backwards to find the identifier
+			paramStart := paramEnd
+			for paramStart >= 0 && isIdentifierChar(expr[paramStart]) {
+				paramStart--
+			}
+
+			if paramStart < paramEnd {
+				paramName := expr[paramStart+1 : paramEnd+1]
+				paramName = strings.TrimSpace(paramName)
+				if paramName != "" && isSimpleIdentifier(paramName) {
+					params[paramName] = true
 				}
 			}
 		}
+
+		offset = arrowIndex + 2 // Move past =>
 	}
 
 	return params
+}
+
+// extractParamNames extracts individual parameter names from a parameter list
+// Example: "sum, p" → ["sum", "p"]
+// Cognitive Load: 5 (String splitting and cleaning)
+func extractParamNames(paramStr string, params map[string]bool) {
+	// Split by comma
+	paramList := strings.Split(paramStr, ",")
+	for _, param := range paramList {
+		param = strings.TrimSpace(param)
+
+		// Remove any destructuring syntax (for now, just skip)
+		if strings.Contains(param, "{") || strings.Contains(param, "[") {
+			continue
+		}
+
+		// Extract just the identifier
+		if param != "" && isSimpleIdentifier(param) {
+			params[param] = true
+		}
+	}
+}
+
+// isIdentifierChar checks if a character can be part of a JavaScript identifier
+// Cognitive Load: 2 (Simple character check)
+func isIdentifierChar(ch byte) bool {
+	return (ch >= 'a' && ch <= 'z') ||
+		(ch >= 'A' && ch <= 'Z') ||
+		(ch >= '0' && ch <= '9') ||
+		ch == '_' || ch == '$'
 }
 
 // isSimpleIdentifier checks if a string is a valid JavaScript identifier
@@ -351,8 +417,10 @@ func isSimpleIdentifier(s string) bool {
 }
 
 // prefixIdentifiersInExpression prefixes standalone identifiers with props. while preserving property chains and method calls
-// Cognitive Load: 18 (Complex string traversal with parentheses tracking for method calls vs grouping)
+// Cognitive Load: 22 (Complex string traversal with string literal tracking)
 // ARROW FUNCTION FIX: Now accepts arrowParams map to skip arrow function parameters
+// STRING LITERAL FIX: Now tracks string literals to avoid processing content inside quotes
+// METHOD CHAIN FIX: Now properly continues method chains after closing parens
 func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool) string {
 	// Merge arrow params with skip list
 	combinedSkip := make(map[string]bool)
@@ -366,14 +434,70 @@ func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool) str
 	}
 
 	// Use a context-aware tokenizer that distinguishes method calls from grouping parens
+	// AND tracks string literals to skip processing inside them
 	var result strings.Builder
 	var currentToken strings.Builder
-	parenDepth := 0 // Track parentheses depth
-	isMethodCall := false // Track if current parens are for a method call
+	parenDepth := 0        // Track parentheses depth
+	isMethodCall := false  // Track if current parens are for a method call
+	inString := false      // Track if we're inside a string literal
+	stringChar := byte(0)  // Track which quote character started the string (' or ")
+	escaped := false       // Track if previous char was backslash
 
 	for i := 0; i < len(expr); i++ {
 		ch := expr[i]
 
+		// STRING LITERAL HANDLING (NEW)
+		// Check for escaped characters
+		if escaped {
+			// Previous char was \, so this char is escaped
+			result.WriteByte(ch)
+			escaped = false
+			continue
+		}
+
+		if ch == '\\' {
+			// Escape character - next char should be treated literally
+			result.WriteByte(ch)
+			escaped = true
+			continue
+		}
+
+		// Check for string delimiters
+		if ch == '\'' || ch == '"' {
+			if !inString {
+				// Entering string literal
+				inString = true
+				stringChar = ch
+
+				// Process any accumulated token before entering string
+				if currentToken.Len() > 0 {
+					token := currentToken.String()
+					result.WriteString(processToken(token, combinedSkip))
+					currentToken.Reset()
+				}
+
+				result.WriteByte(ch)
+				continue
+			} else if ch == stringChar {
+				// Exiting string literal (matching quote)
+				inString = false
+				stringChar = 0
+				result.WriteByte(ch)
+				continue
+			} else {
+				// Different quote character while in string - just part of string content
+				result.WriteByte(ch)
+				continue
+			}
+		}
+
+		// If we're inside a string, just copy characters as-is
+		if inString {
+			result.WriteByte(ch)
+			continue
+		}
+
+		// REST OF EXISTING LOGIC (for when NOT in string)
 		if ch == '(' {
 			// Check if this is a method call (preceded by identifier/property chain)
 			// vs grouping parentheses (preceded by operator/whitespace)
@@ -390,9 +514,51 @@ func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool) str
 			}
 
 			if isMethodCall {
-				// Method call - include in current token
-				currentToken.WriteByte(ch)
-				parenDepth++
+				// Method call - process the method name/chain first, then recursively process args
+				methodName := currentToken.String()
+				currentToken.Reset()
+
+				// Process and append the method name
+				result.WriteString(processToken(methodName, combinedSkip))
+				result.WriteByte('(')
+
+				// Find the matching closing paren and recursively process the arguments
+				argStart := i + 1
+				parenDepth = 1
+				argEnd := argStart
+
+				for argEnd < len(expr) && parenDepth > 0 {
+					if expr[argEnd] == '(' {
+						parenDepth++
+					} else if expr[argEnd] == ')' {
+						parenDepth--
+					}
+					if parenDepth > 0 {
+						argEnd++
+					}
+				}
+
+				// Recursively process arguments
+				if argEnd > argStart {
+					args := expr[argStart:argEnd]
+					argsArrowParams := extractArrowFunctionParams(args)
+					processedArgs := prefixIdentifiersInExpression(args, argsArrowParams)
+					result.WriteString(processedArgs)
+				}
+
+				result.WriteByte(')')
+				i = argEnd // Skip past the closing paren
+				parenDepth = 0
+				isMethodCall = false
+
+				// BUG FIX #2: Check if method chain continues after closing paren
+				// Example: .split('').reverse() - after split('') check for .reverse()
+				// If next char is '.', add it to currentToken to continue the chain
+				// This prevents the next method from being treated as a new token
+				if i+1 < len(expr) && expr[i+1] == '.' {
+					currentToken.WriteByte('.')
+					i++ // Skip the '.' in the next iteration so it's not processed again
+				}
 			} else {
 				// Grouping parens - process accumulated token and keep paren as operator
 				if currentToken.Len() > 0 {
@@ -404,14 +570,7 @@ func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool) str
 				parenDepth++
 			}
 		} else if ch == ')' {
-			if parenDepth > 0 && isMethodCall {
-				// End of method call - include in current token
-				currentToken.WriteByte(ch)
-				parenDepth--
-				if parenDepth == 0 {
-					isMethodCall = false
-				}
-			} else {
+			if parenDepth > 0 {
 				// End of grouping parens - process token and keep paren as operator
 				if currentToken.Len() > 0 {
 					token := currentToken.String()
@@ -420,13 +579,28 @@ func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool) str
 				}
 				result.WriteByte(ch)
 				parenDepth--
+			} else {
+				// Stray closing paren - shouldn't happen, but handle gracefully
+				result.WriteByte(ch)
 			}
-		} else if parenDepth > 0 && isMethodCall {
-			// Inside method call parentheses - include in current token
-			currentToken.WriteByte(ch)
 		} else if ch == '.' {
-			// Property access - keep as part of token
-			currentToken.WriteByte(ch)
+			// Check if this is the spread operator (...) vs property access (.)
+			// Spread operator should be treated as an operator, not part of identifier
+			if i+2 < len(expr) && expr[i+1] == '.' && expr[i+2] == '.' {
+				// This is spread operator (...) - process accumulated token first
+				if currentToken.Len() > 0 {
+					token := currentToken.String()
+					result.WriteString(processToken(token, combinedSkip))
+					currentToken.Reset()
+				}
+				// Write spread operator as-is
+				result.WriteString("...")
+				i += 2 // Skip the next two dots
+				continue // Skip to next iteration (don't process current char again)
+			} else {
+				// Property access - keep as part of token
+				currentToken.WriteByte(ch)
+			}
 		} else if isOperatorOrDelimiter(ch) {
 			// Process accumulated token
 			if currentToken.Len() > 0 {
@@ -457,7 +631,7 @@ func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool) str
 func isOperatorOrDelimiter(ch byte) bool {
 	return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%' ||
 		ch == '[' || ch == ']' ||
-		ch == ',' || ch == '?' || ch == ':' || ch == '!' ||
+		ch == ',' || ch == '?' || ch == ':' || ch == '!' || ch == ';' ||
 		ch == '>' || ch == '<' || ch == '=' || ch == '&' || ch == '|' ||
 		ch == ' ' || ch == '\t' || ch == '\n'
 }
@@ -465,14 +639,22 @@ func isOperatorOrDelimiter(ch byte) bool {
 // processToken processes a single token (identifier, property chain, or method call)
 // Cognitive Load: 10 (Token classification with method call handling)
 // ARROW FUNCTION FIX: Now accepts skipList parameter
+// NOTE: Method call arguments are now processed recursively by prefixIdentifiersInExpression
 func processToken(token string, skipList map[string]bool) string {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return token
 	}
 
-	// Check if it's a property access chain or method call (contains . or ())
-	if strings.Contains(token, ".") || strings.Contains(token, "(") {
+	// BUG FIX #2: If token starts with '.', it's a continuation of a method chain
+	// that was already processed. Just return it as-is without prefixing.
+	// Example: after "animal.split()", if we see ".reverse", return it unchanged
+	if strings.HasPrefix(token, ".") {
+		return token
+	}
+	// Check if it's a property access chain (contains .)
+	// Note: Method calls with () are now handled in prefixIdentifiersInExpression
+	if strings.Contains(token, ".") {
 		// Split by dot to find the root identifier
 		parts := strings.Split(token, ".")
 		firstPart := parts[0]
@@ -561,31 +743,82 @@ func convertObjectLiteralExpressions(objLiteral string) string {
 	return converted
 }
 
+// escapeQuotesInAttributeValue escapes double quotes that aren't inside {...} expressions
+// BUG FIX #1: This prevents: x-if="value == "test"" from breaking the attribute
+// Cognitive Load: 8 (State machine for expression tracking)
+func escapeQuotesInAttributeValue(value string) string {
+	var result strings.Builder
+	inExpression := false
+
+	for i := 0; i < len(value); i++ {
+		ch := value[i]
+
+		if ch == '{' {
+			inExpression = true
+			result.WriteByte(ch)
+		} else if ch == '}' {
+			inExpression = false
+			result.WriteByte(ch)
+		} else if ch == '"' && !inExpression {
+			// Escape double quotes outside of expressions
+			result.WriteString(`\"`)
+		} else {
+			result.WriteByte(ch)
+		}
+	}
+
+	return result.String()
+}
+
+// isEventHandlerAttribute checks if an attribute name is an event handler
+// Event handlers like onclick, @click, x-on:click should NOT have {expr} converted
+// because they contain executable code, not template data
+func isEventHandlerAttribute(name string) bool {
+	// Standard HTML event handlers
+	if strings.HasPrefix(name, "on") {
+		return true
+	}
+	// Alpine.js @ shorthand (@click, @submit, etc.)
+	if strings.HasPrefix(name, "@") {
+		return true
+	}
+	// Alpine.js x-on: syntax (x-on:click, x-on:submit, etc.)
+	if strings.HasPrefix(name, "x-on:") {
+		return true
+	}
+	return false
+}
+
 // renderAttributeToJS renders an HTML attribute with Alpine-aware handling
 // Cognitive Load: 12 (Attribute rendering with expression conversion)
 //
 // CRITICAL FIX: This function now properly converts {expression} patterns in attribute values
 // to ${props.expression} for JavaScript template literals using identifier-level prefixing
+// BUG FIX #1: Quote escaping happens BEFORE conversion to avoid escaping quotes in ${...}
+// BUG FIX #2: Event handler attributes (onclick, @click) are NOT converted
 func renderAttributeToJS(attr ast.Attribute, sb *strings.Builder, ctx *RenderContext, children []ast.Node) {
 	sb.WriteString(attr.Name)
 	sb.WriteString("=\"")
 
-	// Escape backslashes and backticks for template literal safety
-	// Then escape quotes for attribute syntax
-	// Then convert {expression} patterns to ${props.expression}
 	escaped := attr.Value
 
 	// Step 1: Escape backslashes and backticks for template literal
 	escaped = strings.ReplaceAll(escaped, `\`, `\\`)
 	escaped = strings.ReplaceAll(escaped, "`", "\\`")
 
-	// Step 2: Convert {expression} patterns to ${props.expression}
-	// This handles cases like: x-data="{ count: {count} }" → x-data="{ count: ${props.count} }"
-	escaped = convertAttributeExpressions(escaped)
+	// Step 2: Escape double quotes BEFORE conversion (for attribute context)
+	// BUG FIX #1: Smart escaping - only escape quotes outside of {...} expressions
+	// This prevents: x-if="animal == "cat"" from becoming x-if="animal == \"cat\""
+	// Instead we get: x-if="animal == \"cat\"" BEFORE conversion, then after:
+	// x-if="${props.animal == \"cat\"}" which is correct!
+	escaped = escapeQuotesInAttributeValue(escaped)
 
-	// Step 3: Escape double quotes for attribute value syntax
-	// Important: Do this AFTER expression conversion to avoid escaping quotes in ${props.x}
-	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+	// Step 3: Convert {expression} patterns to ${props.expression}
+	// This handles cases like: x-data="{ count: {count} }" → x-data="{ count: ${props.count} }"
+	// But NOT for event handlers (onclick, @click, etc.) where the code should remain as-is
+	if !isEventHandlerAttribute(attr.Name) {
+		escaped = convertAttributeExpressions(escaped)
+	}
 
 	sb.WriteString(escaped)
 	sb.WriteString("\"")
@@ -596,7 +829,9 @@ func renderAttributeToJS(attr ast.Attribute, sb *strings.Builder, ctx *RenderCon
 func renderConditionalToJS(cond *ast.Conditional, sb *strings.Builder, ctx *RenderContext) {
 	// Main if block
 	sb.WriteString(`<template x-if="`)
-	sb.WriteString(cond.IfCondition)
+	// BUG FIX: Escape quotes in condition (same issue as attributes)
+	escapedCondition := escapeQuotesInAttributeValue(cond.IfCondition)
+	sb.WriteString(escapedCondition)
 	sb.WriteString(`">`)
 
 	for _, node := range cond.IfContent {
@@ -608,7 +843,9 @@ func renderConditionalToJS(cond *ast.Conditional, sb *strings.Builder, ctx *Rend
 	// Else-if blocks
 	for i, elseIfCond := range cond.ElseIfConditions {
 		sb.WriteString(`<template x-else-if="`)
-		sb.WriteString(elseIfCond)
+		// BUG FIX: Escape quotes in else-if condition (same issue as if condition)
+		escapedElseIfCond := escapeQuotesInAttributeValue(elseIfCond)
+		sb.WriteString(escapedElseIfCond)
 		sb.WriteString(`">`)
 
 		for _, node := range cond.ElseIfContent[i] {
@@ -660,8 +897,8 @@ func renderLoopToJS(loop *ast.Loop, sb *strings.Builder, ctx *RenderContext) {
 // Pattern: Basic string escaping
 func escapeTemplateLiteral(s string) string {
 	// Order matters: escape backslashes first to avoid double-escaping
-	s = strings.ReplaceAll(s, `\`, `\\`)   // \ → \\
-	s = strings.ReplaceAll(s, "`", "\\`")  // ` → \`
+	s = strings.ReplaceAll(s, `\`, `\\`)    // \ → \\
+	s = strings.ReplaceAll(s, "`", "\\`")   // ` → \`
 	s = strings.ReplaceAll(s, "${", "\\${") // ${ → \${
 	return s
 }
