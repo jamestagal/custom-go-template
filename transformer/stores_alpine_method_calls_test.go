@@ -75,7 +75,7 @@ func TestAlpineAttributesWithMethodCalls(t *testing.T) {
 			attributes := []ast.Attribute{tt.inputAttr}
 			dataScope := make(map[string]any)
 
-			result := transformAttributesWithStores(attributes, dataScope)
+			result := transformAttributeExpressions(attributes, dataScope)
 
 			// Should have exactly 1 attribute
 			if len(result) != 1 {
@@ -150,7 +150,7 @@ func TestNonAlpineAttributesWithStoreExpressions(t *testing.T) {
 			attributes := []ast.Attribute{tt.inputAttr}
 			dataScope := make(map[string]any)
 
-			result := transformAttributesWithStores(attributes, dataScope)
+			result := transformAttributeExpressions(attributes, dataScope)
 
 			if len(result) != 1 {
 				t.Fatalf("Expected 1 attribute, got %d", len(result))

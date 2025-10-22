@@ -99,7 +99,7 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			element := *n
 
 			// Transform attributes (now handles both regular and store expressions)
-			element.Attributes = transformAttributesWithStores(element.Attributes, dataScope)
+			element.Attributes = transformAttributeExpressions(element.Attributes, dataScope)
 
 			// Create a child scope for the element's children
 			// This ensures variables defined in child elements don't leak to siblings

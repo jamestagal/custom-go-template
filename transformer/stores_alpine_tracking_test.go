@@ -78,7 +78,7 @@ func TestTransformAttributesWithAlpineStores(t *testing.T) {
 	}
 
 	dataScope := make(map[string]any)
-	result := transformAttributesWithStores(attributes, dataScope)
+	result := transformAttributeExpressions(attributes, dataScope)
 
 	// Verify attributes unchanged (Alpine directives pass through)
 	if len(result) != 3 {
@@ -185,7 +185,7 @@ func TestBugFix_ThemeStoreNotTracked(t *testing.T) {
 	}
 
 	dataScope := make(map[string]any)
-	transformAttributesWithStores(attributes, dataScope)
+	transformAttributeExpressions(attributes, dataScope)
 
 	// Get tracked stores
 	referencedStores, allDefs := GetTrackedStores(&ast.Template{})

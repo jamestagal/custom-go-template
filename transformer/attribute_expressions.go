@@ -388,12 +388,12 @@ func hasExpressionSyntax(value string) bool {
 	return strings.Contains(value, "{") && strings.Contains(value, "}")
 }
 
-// transformAttributesWithStores transforms attributes containing store expressions
+// transformAttributeExpressions transforms attributes containing store expressions and regular expressions
 // Handles: <div class="{$theme.mode}"> -> <div :class="$store.theme.mode">
 // ALPINE.JS FIX: <button onclick="{expression}"> -> <button @click="expression">
 // BUILD-TIME FIX: Interpolates component props at build time instead of runtime binding
 // Cognitive Load: 20 (regex matching + string building + tracking + event handler conversion)
-func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[string]any) []ast.Attribute {
+func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[string]any) []ast.Attribute {
 	transformedAttributes := make([]ast.Attribute, 0, len(attributes))
 
 	for _, attr := range attributes {

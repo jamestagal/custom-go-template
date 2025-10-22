@@ -20,7 +20,7 @@ func TestTransformAttributesWithStores_RegularExpression(t *testing.T) {
 	}
 
 	// Transform
-	transformed := transformAttributesWithStores(attrs, dataScope)
+	transformed := transformAttributeExpressions(attrs, dataScope)
 
 	// Should have :class attribute
 	found := false
@@ -52,7 +52,7 @@ func TestTransformAttributesWithStores_MixedExpression(t *testing.T) {
 	}
 
 	// Transform
-	transformed := transformAttributesWithStores(attrs, dataScope)
+	transformed := transformAttributeExpressions(attrs, dataScope)
 
 	// Should have :class attribute with combined expression
 	found := false
