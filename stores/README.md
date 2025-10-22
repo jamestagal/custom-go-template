@@ -21,19 +21,21 @@ custom_go_template/
 
 Store files must:
 1. Be valid JavaScript files with `.js` extension
-2. Contain a single JavaScript object literal
-3. Use ES5+ syntax (methods, getters, etc.)
-4. **NOT** include `Alpine.store()` wrapper (added automatically)
-5. **NOT** include surrounding parentheses or semicolons
+2. Use **ES module export syntax** with `export default`
+3. Export a single JavaScript object literal
+4. Use ES6+ syntax (methods, getters, arrow functions, etc.)
+5. **NOT** include `Alpine.store()` wrapper (added automatically)
 
 ### Basic Structure
 
+Store files use **ES module syntax** for better linter support and IDE tooling:
+
 ```javascript
-{
+export default {
   // State properties
   propertyName: initialValue,
 
-  // Methods
+  // Methods (ES6 method shorthand)
   methodName(param) {
     // Access state with 'this'
     this.propertyName = newValue;
@@ -45,6 +47,13 @@ Store files must:
   }
 }
 ```
+
+**Why ES modules?**
+- ✅ Standard JavaScript format
+- ✅ Linters and formatters work correctly
+- ✅ Better IDE autocomplete and error checking
+- ✅ No linting warnings about bare object literals
+- ✅ The `export default` is automatically stripped during processing
 
 ## Store Registration
 
@@ -104,7 +113,7 @@ Access stores with `$storeName` prefix:
 ### 1. auth.js - Authentication Store
 
 ```javascript
-{
+export default {
   isLoggedIn: false,
   user: null,
   login() {
@@ -131,7 +140,7 @@ Access stores with `$storeName` prefix:
 ### 2. cart.js - Shopping Cart Store
 
 ```javascript
-{
+export default {
   items: [],
   total: 0,
   addItem(item) {
@@ -166,7 +175,7 @@ Access stores with `$storeName` prefix:
 ### 3. theme.js - Theme Store
 
 ```javascript
-{
+export default {
   mode: 'light',
   colors: {
     light: {
