@@ -923,7 +923,9 @@ func buildXDataFromProps(props map[string]interface{}) string {
 			// Example: "{\n  name: \"Benjamin\",\n  role: \"admin\"\n}"
 			if transformer.IsJavaScriptLiteral(trimmed) {
 				log.Printf("buildXDataFromProps: Unquoted JS literal detected for key=%s: %s", key, trimmed[:min(50, len(trimmed))])
-				formattedValue = trimmed
+				// CRITICAL FIX: Convert double quotes to single quotes for HTML attribute safety
+				// This prevents HTML entity escaping (&quot;) which breaks Alpine.js parsing
+				formattedValue = strings.ReplaceAll(trimmed, `"`, `'`)
 			} else if transformer.IsFunctionExpression(trimmed) {
 				log.Printf("buildXDataFromProps: Unquoted function expression detected for key=%s", key)
 				formattedValue = trimmed
@@ -936,7 +938,9 @@ func buildXDataFromProps(props map[string]interface{}) string {
 				// CRITICAL FIX: Check if unwrapped content is a JavaScript literal
 				if transformer.IsJavaScriptLiteral(unwrapped) {
 					log.Printf("buildXDataFromProps: Unwrapped content is JS literal, returning as-is: %s", unwrapped[:min(50, len(unwrapped))])
-					formattedValue = unwrapped
+					// CRITICAL FIX: Convert double quotes to single quotes for HTML attribute safety
+					// This prevents HTML entity escaping (&quot;) which breaks Alpine.js parsing
+					formattedValue = strings.ReplaceAll(unwrapped, `"`, `'`)
 				} else if transformer.IsFunctionExpression(unwrapped) {
 					// CRITICAL FIX: Check if unwrapped content is a function expression
 					log.Printf("buildXDataFromProps: Unwrapped content is function expression, returning as-is")
