@@ -917,8 +917,17 @@ func buildXDataFromProps(props map[string]interface{}) string {
 
 			trimmed := strings.TrimSpace(v)
 
-			// Check if it's a quoted string that might contain a JavaScript literal
-			if strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`) && len(trimmed) > 1 {
+			// CRITICAL FIX: Check if string is an UNQUOTED JavaScript literal FIRST
+			// This handles multiline objects/arrays that parser stores as raw strings (no outer quotes)
+			// Example: "{\n  name: \"Benjamin\",\n  role: \"admin\"\n}"
+			if transformer.IsJavaScriptLiteral(trimmed) {
+				log.Printf("buildXDataFromProps: Unquoted JS literal detected for key=%s: %s", key, trimmed[:min(50, len(trimmed))])
+				formattedValue = trimmed
+			} else if transformer.IsFunctionExpression(trimmed) {
+				log.Printf("buildXDataFromProps: Unquoted function expression detected for key=%s", key)
+				formattedValue = trimmed
+			} else if strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`) && len(trimmed) > 1 {
+
 				// Unwrap the double quotes
 				unwrapped := trimmed[1 : len(trimmed)-1]
 				log.Printf("buildXDataFromProps: Unwrapped double-quoted string for key=%s: %q → %q", key, v, unwrapped)
