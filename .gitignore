@@ -33,3 +33,4 @@ server_test
 .DS_Store
 .AppleDouble
 .LSOverride
+.agent-os/debug/
