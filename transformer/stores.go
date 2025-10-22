@@ -2,11 +2,28 @@ package transformer
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"regexp"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
+
+// --- Expression Debugging (Environment Variable Control) ---
+
+// debugExpressions is enabled via DEBUG_EXPRESSIONS=true environment variable
+// When enabled, logs detailed information about expression transformation decisions
+// (build-time vs runtime, resolved values, reasons for runtime binding)
+var debugExpressions = os.Getenv("DEBUG_EXPRESSIONS") == "true"
+
+// logExpressionDebug logs expression transformation decisions when debugging is enabled
+// Cognitive Load: 3 (simple conditional logging)
+func logExpressionDebug(format string, args ...interface{}) {
+	if debugExpressions {
+		log.Printf("[EXPR-DEBUG] "+format, args...)
+	}
+}
 
 // --- Store Reference Tracking (Task 2.4) ---
 
@@ -167,6 +184,59 @@ var storeAttrPattern = regexp.MustCompile(`\{\$([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA
 // This captures any expression that doesn't start with $
 var regularExprPattern = regexp.MustCompile(`\{([^$}][^}]*)\}`)
 
+// IsSimpleVariable checks if an expression is a simple variable name (not a complex expression)
+// Returns true for: "description", "title", "count"
+// Returns false for: "item.type", "count + 1", "arr[0]"
+// Cognitive Load: 3 (simple pattern matching)
+// EXPORTED for testing
+func IsSimpleVariable(expr string) bool {
+	expr = strings.TrimSpace(expr)
+	// Simple variable: only letters, numbers, and underscores, no dots or operators
+	return regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`).MatchString(expr)
+}
+
+// TryResolveBuildTimeValue attempts to resolve an expression to a build-time value
+// Returns (value, true) if the expression is resolvable at build time
+// Returns ("", false) if the expression needs runtime evaluation
+// Cognitive Load: 6 (scope lookup + type checking)
+// EXPORTED for testing
+func TryResolveBuildTimeValue(expr string, dataScope map[string]any) (string, bool) {
+	// Only resolve simple variables (not complex expressions)
+	if !IsSimpleVariable(expr) {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Complex expression (not a simple variable)", expr)
+		return "", false
+	}
+
+	// Check if variable exists in dataScope
+	value, exists := dataScope[expr]
+	if !exists {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Variable not in dataScope", expr)
+		return "", false
+	}
+
+	// If value is nil, it's a runtime-only variable (e.g., loop variable)
+	if value == nil {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Variable is nil (loop variable marker)", expr)
+		return "", false
+	}
+
+	// Resolve to string value
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case int:
+		return fmt.Sprintf("%d", v), true
+	case float64:
+		return fmt.Sprintf("%g", v), true
+	case bool:
+		return fmt.Sprintf("%t", v), true
+	default:
+		// Complex types (maps, arrays, etc.) need runtime evaluation
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Complex type %T (needs runtime evaluation)", expr, v)
+		return "", false
+	}
+}
+
 // Pattern to detect store expressions in conditions: $storeName.property (without braces)
 // Matches: $storeName.property, $storeName.nested.property, etc.
 // Cognitive Load: 4 (regex pattern)
@@ -321,6 +391,7 @@ func hasExpressionSyntax(value string) bool {
 // transformAttributesWithStores transforms attributes containing store expressions
 // Handles: <div class="{$theme.mode}"> -> <div :class="$store.theme.mode">
 // ALPINE.JS FIX: <button onclick="{expression}"> -> <button @click="expression">
+// BUILD-TIME FIX: Interpolates component props at build time instead of runtime binding
 // Cognitive Load: 20 (regex matching + string building + tracking + event handler conversion)
 func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[string]any) []ast.Attribute {
 	transformedAttributes := make([]ast.Attribute, 0, len(attributes))
@@ -407,6 +478,16 @@ func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[str
 				// Determine whether this is an Alpine directive
 				isAlpine := strings.HasPrefix(attr.Name, "x-") || strings.HasPrefix(attr.Name, "@")
 
+				// Build the generated binding syntax for logging
+				var generatedBinding string
+				if isAlpine {
+					generatedBinding = fmt.Sprintf("%s=\"%s\"", attr.Name, alpineStoreExpr)
+				} else {
+					generatedBinding = fmt.Sprintf(":%s=\"%s\"", attr.Name, alpineStoreExpr)
+				}
+				logExpressionDebug("Attribute '%s' expression '{$%s}' → RUNTIME (store)", attr.Name, storeExpr)
+				logExpressionDebug("  ↳ Generated: %s", generatedBinding)
+
 				// Transform to Alpine.js bind syntax or Alpine directive
 				// NOTE: Don't add : prefix here - the renderer adds it for Dynamic=true attributes
 				transformedAttr := ast.Attribute{
@@ -423,24 +504,53 @@ func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[str
 				// Case 2: Pure regular expression {expr}
 				expression := regularMatches[0][1] // Captured expression without braces
 
-				// Extract variables from expression to data scope
-				extractVariablesFromExpr(expression, dataScope)
+				// CRITICAL FIX: Check if this is a build-time resolvable value (component prop)
+				// If so, interpolate the value instead of creating a runtime binding
+				if resolvedValue, resolvable := TryResolveBuildTimeValue(expression, dataScope); resolvable {
+					// Build-time interpolation: replace {description} with the actual value
+					log.Printf("[BUILD-TIME] Interpolating {%s} → %q", expression, resolvedValue)
+					logExpressionDebug("Attribute '%s' expression '{%s}' → BUILD-TIME", attr.Name, expression)
+					logExpressionDebug("  ↳ Resolved value: %q", resolvedValue)
+					transformedAttr := ast.Attribute{
+						Name:       attr.Name,
+						Value:      resolvedValue,
+						Dynamic:    false, // Static value, no runtime binding
+						IsAlpine:   false,
+						AlpineType: "",
+						AlpineKey:  "",
+					}
+					transformedAttributes = append(transformedAttributes, transformedAttr)
+				} else {
+					// Runtime expression: create Alpine.js binding
+					// Extract variables from expression to data scope
+					extractVariablesFromExpr(expression, dataScope)
 
-				// Determine whether this is an Alpine directive
-				isAlpine := strings.HasPrefix(attr.Name, "x-") || strings.HasPrefix(attr.Name, "@")
+					// Determine whether this is an Alpine directive
+					isAlpine := strings.HasPrefix(attr.Name, "x-") || strings.HasPrefix(attr.Name, "@")
 
-				// Transform to Alpine.js bind syntax or Alpine directive
-				// NOTE: Don't add : prefix here - the renderer adds it for Dynamic=true attributes
-				transformedAttr := ast.Attribute{
-					Name:       attr.Name,
-					Value:      expression,
-					Dynamic:    !isAlpine, // Mark as dynamic for regular HTML attributes (renderer will add :)
-					IsAlpine:   isAlpine,
-					AlpineType: extractAlpineType(attr.Name),
-					AlpineKey:  "",
+					// Build the generated binding syntax for logging
+					var generatedBinding string
+					if isAlpine {
+						generatedBinding = fmt.Sprintf("%s=\"%s\"", attr.Name, expression)
+					} else {
+						generatedBinding = fmt.Sprintf(":%s=\"%s\"", attr.Name, expression)
+					}
+					logExpressionDebug("Attribute '%s' expression '{%s}' → RUNTIME", attr.Name, expression)
+					logExpressionDebug("  ↳ Generated: %s", generatedBinding)
+
+					// Transform to Alpine.js bind syntax or Alpine directive
+					// NOTE: Don't add : prefix here - the renderer adds it for Dynamic=true attributes
+					transformedAttr := ast.Attribute{
+						Name:       attr.Name,
+						Value:      expression,
+						Dynamic:    !isAlpine, // Mark as dynamic for regular HTML attributes (renderer will add :)
+						IsAlpine:   isAlpine,
+						AlpineType: extractAlpineType(attr.Name),
+						AlpineKey:  "",
+					}
+
+					transformedAttributes = append(transformedAttributes, transformedAttr)
 				}
-
-				transformedAttributes = append(transformedAttributes, transformedAttr)
 			} else {
 				// Case 3: Mixed content - static text + expressions (store and/or regular)
 				// We need to handle both types of expressions together
@@ -554,6 +664,11 @@ func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[str
 
 				// Combine all parts with + operator
 				combinedExpression := strings.Join(expressionParts, " + ")
+
+				// Debug logging for mixed content
+				logExpressionDebug("Attribute '%s' mixed content (static + expressions) → RUNTIME", attr.Name)
+				logExpressionDebug("  ↳ Generated: :%s=\"%s\"", attr.Name, combinedExpression)
+				logExpressionDebug("  ↳ Expression parts: %d", len(expressionParts))
 
 				// Create dynamic attribute
 				// NOTE: Don't add : prefix here - the renderer adds it for Dynamic=true attributes

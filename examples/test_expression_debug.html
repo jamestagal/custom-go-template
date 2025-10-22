@@ -1,0 +1,39 @@
+---
+let title = "Test Page"
+let description = "A powerful template engine"
+let count = 42
+let items = ["one", "two", "three"]
+
+prop type = "info"
+---
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Expression Debug Test</title>
+</head>
+<body>
+    <h1>{title}</h1>
+
+    <!-- BUILD-TIME: Simple variable in dataScope -->
+    <p content="{description}">Description here</p>
+
+    <!-- BUILD-TIME: Number variable -->
+    <div data-count="{count}">Count</div>
+
+    <!-- RUNTIME: Variable not in dataScope -->
+    <div class="{type}">Notification</div>
+
+    <!-- RUNTIME: Complex expression -->
+    <div data-value="{count + 10}">Value</div>
+
+    <!-- RUNTIME: Store expression -->
+    <div theme="{$theme.mode}">Theme</div>
+
+    <!-- RUNTIME: Mixed content -->
+    <div class="notification {type}">Mixed</div>
+
+    <!-- RUNTIME: Array (complex type) -->
+    <div data-items="{items}">Items</div>
+</body>
+</html>
