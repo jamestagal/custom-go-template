@@ -879,9 +879,13 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 // CRITICAL: Functions must NOT be quoted. Example output:
 // {buildTime:'20ms',formatPrice:function formatPrice(price){return "$"+price.toFixed(2);}}
 //
+// CRITICAL FIX: Now unwraps quoted JavaScript literals (arrays/objects) before checking type
+// This prevents treating `"[...]"` as a string when it should be an actual array
+//
 // Pattern: Data Formatting Pattern [Load: 12]
 // Cognitive Load: 12 (iterate props: 2, detect functions: 3, format values: 5, join: 2)
 func buildXDataFromProps(props map[string]interface{}) string {
+	log.Printf("=== buildXDataFromProps CALLED with %d props ===", len(props))
 	if len(props) == 0 {
 		return "{}"
 	}
@@ -901,12 +905,39 @@ func buildXDataFromProps(props map[string]interface{}) string {
 	for _, key := range keys {
 		value := props[key]
 
+		// DEBUG: Log the actual value type and content
+		log.Printf("DEBUG buildXDataFromProps: key=%s, value=%#v, type=%T", key, value, value)
+
 		// Format value as JavaScript (NOT JSON)
 		var formattedValue string
 		switch v := value.(type) {
 		case string:
-			// Check if it's a function definition
-			if strings.HasPrefix(v, "function ") || strings.Contains(v, "=>") {
+			// CRITICAL FIX: Apply the SAME unwrapping logic as transformer/alpine.go
+			// Check if string is quoted and unwrap, then check if it's a JS literal
+
+			trimmed := strings.TrimSpace(v)
+
+			// Check if it's a quoted string that might contain a JavaScript literal
+			if strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`) && len(trimmed) > 1 {
+				// Unwrap the double quotes
+				unwrapped := trimmed[1 : len(trimmed)-1]
+				log.Printf("buildXDataFromProps: Unwrapped double-quoted string for key=%s: %q → %q", key, v, unwrapped)
+
+				// CRITICAL FIX: Check if unwrapped content is a JavaScript literal
+				if transformer.IsJavaScriptLiteral(unwrapped) {
+					log.Printf("buildXDataFromProps: Unwrapped content is JS literal, returning as-is: %s", unwrapped[:min(50, len(unwrapped))])
+					formattedValue = unwrapped
+				} else if transformer.IsFunctionExpression(unwrapped) {
+					// CRITICAL FIX: Check if unwrapped content is a function expression
+					log.Printf("buildXDataFromProps: Unwrapped content is function expression, returning as-is")
+					formattedValue = unwrapped
+				} else {
+					// Regular string - re-quote with single quotes
+					escaped := escapeStringForJS(unwrapped)
+					formattedValue = fmt.Sprintf(`'%s'`, escaped)
+					log.Printf("buildXDataFromProps: Re-quoted with single quotes: %q → %s", unwrapped, formattedValue)
+				}
+			} else if strings.HasPrefix(v, "function ") || strings.Contains(v, "=>") {
 				// Function - keep as-is, just minify whitespace for HTML attribute
 				formattedValue = minifyFunction(v)
 			} else {
@@ -933,6 +964,14 @@ func buildXDataFromProps(props map[string]interface{}) string {
 	}
 
 	return "{" + strings.Join(parts, ",") + "}"
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // minifyFunction removes unnecessary whitespace from function definitions

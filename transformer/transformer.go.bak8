@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -99,7 +100,7 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			element := *n
 
 			// Transform attributes (now handles both regular and store expressions)
-			element.Attributes = transformAttributesWithStores(element.Attributes, dataScope)
+			element.Attributes = transformAttributes(element.Attributes, dataScope)
 
 			// Create a child scope for the element's children
 			// This ensures variables defined in child elements don't leak to siblings
@@ -202,10 +203,8 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 }
 
 // applyAlpineDataWrapper wraps the nodes in an Alpine.js x-data wrapper
-// Uses alpineDataFormatter from alpine.go which properly formats JavaScript values
 func applyAlpineDataWrapper(nodes []ast.Node, dataScope map[string]any) []ast.Node {
-	// Build the x-data value from the data scope using proper JavaScript formatting
-	// alpineDataFormatter uses FormatGoValueToJS which handles arrays, objects, etc.
+	// Build the x-data value from the data scope
 	xDataValue := alpineDataFormatter(dataScope)
 
 	// Create a wrapper div with the x-data directive
@@ -224,4 +223,41 @@ func applyAlpineDataWrapper(nodes []ast.Node, dataScope map[string]any) []ast.No
 	}
 
 	return []ast.Node{wrapperDiv}
+}
+
+// buildXDataValue creates the Alpine.js x-data attribute value from the data scope
+func buildXDataValue(dataScope map[string]any) string {
+	if len(dataScope) == 0 {
+		return "{}"
+	}
+
+	var parts []string
+	for key, value := range dataScope {
+		parts = append(parts, fmt.Sprintf("%s: %v", key, formatValue(value)))
+	}
+
+	return "{" + strings.Join(parts, ", ") + "}"
+}
+
+// formatValue formats a Go value for JavaScript
+func formatValue(v interface{}) string {
+	if v == nil {
+		return "null"
+	}
+
+	switch val := v.(type) {
+	case string:
+		return fmt.Sprintf("'%s'", val)
+	case bool:
+		return fmt.Sprintf("%t", val)
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", val)
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", val)
+	case float32, float64:
+		return fmt.Sprintf("%f", val)
+	default:
+		// For complex types, just use %v
+		return fmt.Sprintf("%v", val)
+	}
 }

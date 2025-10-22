@@ -32,7 +32,12 @@ type StyleBlock struct {
 
 // extractComponentNameFromPath extracts component name from a path
 // Example: "./components/UserProfile.html" -> "UserProfile"
+// Example: "./components/userprofile.html" -> "Userprofile" (capitalized to match registration)
 // Example: "{path}" -> "" (skip dynamic runtime paths)
+//
+// CRITICAL FIX: Must capitalize first letter to match component registration convention
+// Components are registered with capitalized names (e.g., "userprofile.html" -> "Userprofile")
+// This function must return the same capitalization for lookups to work.
 func extractComponentNameFromPath(path string) string {
 	// Skip paths with runtime variables like {path}
 	if strings.Contains(path, "{") {
@@ -47,11 +52,23 @@ func extractComponentNameFromPath(path string) string {
 	filename := parts[len(parts)-1]
 
 	// Remove extension
+	baseName := filename
 	if idx := strings.LastIndex(filename, "."); idx != -1 {
-		return filename[:idx]
+		baseName = filename[:idx]
 	}
 
-	return filename
+	// CRITICAL FIX: Capitalize first letter to match registration
+	// This matches the logic in cmd/server/main.go registerComponentsFromDir()
+	if len(baseName) == 0 {
+		return ""
+	}
+
+	// Capitalize first letter: "userprofile" -> "Userprofile"
+	capitalizedName := strings.ToUpper(baseName[:1]) + baseName[1:]
+
+	log.Printf("[extractComponentNameFromPath] Extracted component name: %q from path: %q", capitalizedName, path)
+
+	return capitalizedName
 }
 
 // findComponentNodes recursively finds all component nodes in the AST tree
@@ -175,11 +192,16 @@ func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transfor
 			}
 		}
 
+		log.Printf("[collectStyles] Component '%s' references: %v", name, uniqueComponentNames)
+
 		// Process all discovered components recursively (dependencies first)
 		for _, compName := range uniqueComponentNames {
 			if compTemplate, exists := transformer.GetComponentTemplate(compName); exists {
+				log.Printf("[collectStyles] Found component template for '%s', collecting styles recursively", compName)
 				// Recursively collect styles from dependency
 				collectStyles(compTemplate.Template, compName)
+			} else {
+				log.Printf("[collectStyles] WARNING: Component '%s' referenced but not found in registry", compName)
 			}
 			// Gracefully skip missing components (no panic)
 		}
@@ -204,6 +226,7 @@ func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transfor
 						Hash:    hash,
 					}
 					orderedHashes = append(orderedHashes, hash)
+					log.Printf("[collectStyles] Added style block from '%s' (%d bytes, hash: %s...)", name, len(trimmedContent), hash[:8])
 				}
 			}
 		}
@@ -260,7 +283,10 @@ func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transfor
 		result.WriteString("\n\n")
 	}
 
-	return result.String()
+	finalResult := result.String()
+	log.Printf("[AggregateComponentStyles] Final aggregated CSS: %d bytes from %d unique style blocks", len(finalResult), len(orderedHashes))
+
+	return finalResult
 }
 
 // AggregateComponentStyles traverses the component tree and aggregates styles

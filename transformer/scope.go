@@ -3,7 +3,6 @@ package transformer
 import (
 	"log"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
@@ -32,45 +31,26 @@ func FindFenceSection(nodes []ast.Node) *ast.FenceSection {
 	return nil
 }
 
-// CollectFenceData extracts variables from fence section and adds them to data scope
+// CollectFenceData extracts variables from fence section and adds them to data scope.
+// CRITICAL FIX: Now uses parseValue() for consistent handling of JavaScript literals.
+// This ensures quoted arrays/objects like let animals = "[...]" are unwrapped properly.
 func CollectFenceData(fence *ast.FenceSection, dataScope map[string]any) {
 	// Process variables directly from the FenceSection struct
 	for _, variable := range fence.Variables {
 		varName := variable.Name
 		varValue := variable.Value
 
-		// Try to parse the value (simple cases only)
-		// For complex cases (objects, arrays, expressions), store the raw value as a string
-		// so Alpine.js can evaluate it at runtime
-		if strings.HasPrefix(varValue, "\"") || strings.HasPrefix(varValue, "'") {
-			// String value
-			dataScope[varName] = strings.Trim(varValue, "\"'")
-		} else if varValue == "true" {
-			dataScope[varName] = true
-		} else if varValue == "false" {
-			dataScope[varName] = false
-		} else if varValue == "null" {
-			dataScope[varName] = nil
-		} else if regexp.MustCompile(`^[0-9]+$`).MatchString(varValue) {
-			// Integer value
-			dataScope[varName] = varValue // Keep as string, Alpine.js will convert
-		} else if regexp.MustCompile(`^[0-9]*\.[0-9]+$`).MatchString(varValue) {
-			// Float value
-			dataScope[varName] = varValue // Keep as string, Alpine.js will convert
-		} else {
-			// CRITICAL FIX: For complex expressions (objects, arrays, etc.),
-			// store the actual value string instead of nil.
-			// This allows components to receive the expression string and
-			// output it in their x-data for Alpine.js to evaluate.
-			//
-			// Example: let user1 = {name:"Benjamin"}
-			//   Before: dataScope["user1"] = nil
-			//   After:  dataScope["user1"] = "{name:\"Benjamin\"}"
-			//
-			// This fixes the bug where dynamic component props like user={user1}
-			// were being passed as nil instead of the object expression.
-			dataScope[varName] = varValue
-		}
+		log.Printf("[CollectFenceData] Processing variable: %s = %q", varName, varValue)
+
+		// CRITICAL FIX: Use parseValue() for consistent JavaScript literal handling
+		// This handles:
+		// - Quoted arrays: let animals = "['dog','cat']" → unwrapped to ['dog','cat']
+		// - Quoted objects: let user = "{name:'John'}" → unwrapped to {name:'John'}
+		// - Regular values: let name = "John" → unwrapped to John
+		parsedValue := parseValue(varValue)
+		dataScope[varName] = parsedValue
+
+		log.Printf("[CollectFenceData] Stored: %s = (type=%T) %v", varName, parsedValue, parsedValue)
 	}
 
 	// Process props
@@ -78,20 +58,13 @@ func CollectFenceData(fence *ast.FenceSection, dataScope map[string]any) {
 		if _, exists := dataScope[prop.Name]; !exists {
 			// Only add if not already provided in props
 			if prop.DefaultValue != "" {
-				// Try to parse the default value (simple cases only)
-				if strings.HasPrefix(prop.DefaultValue, "\"") || strings.HasPrefix(prop.DefaultValue, "'") {
-					dataScope[prop.Name] = strings.Trim(prop.DefaultValue, "\"'")
-				} else if prop.DefaultValue == "true" {
-					dataScope[prop.Name] = true
-				} else if prop.DefaultValue == "false" {
-					dataScope[prop.Name] = false
-				} else if prop.DefaultValue == "null" {
-					dataScope[prop.Name] = nil
-				} else {
-					// CRITICAL FIX: Same as above - store the expression string
-					// instead of nil for complex prop defaults
-					dataScope[prop.Name] = prop.DefaultValue
-				}
+				log.Printf("[CollectFenceData] Processing prop default: %s = %q", prop.Name, prop.DefaultValue)
+
+				// CRITICAL FIX: Use parseValue() for prop defaults too
+				parsedValue := parseValue(prop.DefaultValue)
+				dataScope[prop.Name] = parsedValue
+
+				log.Printf("[CollectFenceData] Stored prop: %s = (type=%T) %v", prop.Name, parsedValue, parsedValue)
 			} else {
 				dataScope[prop.Name] = nil
 			}

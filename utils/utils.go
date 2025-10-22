@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"reflect"
@@ -153,4 +155,15 @@ func DeclProps(props map[string]any) string {
 		builder.WriteString(fmt.Sprintf("let %s = %s;\n", name, AnyToJSValue(value)))
 	}
 	return builder.String()
+}
+
+// GenerateRandom generates a random hex string for scoping purposes
+// Pattern: Random ID Generator [Load: 4]
+// Cognitive Load: 4 (simple random generation with error handling)
+func GenerateRandom() (string, error) {
+	bytes := make([]byte, 8) // 8 bytes = 16 hex characters
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("GenerateRandom: failed to generate random bytes: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
 }

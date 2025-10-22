@@ -366,6 +366,20 @@ func formatComponentData(dataScope map[string]any) string {
 				continue
 			}
 
+			// CRITICAL FIX: Check for JavaScript literal BEFORE checking isDynamicExpression
+			// This matches the logic in alpineDataFormatter (alpine.go lines 838-841)
+			// JavaScript literals (arrays/objects) should be output as-is without quotes
+			trimmedValue = strings.TrimSpace(cleanValue)
+			if IsJavaScriptLiteral(trimmedValue) {
+				// JavaScript literal (array or object) - don't quote it
+				result.WriteString(key)
+				result.WriteString(": ")
+				// Convert double quotes to single quotes for HTML attribute safety
+				cleanValue = strings.ReplaceAll(cleanValue, `"`, `'`)
+				result.WriteString(cleanValue)
+				log.Printf("[formatComponentData] Detected JavaScript literal for key=%q, outputting as-is: %s", key, truncateString(cleanValue, 100))
+				continue
+			}
 
 			// Check if this is a dynamic expression (no quotes)
 			// We need to handle variable references without quotes

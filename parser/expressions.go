@@ -280,6 +280,58 @@ func FenceParser() Parser {
 	)
 }
 
+// unwrapQuotedLiteral removes outer quotes from JavaScript literals if present
+// Pattern: Value Sanitization [Load: 6]
+// Cognitive Load: 6 (string manipulation, conditional unwrapping)
+//
+// Handles cases where multi-line parsing wraps JavaScript literals in quotes:
+//   - '[...]' → [...]  (array literal)
+//   - '{...}' → {...}  (object literal)
+//   - '"text"' → "text" (already quoted string - keep as-is)
+//   - 'text' → text (unquoted string)
+//
+// This fixes the bug where notifications appears as 'notifications:'[...]'' with outer quotes
+func unwrapQuotedLiteral(value string) string {
+	trimmed := strings.TrimSpace(value)
+
+	// Need at least 2 characters for quotes
+	if len(trimmed) < 2 {
+		return value
+	}
+
+	// Check if outer characters are quotes
+	firstChar := trimmed[0]
+	lastChar := trimmed[len(trimmed)-1]
+
+	// Single-quoted or double-quoted
+	if (firstChar == '\'' && lastChar == '\'') || (firstChar == '"' && lastChar == '"') {
+		inner := trimmed[1 : len(trimmed)-1]
+		innerTrimmed := strings.TrimSpace(inner)
+
+		// Check if inner content is a JavaScript literal (array or object)
+		if len(innerTrimmed) > 0 {
+			innerFirst := innerTrimmed[0]
+			innerLast := innerTrimmed[len(innerTrimmed)-1]
+
+			// Array literal: '[...]' → [...]
+			if innerFirst == '[' && innerLast == ']' {
+				log.Printf("[unwrapQuotedLiteral] Unwrapped array literal: %q → %q", trimmed[:min(50, len(trimmed))], innerTrimmed[:min(50, len(innerTrimmed))])
+				return innerTrimmed
+			}
+
+			// Object literal: '{...}' → {...}
+			if innerFirst == '{' && innerLast == '}' {
+				log.Printf("[unwrapQuotedLiteral] Unwrapped object literal: %q → %q", trimmed[:min(50, len(trimmed))], innerTrimmed[:min(50, len(innerTrimmed))])
+				return innerTrimmed
+			}
+		}
+	}
+
+	// Not a quoted literal, return as-is
+	return value
+}
+
+
 // parseFenceContent extracts props, variables, functions, stores, and imports from fence section content
 // Now handles multi-line values for arrays, objects, and ternary expressions
 // Pattern: Fence Content Parser [Load: 12]
@@ -390,12 +442,15 @@ func parseFenceContent(content string) *ast.FenceSection {
 				// Multi-line value - accumulate lines until complete
 				fullValue, endIndex := parseMultiLineValue(lines, i, firstLineValue)
 				if fullValue != "" {
-					preview := fullValue
-					if len(fullValue) > 50 {
-						preview = fullValue[:50] + "..."
+					// Unwrap quoted literals (COGNITIVE LOAD RULE: sanitize before storing)
+					unwrapped := unwrapQuotedLiteral(fullValue)
+
+					preview := unwrapped
+					if len(unwrapped) > 50 {
+						preview = unwrapped[:50] + "..."
 					}
-					log.Printf("[parseFenceContent] Found multi-line store: %s = %s (total %d chars)", storeName, preview, len(fullValue))
-					fence.Stores[storeName] = fullValue
+					log.Printf("[parseFenceContent] Found multi-line store: %s = %s (total %d chars)", storeName, preview, len(unwrapped))
+					fence.Stores[storeName] = unwrapped
 					i = endIndex + 1
 					continue
 				}
@@ -404,6 +459,7 @@ func parseFenceContent(content string) *ast.FenceSection {
 			// Single-line value
 			value := strings.TrimSpace(firstLineValue)
 			value = strings.TrimSuffix(value, ";")
+			value = unwrapQuotedLiteral(value) // Also unwrap single-line values
 
 			log.Printf("[parseFenceContent] Found store: %s = %s", storeName, value)
 			fence.Stores[storeName] = value
@@ -421,14 +477,17 @@ func parseFenceContent(content string) *ast.FenceSection {
 				// Multi-line value - accumulate lines until complete
 				fullValue, endIndex := parseMultiLineValue(lines, i, firstLineValue)
 				if fullValue != "" {
-					preview := fullValue
-					if len(fullValue) > 50 {
-						preview = fullValue[:50] + "..."
+					// Unwrap quoted literals (COGNITIVE LOAD RULE: sanitize before storing)
+					unwrapped := unwrapQuotedLiteral(fullValue)
+
+					preview := unwrapped
+					if len(unwrapped) > 50 {
+						preview = unwrapped[:50] + "..."
 					}
-					log.Printf("[parseFenceContent] Found multi-line prop: %s = %s (total %d chars)", propName, preview, len(fullValue))
+					log.Printf("[parseFenceContent] Found multi-line prop: %s = %s (total %d chars)", propName, preview, len(unwrapped))
 					fence.Props = append(fence.Props, ast.PropNode{
 						Name:         propName,
-						DefaultValue: fullValue,
+						DefaultValue: unwrapped,
 					})
 					i = endIndex + 1
 					continue
@@ -438,6 +497,7 @@ func parseFenceContent(content string) *ast.FenceSection {
 			// Single-line value
 			value := strings.TrimSpace(firstLineValue)
 			value = strings.TrimSuffix(value, ";")
+			value = unwrapQuotedLiteral(value) // Also unwrap single-line values
 
 			log.Printf("[parseFenceContent] Found prop: %s = %s", propName, value)
 			fence.Props = append(fence.Props, ast.PropNode{
@@ -459,15 +519,18 @@ func parseFenceContent(content string) *ast.FenceSection {
 				// Multi-line value
 				fullValue, endIndex := parseMultiLineValue(lines, i, firstLineValue)
 				if fullValue != "" {
-					preview := fullValue
-					if len(fullValue) > 50 {
-						preview = fullValue[:50] + "..."
+					// Unwrap quoted literals (COGNITIVE LOAD RULE: sanitize before storing)
+					unwrapped := unwrapQuotedLiteral(fullValue)
+
+					preview := unwrapped
+					if len(unwrapped) > 50 {
+						preview = unwrapped[:50] + "..."
 					}
-					log.Printf("[parseFenceContent] Found multi-line variable: %s %s = %s (total %d chars)", keyword, varName, preview, len(fullValue))
+					log.Printf("[parseFenceContent] Found multi-line variable: %s %s = %s (total %d chars)", keyword, varName, preview, len(unwrapped))
 					fence.Variables = append(fence.Variables, ast.VariableNode{
 						Keyword: keyword,
 						Name:    varName,
-						Value:   fullValue,
+						Value:   unwrapped,
 					})
 					i = endIndex + 1
 					continue
@@ -477,6 +540,7 @@ func parseFenceContent(content string) *ast.FenceSection {
 			// Single-line value
 			value := strings.TrimSpace(firstLineValue)
 			value = strings.TrimSuffix(value, ";")
+			value = unwrapQuotedLiteral(value) // Also unwrap single-line values
 
 			log.Printf("[parseFenceContent] Found variable: %s %s = %s", keyword, varName, value)
 			fence.Variables = append(fence.Variables, ast.VariableNode{
