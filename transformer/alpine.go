@@ -348,7 +348,6 @@ func FormatGoValueToJS(value any) string {
 
 	switch v := value.(type) {
 	case string:
-		log.Printf("[DEBUG formatGoValueToJS] Processing string: %q (len=%d)", v, len(v))
 
 		// FIRST: Check for malformed Go slice format BEFORE other checks
 		if fixed, wasFixed := DetectAndFixGoSliceFormat(v); wasFixed {
@@ -374,8 +373,11 @@ func FormatGoValueToJS(value any) string {
 
 				// CRITICAL FIX: Check if unwrapped content is a JavaScript literal
 				if IsJavaScriptLiteral(unwrapped) {
-					log.Printf("formatGoValueToJS: Unwrapped content is JS literal, returning as-is: %s", unwrapped[:min(50, len(unwrapped))])
-					return unwrapped
+					log.Printf("formatGoValueToJS: Unwrapped content is JS literal, converting quotes: %s", unwrapped[:min(50, len(unwrapped))])
+					// CRITICAL FIX: Convert double quotes to single quotes for HTML attribute safety
+					// When embedded in x-data="...", double quotes break the attribute
+					result := strings.ReplaceAll(unwrapped, `"`, `'`)
+					return result
 				}
 
 				// CRITICAL FIX: Check if unwrapped content is a function expression
@@ -403,8 +405,11 @@ func FormatGoValueToJS(value any) string {
 
 				// CRITICAL FIX: Check if unwrapped content is a JavaScript literal
 				if IsJavaScriptLiteral(unwrapped) {
-					log.Printf("formatGoValueToJS: Unwrapped content is JS literal, returning as-is: %s", unwrapped[:min(50, len(unwrapped))])
-					return unwrapped
+					log.Printf("formatGoValueToJS: Unwrapped content is JS literal, converting quotes: %s", unwrapped[:min(50, len(unwrapped))])
+					// CRITICAL FIX: Convert double quotes to single quotes for HTML attribute safety
+					// When embedded in x-data="...", double quotes break the attribute
+					result := strings.ReplaceAll(unwrapped, `"`, `'`)
+					return result
 				}
 
 				// CRITICAL FIX: Check if unwrapped content is a function expression
@@ -431,15 +436,17 @@ func FormatGoValueToJS(value any) string {
 		}
 
 		// CRITICAL FIX: Check if it's a JavaScript literal (array or object)
-		// Return AS-IS without any conversion - Alpine.js will handle it
+		// Return with single quotes - required for HTML attribute embedding
 		// This preserves JavaScript syntax including ternaries, property access, etc.
 		if IsJavaScriptLiteral(v) {
-			log.Printf("formatGoValueToJS: Detected JavaScript literal, returning as-is (length: %d, preview: %s...)",
+			log.Printf("formatGoValueToJS: Detected JavaScript literal, converting quotes (length: %d, preview: %s...)",
 				len(v),
 				truncateString(v, 50))
-			// Return the JavaScript literal unchanged
+			// CRITICAL FIX: Convert double quotes to single quotes for HTML attribute safety
+			// When embedded in x-data="...", double quotes break the attribute
+			result := strings.ReplaceAll(v, `"`, `'`)
 			// Alpine.js accepts JavaScript object syntax: {isLoggedIn: false, navItems: isLoggedIn ? [...] : [...]}
-			return v
+			return result
 		}
 
 		// CRITICAL FIX: Check if it's a JavaScript expression that needs to be evaluated
