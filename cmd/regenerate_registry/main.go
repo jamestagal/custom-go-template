@@ -11,6 +11,7 @@ import (
 	"github.com/jimafisk/custom_go_template/builder"
 	"github.com/jimafisk/custom_go_template/parser"
 	"github.com/jimafisk/custom_go_template/transformer"
+	"github.com/jimafisk/custom_go_template/utils"
 )
 
 func main() {
@@ -124,33 +125,8 @@ func extractComponentProps(template *ast.Template) map[string]interface{} {
 	return props
 }
 
+// registerStores loads all store files from the stores/ directory.
+// This is a wrapper around utils.RegisterStores() for consistency.
 func registerStores() map[string]string {
-	stores := make(map[string]string)
-	storeDir := "stores"
-
-	files, err := os.ReadDir(storeDir)
-	if err != nil {
-		log.Printf("Stores directory not found (this is OK): %s", storeDir)
-		return stores
-	}
-
-	for _, file := range files {
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".js") {
-			continue
-		}
-
-		storeName := strings.TrimSuffix(file.Name(), ".js")
-		storePath := fmt.Sprintf("%s/%s", storeDir, file.Name())
-
-		content, err := os.ReadFile(storePath)
-		if err != nil {
-			log.Printf("WARNING: Failed to read store file %s: %v", storePath, err)
-			continue
-		}
-
-		stores[storeName] = string(content)
-		log.Printf("Loaded store: %s", storeName)
-	}
-
-	return stores
+	return utils.RegisterStores()
 }

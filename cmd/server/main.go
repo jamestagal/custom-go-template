@@ -21,6 +21,7 @@ import (
 	"github.com/jimafisk/custom_go_template/parser"
 	"github.com/jimafisk/custom_go_template/renderer"
 	"github.com/jimafisk/custom_go_template/transformer"
+	"github.com/jimafisk/custom_go_template/utils"
 )
 
 // Global store registry loaded at startup
@@ -1232,42 +1233,13 @@ func registerComponentsFromDir(dir string, pathPrefix string, storeRegistry map[
 //
 // Pattern: File Discovery Pattern [Load: 8]
 // Cognitive Load: 8 (read dir: 2, filter: 2, read files: 2, map building: 2)
+// registerStores loads all store files from the stores/ directory.
+// This is a wrapper around utils.RegisterStores() for backward compatibility.
+//
+// Pattern: Delegation to Shared Utility [Load: 1]
+// Cognitive Load: 1 (simple function call delegation)
 func registerStores() map[string]string {
-	stores := make(map[string]string)
-	storeDir := "stores"
-
-	// Read the stores directory (COGNITIVE LOAD RULE: wrapped error)
-	files, err := os.ReadDir(storeDir)
-	if err != nil {
-		// Directory not existing is not an error - just log and return empty map
-		log.Printf("Stores directory not found (this is OK): %s", storeDir)
-		return stores
-	}
-
-	// Process each .js file in the directory
-	for _, file := range files {
-		// Skip directories and non-.js files
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".js") {
-			continue
-		}
-
-		// Extract store name from filename (e.g., "auth.js" → "auth")
-		storeName := strings.TrimSuffix(file.Name(), ".js")
-		storePath := fmt.Sprintf("%s/%s", storeDir, file.Name())
-
-		// Read store file content (COGNITIVE LOAD RULE: wrapped error)
-		content, err := os.ReadFile(storePath)
-		if err != nil {
-			log.Printf("WARNING: Failed to read store file %s: %v", storePath, err)
-			continue
-		}
-
-		// Store the content
-		stores[storeName] = string(content)
-		log.Printf("Registered store: %s from %s", storeName, storePath)
-	}
-
-	return stores
+	return utils.RegisterStores()
 }
 
 // generateComponentRegistry generates the JavaScript component registry file
