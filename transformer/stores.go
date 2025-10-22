@@ -163,6 +163,10 @@ func transformStoreExpressionInAttribute(node *ast.StoreExpressionNode, attrName
 // Pattern to detect store expressions in attribute values: {$storeName.property}
 var storeAttrPattern = regexp.MustCompile(`\{\$([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)\}`)
 
+// Pattern to detect regular expressions in attribute values: {expression}
+// This captures any expression that doesn't start with $
+var regularExprPattern = regexp.MustCompile(`\{([^$}][^}]*)\}`)
+
 // Pattern to detect store expressions in conditions: $storeName.property (without braces)
 // Matches: $storeName.property, $storeName.nested.property, etc.
 // Cognitive Load: 4 (regex pattern)
@@ -366,16 +370,17 @@ func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[str
 			continue
 		}
 
-		// Check if the attribute value contains store expression(s)
-		allMatches := storeAttrPattern.FindAllStringSubmatch(attr.Value, -1)
+		// Check if the attribute value contains store expression(s) or regular expressions
+		storeMatches := storeAttrPattern.FindAllStringSubmatch(attr.Value, -1)
+		regularMatches := regularExprPattern.FindAllStringSubmatch(attr.Value, -1)
 
-		if len(allMatches) > 0 {
-			// Handle store expressions in attributes
-			// Check if it's a pure store expression or mixed content
+		// Handle attributes with expressions (either store or regular)
+		if len(storeMatches) > 0 || len(regularMatches) > 0 {
 			trimmedValue := strings.TrimSpace(attr.Value)
 
-			// Check if entire value is just a store expression: {$store.prop}
-			if len(allMatches) == 1 && storeAttrPattern.MatchString(trimmedValue) && trimmedValue == allMatches[0][0] {
+			// Case 1: Pure store expression {$store.prop}
+			if len(storeMatches) == 1 && len(regularMatches) == 0 && storeAttrPattern.MatchString(trimmedValue) && trimmedValue == storeMatches[0][0] {
+				allMatches := storeMatches
 				// Pure store expression
 				storeExpr := allMatches[0][1] // Full match without braces
 
@@ -419,47 +424,134 @@ func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[str
 				}
 
 				transformedAttributes = append(transformedAttributes, transformedAttr)
+			} else if len(regularMatches) == 1 && len(storeMatches) == 0 && regularExprPattern.MatchString(trimmedValue) && trimmedValue == regularMatches[0][0] {
+				// Case 2: Pure regular expression {expr}
+				expression := regularMatches[0][1] // Captured expression without braces
+
+				// Extract variables from expression to data scope
+				extractVariablesFromExpr(expression, dataScope)
+
+				// Determine attribute name and whether it needs : prefix
+				attrName := attr.Name
+				isAlpine := strings.HasPrefix(attrName, "x-") || strings.HasPrefix(attrName, "@")
+
+				// For dynamic binding on regular HTML attributes, add : prefix to the name
+				if !isAlpine {
+					attrName = ":" + attrName
+				}
+
+				// Transform to Alpine.js bind syntax or Alpine directive
+				transformedAttr := ast.Attribute{
+					Name:       attrName,
+					Value:      expression,
+					Dynamic:    !isAlpine, // Not dynamic if it's an Alpine directive
+					IsAlpine:   isAlpine,
+					AlpineType: extractAlpineType(attr.Name), // Use original name for type extraction
+					AlpineKey:  "",
+				}
+
+				transformedAttributes = append(transformedAttributes, transformedAttr)
 			} else {
-				// Mixed content: static text + store expressions
+				// Case 3: Mixed content - static text + expressions (store and/or regular)
+				// We need to handle both types of expressions together
 				// Use FindAllStringSubmatchIndex to get positions
-				matchIndices := storeAttrPattern.FindAllStringSubmatchIndex(attr.Value, -1)
+				storeMatchIndices := storeAttrPattern.FindAllStringSubmatchIndex(attr.Value, -1)
+				regularMatchIndices := regularExprPattern.FindAllStringSubmatchIndex(attr.Value, -1)
+
+				// Create a unified list of all expressions with their positions and types
+				type exprMatch struct {
+					start      int
+					end        int
+					expression string
+					isStore    bool
+				}
+
+				var allExprs []exprMatch
+
+				// Add store expressions
+				for i, matchIdx := range storeMatchIndices {
+					allExprs = append(allExprs, exprMatch{
+						start:      matchIdx[0],
+						end:        matchIdx[1],
+						expression: storeMatches[i][1],
+						isStore:    true,
+					})
+				}
+
+				// Add regular expressions (but skip if they overlap with store expressions)
+				for i, matchIdx := range regularMatchIndices {
+					// Check for overlap with store expressions
+					overlaps := false
+					for _, storeIdx := range storeMatchIndices {
+						if (matchIdx[0] >= storeIdx[0] && matchIdx[0] < storeIdx[1]) ||
+							(matchIdx[1] > storeIdx[0] && matchIdx[1] <= storeIdx[1]) {
+							overlaps = true
+							break
+						}
+					}
+
+					if !overlaps {
+						allExprs = append(allExprs, exprMatch{
+							start:      matchIdx[0],
+							end:        matchIdx[1],
+							expression: regularMatches[i][1],
+							isStore:    false,
+						})
+					}
+				}
+
+				// Sort expressions by their start position
+				// (Simple bubble sort since there are usually few expressions)
+				for i := 0; i < len(allExprs); i++ {
+					for j := i + 1; j < len(allExprs); j++ {
+						if allExprs[j].start < allExprs[i].start {
+							allExprs[i], allExprs[j] = allExprs[j], allExprs[i]
+						}
+					}
+				}
+
+				// Build the combined expression from the sorted expressions
 				var expressionParts []string
 				lastEnd := 0
 
-				for i, matchIdx := range matchIndices {
-					// matchIdx[0] is start of full match, matchIdx[1] is end of full match
-					// matchIdx[2] is start of captured group, matchIdx[3] is end of captured group
-
-					// Add static text before this store expression
-					if matchIdx[0] > lastEnd {
-						staticPart := attr.Value[lastEnd:matchIdx[0]]
+				for _, expr := range allExprs {
+					// Add static text before this expression
+					if expr.start > lastEnd {
+						staticPart := attr.Value[lastEnd:expr.start]
 						if staticPart != "" {
 							expressionParts = append(expressionParts, fmt.Sprintf("'%s'", staticPart))
 						}
 					}
 
-					// Parse store expression from the original match
-					storeExpr := allMatches[i][1]
-					parts := strings.SplitN(storeExpr, ".", 2)
-					storeName := parts[0]
-					property := ""
-					if len(parts) > 1 {
-						property = parts[1]
+					// Add the expression (either store or regular)
+					if expr.isStore {
+						// Store expression: transform to $store.storeName.property
+						parts := strings.SplitN(expr.expression, ".", 2)
+						storeName := parts[0]
+						property := ""
+						if len(parts) > 1 {
+							property = parts[1]
+						}
+
+						// Track this store reference (Task 2.4)
+						TrackStoreReference(storeName)
+
+						storeNode := &ast.StoreExpressionNode{
+							StoreName: storeName,
+							Property:  property,
+						}
+
+						// Add the store expression
+						alpineStoreExpr := buildAlpineStoreExpression(storeNode)
+						expressionParts = append(expressionParts, alpineStoreExpr)
+					} else {
+						// Regular expression: add as-is (variable reference)
+						// Extract variables from expression to data scope
+						extractVariablesFromExpr(expr.expression, dataScope)
+						expressionParts = append(expressionParts, expr.expression)
 					}
 
-					// Track this store reference (Task 2.4)
-					TrackStoreReference(storeName)
-
-					storeNode := &ast.StoreExpressionNode{
-						StoreName: storeName,
-						Property:  property,
-					}
-
-					// Add the store expression
-					alpineStoreExpr := buildAlpineStoreExpression(storeNode)
-					expressionParts = append(expressionParts, alpineStoreExpr)
-
-					lastEnd = matchIdx[1]
+					lastEnd = expr.end
 				}
 
 				// Add remaining static text after last expression
