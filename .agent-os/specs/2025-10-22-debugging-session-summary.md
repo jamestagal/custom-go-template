@@ -1,9 +1,15 @@
 # Session Summary: Debugging JavaScript Syntax Errors and CSS Rendering
 
 **Date**: 2025-10-22
-**Session Duration**: ~2 hours
-**Token Usage**: 97,551/200,000 (49%)
+**Session Duration**: ~5 hours (across 2 sessions)
+**Token Usage**:
+- Session 1: 97,551/200,000 (49%)
+- Session 2: ~115,000/200,000 (58%)
 **Starting Commit**: `3bc8279` - "WIP: Attempted fixes for JS syntax errors and CSS rendering"
+**Ending Commits**:
+- `ce53277` - JavaScript literal quote conversion (partial fix)
+- `9797916` - Complete JavaScript syntax error fix
+- `6385261` - Expression debugging system
 **MANDATORY: Use go-backend agent for all Go implementation**
 
 ## Initial Issues Reported
@@ -252,6 +258,48 @@ Extended `transformAttributesWithStores()` in `transformer/stores.go`:
 - **Files:** `transformer/stores.go` + test files
 - **Result:** Dynamic CSS classes work correctly, components render with proper styles
 
+**Critical Regression Fix:**
+- **Problem:** Initial class expression fix transformed ALL `{expr}` to runtime bindings, breaking build-time prop interpolation (caused `ReferenceError: description is not defined`)
+- **Solution:** Added build-time vs runtime detection logic with `IsSimpleVariable()` and `TryResolveBuildTimeValue()` helpers
+- **Files:** `transformer/stores.go`, `transformer/build_time_prop_test.go`
+- **Result:** Build-time props interpolated correctly, runtime variables get Alpine.js bindings
+
+### ✨ New Feature: Expression Debugging System (Commit `6385261`)
+
+**User Request:** Better visibility into build-time vs runtime expression resolution for Plenti development (most use cases should be build-time).
+
+**Implementation:**
+- Added `DEBUG_EXPRESSIONS=true` environment variable toggle
+- Zero performance impact when disabled (default)
+- Comprehensive logging of transformation decisions
+
+**Usage:**
+```bash
+DEBUG_EXPRESSIONS=true go run cmd/server/main.go
+```
+
+**Example Output:**
+```
+[EXPR-DEBUG] Attribute 'content' expression '{description}' → BUILD-TIME
+[EXPR-DEBUG]   ↳ Resolved value: "A powerful template engine"
+
+[EXPR-DEBUG] Attribute 'class' expression '{type}' → RUNTIME
+[EXPR-DEBUG]   ↳ Generated: :class="'notification-' + type"
+```
+
+**Files Added:**
+- `EXPRESSION_DEBUGGING_README.md` - Quick start guide
+- `docs/ExpressionDebugging.md` - Comprehensive documentation
+- `cmd/test_expression_debug/main.go` - Demo program
+- `examples/test_expression_debug.html` - Test template
+- `test_expression_debug.sh` - Helper script
+
+**Benefits:**
+- Helps diagnose unexpected runtime bindings
+- Makes transformation behavior transparent
+- Aids in template performance optimization
+- Educational tool for understanding the engine
+
 ### Test Results
 
 - ✅ JavaScript syntax error eliminated
@@ -259,15 +307,28 @@ Extended `transformAttributesWithStores()` in `transformer/stores.go`:
 - ✅ No double colons in rendered HTML
 - ✅ Dynamic class bindings use correct `:class` syntax
 - ✅ All 6 new class transformation tests pass
+- ✅ Build-time prop interpolation tests pass
 - ✅ CSS styles apply correctly to components
+- ✅ No regression errors (description is defined)
+- ✅ Expression debugging outputs clear logs
 
 ### Final Status
 
 **Server:** Running on port 3333
 **Branch:** runtime-component-resolution
 **All Issues:** RESOLVED ✅
+**New Features:** Expression debugging system added
+
+### Commits Summary
+
+1. **`ce53277`** - fix: Convert double quotes to single quotes in buildXDataFromProps (partial)
+2. **`9797916`** - fix: Convert double quotes in FormatGoValueToJS (complete fix)
+3. **`cfe9e8e`** - refactor: Extract store registration to shared utility
+4. **`682050d`** - docs: Update store files to use ES module export syntax
+5. **`6385261`** - feat: Add expression transformation debugging system
 
 ---
 
 **Session End**: 2025-10-22
-**Goal Achieved**: ✅ Fixed JavaScript syntax error and CSS rendering issues
+**Goal Achieved**: ✅ Fixed JavaScript syntax error, CSS rendering issues, and added debugging tools
+**Total Fixes**: 3 critical bugs resolved + 1 new developer tool added
