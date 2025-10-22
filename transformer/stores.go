@@ -404,22 +404,17 @@ func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[str
 				// Build Alpine.js store reference
 				alpineStoreExpr := buildAlpineStoreExpression(storeNode)
 
-				// Determine attribute name and whether it needs : prefix
-				attrName := attr.Name
-				isAlpine := strings.HasPrefix(attrName, "x-") || strings.HasPrefix(attrName, "@")
-
-				// For dynamic binding on regular HTML attributes, add : prefix to the name
-				if !isAlpine {
-					attrName = ":" + attrName
-				}
+				// Determine whether this is an Alpine directive
+				isAlpine := strings.HasPrefix(attr.Name, "x-") || strings.HasPrefix(attr.Name, "@")
 
 				// Transform to Alpine.js bind syntax or Alpine directive
+				// NOTE: Don't add : prefix here - the renderer adds it for Dynamic=true attributes
 				transformedAttr := ast.Attribute{
-					Name:       attrName,
+					Name:       attr.Name,
 					Value:      alpineStoreExpr,
-					Dynamic:    !isAlpine, // Not dynamic if it's an Alpine directive
+					Dynamic:    !isAlpine, // Mark as dynamic for regular HTML attributes (renderer will add :)
 					IsAlpine:   isAlpine,
-					AlpineType: extractAlpineType(attr.Name), // Use original name for type extraction
+					AlpineType: extractAlpineType(attr.Name),
 					AlpineKey:  "",
 				}
 
@@ -431,22 +426,17 @@ func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[str
 				// Extract variables from expression to data scope
 				extractVariablesFromExpr(expression, dataScope)
 
-				// Determine attribute name and whether it needs : prefix
-				attrName := attr.Name
-				isAlpine := strings.HasPrefix(attrName, "x-") || strings.HasPrefix(attrName, "@")
-
-				// For dynamic binding on regular HTML attributes, add : prefix to the name
-				if !isAlpine {
-					attrName = ":" + attrName
-				}
+				// Determine whether this is an Alpine directive
+				isAlpine := strings.HasPrefix(attr.Name, "x-") || strings.HasPrefix(attr.Name, "@")
 
 				// Transform to Alpine.js bind syntax or Alpine directive
+				// NOTE: Don't add : prefix here - the renderer adds it for Dynamic=true attributes
 				transformedAttr := ast.Attribute{
-					Name:       attrName,
+					Name:       attr.Name,
 					Value:      expression,
-					Dynamic:    !isAlpine, // Not dynamic if it's an Alpine directive
+					Dynamic:    !isAlpine, // Mark as dynamic for regular HTML attributes (renderer will add :)
 					IsAlpine:   isAlpine,
-					AlpineType: extractAlpineType(attr.Name), // Use original name for type extraction
+					AlpineType: extractAlpineType(attr.Name),
 					AlpineKey:  "",
 				}
 
@@ -565,15 +555,10 @@ func transformAttributesWithStores(attributes []ast.Attribute, dataScope map[str
 				// Combine all parts with + operator
 				combinedExpression := strings.Join(expressionParts, " + ")
 
-				// For mixed content dynamic bindings, add : prefix to the name
-				attrName := attr.Name
-				if !strings.HasPrefix(attrName, "x-") && !strings.HasPrefix(attrName, "@") {
-					attrName = ":" + attrName
-				}
-
 				// Create dynamic attribute
+				// NOTE: Don't add : prefix here - the renderer adds it for Dynamic=true attributes
 				transformedAttr := ast.Attribute{
-					Name:    attrName,
+					Name:    attr.Name,
 					Value:   combinedExpression,
 					Dynamic: true,
 				}

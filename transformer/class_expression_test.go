@@ -67,17 +67,17 @@ prop type = "success"
 		t.Fatalf("Expected to find inner div as child of wrapper, found children: %+v", wrapperDiv.Children)
 	}
 
-	// Find the :class attribute on the inner div
+	// Find the class attribute on the inner div (should be Dynamic=true)
 	var classAttr *ast.Attribute
 	for i, attr := range innerDiv.Attributes {
-		if attr.Name == ":class" {
+		if attr.Name == "class" && attr.Dynamic {
 			classAttr = &innerDiv.Attributes[i]
 			break
 		}
 	}
 
 	if classAttr == nil {
-		t.Fatalf("Expected :class attribute on inner div, found attributes: %+v", innerDiv.Attributes)
+		t.Fatalf("Expected dynamic class attribute on inner div, found attributes: %+v", innerDiv.Attributes)
 	}
 
 	// Should contain mixed expression with static and dynamic parts
@@ -129,17 +129,17 @@ prop className = "active"
 		t.Fatal("Expected to find div element in transformed AST")
 	}
 
-	// Should have :class attribute with value "className"
+	// Should have class attribute with Dynamic=true and value "className"
 	var found bool
 	for _, attr := range divElement.Attributes {
-		if attr.Name == ":class" && attr.Value == "className" {
+		if attr.Name == "class" && attr.Dynamic && attr.Value == "className" {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		t.Errorf("Expected :class=\"className\" binding, found attributes: %+v", divElement.Attributes)
+		t.Errorf("Expected dynamic class=\"className\" binding, found attributes: %+v", divElement.Attributes)
 	}
 
 	t.Logf("Transformed attributes: %+v", divElement.Attributes)
@@ -231,17 +231,17 @@ prop variant = "large"
 		t.Fatal("Expected to find div element in transformed AST")
 	}
 
-	// Find :class attribute
+	// Find dynamic class attribute
 	var classAttr *ast.Attribute
 	for i, attr := range divElement.Attributes {
-		if attr.Name == ":class" {
+		if attr.Name == "class" && attr.Dynamic {
 			classAttr = &divElement.Attributes[i]
 			break
 		}
 	}
 
 	if classAttr == nil {
-		t.Fatalf("Expected :class attribute, found attributes: %+v", divElement.Attributes)
+		t.Fatalf("Expected dynamic class attribute, found attributes: %+v", divElement.Attributes)
 	}
 
 	// Should contain both variant and $store.theme.mode
