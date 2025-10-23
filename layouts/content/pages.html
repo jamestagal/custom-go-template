@@ -2,5 +2,5 @@
 <!-- NOTE: <head> provided by wrapper layout (includes Alpine.js + runtime-components.js) -->
 <!-- NOTE: No fence section - uses variables from parent scope (html.html wrapper) -->
 {for component in content.components}
-    <Component:dynamic name={component.name} {...component.fields} content={content} allContent={allContent} />
+    <Component:dynamic name={component.name} {...component.fields} content={content} />
 {/for}

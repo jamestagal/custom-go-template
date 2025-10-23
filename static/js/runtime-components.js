@@ -205,9 +205,19 @@ async function renderDynamicComponent(el, componentName, props) {
             throw new Error(`Invalid template output for '${componentName}': expected string, got ${typeof html}`);
         }
 
-        // STEP 4: Set element content (COGNITIVE LOAD: 1)
-        el.innerHTML = html;
-        console.log(`Component '${componentName}' rendered successfully`);
+        // STEP 4: Wrap component in x-data scope and set element content (COGNITIVE LOAD: 3)
+        // Components from the registry may have x-for and other directives that reference props
+        // We need to provide props in an Alpine.js x-data scope so Alpine can resolve them
+        // IMPORTANT: Wrap props under a "props" key to match the template's "props.*" references
+        // Example: x-for="item in props.todos" needs x-data to have { props: { todos: [...] } }
+        const xDataScope = { props: normalizedProps };
+        const xDataJSON = JSON.stringify(xDataScope)
+            .replace(/</g, '\\u003c')  // Escape < for security (prevents XSS)
+            .replace(/>/g, '\\u003e')  // Escape > for security
+            .replace(/'/g, "\\'");      // Escape single quotes for attribute context
+
+        el.innerHTML = `<div x-data='${xDataJSON}'>${html}</div>`;
+        console.log(`Component '${componentName}' rendered successfully with x-data scope`);
 
         // STEP 5: Re-initialize Alpine directives in new content (COGNITIVE LOAD: 3)
         // This ensures any Alpine.js directives in the component template work

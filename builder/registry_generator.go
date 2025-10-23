@@ -18,8 +18,9 @@ type ComponentTemplate struct {
 // RenderContext tracks rendering context to handle expressions differently in different contexts
 // Pattern: Context Object Pattern [Load: 5]
 type RenderContext struct {
-	insideLiteral    bool // Inside <style> or <script> tags where expressions should NOT be converted
-	insideAlpineAttr bool // Inside Alpine.js directive where expressions should be preserved
+	insideLiteral    bool            // Inside <style> or <script> tags where expressions should NOT be converted
+	insideAlpineAttr bool            // Inside Alpine.js directive where expressions should be preserved
+	loopVars         map[string]bool // Track loop variables (iterator, value) that should NOT get props. prefix
 }
 
 // GenerateComponentRegistry converts component ASTs to ES module with template literal factories
@@ -67,6 +68,7 @@ func convertToJSTemplate(template *ast.Template) string {
 	ctx := &RenderContext{
 		insideLiteral:    false,
 		insideAlpineAttr: false,
+		loopVars:         make(map[string]bool),
 	}
 
 	for _, node := range template.RootNodes {
@@ -111,11 +113,18 @@ func renderNodeToJS(node ast.Node, sb *strings.Builder, ctx *RenderContext) {
 			sb.WriteString("{")
 			sb.WriteString(n.Expression)
 			sb.WriteString("}")
+		} else if expressionReferencesLoopVar(n.Expression, ctx.loopVars) {
+			// LOOP VARIABLE FIX: Expression references loop variable → use Alpine x-text directive
+			// Cannot use ${...} template literal because loop variable doesn't exist during template function execution
+			sb.WriteString(`<span x-text="`)
+			sb.WriteString(n.Expression)
+			sb.WriteString(`"></span>`)
 		} else {
 			// Use identifier-level prefixing to handle complex expressions
 			// ARROW FUNCTION FIX: Extract arrow function parameters before prefixing
 			arrowParams := extractArrowFunctionParams(n.Expression)
-			converted := prefixIdentifiersInExpression(n.Expression, arrowParams)
+			// LOOP VARIABLE FIX: Pass loop variables to skip list
+			converted := prefixIdentifiersInExpression(n.Expression, arrowParams, ctx.loopVars)
 			// Normal content - transform {variable} to ${props.variable}
 			sb.WriteString("${")
 			sb.WriteString(converted)
@@ -186,7 +195,8 @@ func renderElementToJS(elem *ast.Element, sb *strings.Builder, ctx *RenderContex
 	// Determine if children are in literal context
 	childCtx := &RenderContext{
 		insideLiteral:    ctx.insideLiteral || isLiteralContentElement(elem.TagName),
-		insideAlpineAttr: false, // Reset for element children
+		insideAlpineAttr: false,        // Reset for element children
+		loopVars:         ctx.loopVars, // CRITICAL: Preserve loop variables from parent context
 	}
 
 	// Render children with updated context
@@ -259,7 +269,7 @@ var identifierPattern = regexp.MustCompile(`(?:^|[^a-zA-Z0-9_$.\]])([a-zA-Z_$][\
 // - Alpine object literals: { count: {count} } → { count: ${props.count} }
 // - Arrow functions: {products.reduce((sum, p) => sum + p)} → ${props.products.reduce((sum, p) => sum + p)}
 // - Skip list: Loop variables, Alpine built-ins, JS built-ins, arrow function params are NOT prefixed
-func convertAttributeExpressions(attrValue string) string {
+func convertAttributeExpressions(attrValue string, loopVars map[string]bool) string {
 	// Find all {expression} patterns
 	return expressionPattern.ReplaceAllStringFunc(attrValue, func(match string) string {
 		// Extract the expression without braces
@@ -282,7 +292,7 @@ func convertAttributeExpressions(attrValue string) string {
 
 		// For other expressions, prefix each identifier with props.
 		// We need to be careful about property access chains and method calls
-		converted := prefixIdentifiersInExpression(expr, arrowParams)
+		converted := prefixIdentifiersInExpression(expr, arrowParams, loopVars)
 
 		return "${" + converted + "}"
 	})
@@ -421,14 +431,20 @@ func isSimpleIdentifier(s string) bool {
 // ARROW FUNCTION FIX: Now accepts arrowParams map to skip arrow function parameters
 // STRING LITERAL FIX: Now tracks string literals to avoid processing content inside quotes
 // METHOD CHAIN FIX: Now properly continues method chains after closing parens
-func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool) string {
-	// Merge arrow params with skip list
+// LOOP VARIABLE FIX: Now accepts loopVars map to skip loop variables
+func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool, loopVars map[string]bool) string {
+	// Merge arrow params and loop vars with skip list
 	combinedSkip := make(map[string]bool)
 	for k, v := range skipIdentifiers {
 		combinedSkip[k] = v
 	}
 	if arrowParams != nil {
 		for k, v := range arrowParams {
+			combinedSkip[k] = v
+		}
+	}
+	if loopVars != nil {
+		for k, v := range loopVars {
 			combinedSkip[k] = v
 		}
 	}
@@ -542,7 +558,8 @@ func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool) str
 				if argEnd > argStart {
 					args := expr[argStart:argEnd]
 					argsArrowParams := extractArrowFunctionParams(args)
-					processedArgs := prefixIdentifiersInExpression(args, argsArrowParams)
+					// Pass loopVars through recursive call
+					processedArgs := prefixIdentifiersInExpression(args, argsArrowParams, loopVars)
 					result.WriteString(processedArgs)
 				}
 
@@ -796,7 +813,26 @@ func isEventHandlerAttribute(name string) bool {
 // to ${props.expression} for JavaScript template literals using identifier-level prefixing
 // BUG FIX #1: Quote escaping happens BEFORE conversion to avoid escaping quotes in ${...}
 // BUG FIX #2: Event handler attributes (onclick, @click) are NOT converted
+// LOOP VARIABLE FIX: Attributes with loop variable expressions use Alpine : binding
 func renderAttributeToJS(attr ast.Attribute, sb *strings.Builder, ctx *RenderContext, children []ast.Node) {
+	// LOOP VARIABLE FIX: Check if attribute value contains loop variable expression
+	// If so, convert to Alpine : binding syntax
+	// Example: src="{card.icon.src}" → :src="card.icon.src"
+	if attributeReferencesLoopVar(attr.Value, ctx.loopVars) {
+		// Use Alpine binding syntax
+		sb.WriteString(":")
+		sb.WriteString(attr.Name)
+		sb.WriteString("=\"")
+
+		// Extract expression from braces and write directly
+		// {card.icon.src} → card.icon.src
+		expr := extractExpressionFromBraces(attr.Value)
+		sb.WriteString(expr)
+		sb.WriteString("\"")
+		return
+	}
+
+	// Normal attribute handling (for non-loop-variable attributes)
 	sb.WriteString(attr.Name)
 	sb.WriteString("=\"")
 
@@ -817,7 +853,7 @@ func renderAttributeToJS(attr ast.Attribute, sb *strings.Builder, ctx *RenderCon
 	// This handles cases like: x-data="{ count: {count} }" → x-data="{ count: ${props.count} }"
 	// But NOT for event handlers (onclick, @click, etc.) where the code should remain as-is
 	if !isEventHandlerAttribute(attr.Name) {
-		escaped = convertAttributeExpressions(escaped)
+		escaped = convertAttributeExpressions(escaped, ctx.loopVars)
 	}
 
 	sb.WriteString(escaped)
@@ -868,25 +904,68 @@ func renderConditionalToJS(cond *ast.Conditional, sb *strings.Builder, ctx *Rend
 }
 
 // renderLoopToJS renders loop blocks as Alpine.js <template> elements
-// Cognitive Load: 9 (Loop structure with context)
+// Cognitive Load: 12 (Loop structure with context and variable tracking)
 func renderLoopToJS(loop *ast.Loop, sb *strings.Builder, ctx *RenderContext) {
 	sb.WriteString(`<template x-for="`)
 
 	// Build x-for expression
-	if loop.Value != "" {
-		// For (key, value) in collection syntax
-		sb.WriteString(loop.Value)
+	// Note: In AST, Value = item variable, Iterator = optional index variable
+	// For simple loops: "item in collection"
+	// For loops with index: "(item, index) in collection"
+	iteratorTrimmed := strings.TrimSpace(loop.Iterator)
+	if iteratorTrimmed != "" {
+		// Loop with index: (item, index) in collection
+		sb.WriteString("(")
+		sb.WriteString(loop.Value)  // item
 		sb.WriteString(", ")
+		sb.WriteString(iteratorTrimmed)  // index
+		sb.WriteString(")")
+	} else {
+		// Simple loop: item in collection
+		sb.WriteString(loop.Value)  // item only
 	}
 
-	sb.WriteString(loop.Iterator)
 	sb.WriteString(" in ")
-	sb.WriteString(loop.Collection)
+
+	// CRITICAL FIX: Prefix collection with props. if it's not a loop variable or special identifier
+	collection := loop.Collection
+	if !skipIdentifiers[collection] && !ctx.loopVars[collection] {
+		// Check if it's a property chain - only prefix if root is not in skip list
+		if strings.Contains(collection, ".") {
+			parts := strings.Split(collection, ".")
+			if !skipIdentifiers[parts[0]] && !ctx.loopVars[parts[0]] {
+				collection = "props." + collection
+			}
+		} else {
+			collection = "props." + collection
+		}
+	}
+	sb.WriteString(collection)
 	sb.WriteString(`">`)
 
-	// Render loop content
+	// CRITICAL FIX: Create new context with loop variables tracked
+	loopCtx := &RenderContext{
+		insideLiteral:    ctx.insideLiteral,
+		insideAlpineAttr: ctx.insideAlpineAttr,
+		loopVars:         make(map[string]bool),
+	}
+
+	// Copy parent loop vars
+	for k, v := range ctx.loopVars {
+		loopCtx.loopVars[k] = v
+	}
+
+	// Add current loop variables
+	if iteratorTrimmed != "" {
+		loopCtx.loopVars[iteratorTrimmed] = true
+	}
+	if loop.Value != "" {
+		loopCtx.loopVars[loop.Value] = true
+	}
+
+	// Render loop content with loop variables in context
 	for _, node := range loop.Content {
-		renderNodeToJS(node, sb, ctx)
+		renderNodeToJS(node, sb, loopCtx)
 	}
 
 	sb.WriteString("</template>")
@@ -909,4 +988,75 @@ func isAlpineDirective(attrName string) bool {
 	return strings.HasPrefix(attrName, "x-") ||
 		strings.HasPrefix(attrName, "@") ||
 		strings.HasPrefix(attrName, ":")
+}
+
+// expressionReferencesLoopVar checks if an expression references any loop variable
+// Cognitive Load: 7 (Expression parsing with identifier extraction)
+// Examples:
+//   - "text" with loopVars{"text": true} → true
+//   - "card.icon.src" with loopVars{"card": true} → true
+//   - "props.title" with loopVars{"card": true} → false
+func expressionReferencesLoopVar(expr string, loopVars map[string]bool) bool {
+	if len(loopVars) == 0 {
+		return false
+	}
+
+	// Extract root identifier from expression
+	// For "card.icon.src" → "card"
+	// For "text" → "text"
+	// For "item.name + ' - ' + item.price" → check both "item" references
+
+	// Split by operators and delimiters to extract all identifiers
+	// Simple approach: check if any loop variable appears as a standalone identifier
+	for loopVar := range loopVars {
+		// Check if loop variable appears as complete identifier
+		// Use word boundary regex to avoid matching "card" in "discard"
+		pattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(loopVar) + `\b`)
+		if pattern.MatchString(expr) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// attributeReferencesLoopVar checks if an attribute value contains expressions that reference loop variables
+// Cognitive Load: 6 (Expression extraction with loop var check)
+// Examples:
+//   - "{card.icon.src}" with loopVars{"card": true} → true
+//   - "{props.title}" with loopVars{"card": true} → false
+//   - "static-value" → false
+func attributeReferencesLoopVar(attrValue string, loopVars map[string]bool) bool {
+	if len(loopVars) == 0 {
+		return false
+	}
+
+	// Find all {expression} patterns in attribute value
+	matches := expressionPattern.FindAllStringSubmatch(attrValue, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			expr := match[1] // Extract expression without braces
+			if expressionReferencesLoopVar(expr, loopVars) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// extractExpressionFromBraces extracts the expression content from an attribute value
+// Cognitive Load: 5 (Simple extraction)
+// Examples:
+//   - "{card.icon.src}" → "card.icon.src"
+//   - "{text}" → "text"
+//   - "prefix {expr} suffix" → "expr" (first expression)
+func extractExpressionFromBraces(attrValue string) string {
+	// Find first {expression} pattern
+	match := expressionPattern.FindStringSubmatch(attrValue)
+	if len(match) > 1 {
+		return match[1] // Return expression without braces
+	}
+	// If no braces found, return as-is (shouldn't happen in normal flow)
+	return attrValue
 }

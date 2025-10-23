@@ -262,18 +262,12 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 		log.Printf("[renderWithWrapper] Loaded content for route %s: %d top-level keys", routePath, len(contentData))
 	}
 
-	// Step 2: Generate allContent list (all available content files)
-	allContent := getAllContent()
-	log.Printf("[renderWithWrapper] Generated allContent: %d files", len(allContent))
+	// Step 2: allContent generation moved to opt-in only (see magic variables below)
+	// NOTE: allContent is a large dataset and should only be loaded when explicitly requested via export let
+	// This improves performance by reducing HTML payload size and initial page load time
 
-	// Step 3: Generate allLayouts list (all available layout components)
-	allLayoutsMap := transformer.GetAllComponentNames()
-	allLayouts := make([]string, 0, len(allLayoutsMap))
-	for name := range allLayoutsMap {
-		allLayouts = append(allLayouts, name)
-	}
-	sort.Strings(allLayouts) // Consistent ordering
-	log.Printf("[renderWithWrapper] Generated allLayouts: %d components", len(allLayouts))
+	// Step 3: allLayouts generation moved to opt-in only (see magic variables below)
+	// NOTE: allLayouts is only needed for Plenti compatibility and should be opt-in
 
 	// Step 4: Extract content.fields for wrapper to pass to dynamic component
 	// This handles the Plenti collection type structure
@@ -304,11 +298,10 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 	// Step 5: Build props map for wrapper
 	// IMPORTANT: These are offered to the wrapper, but wrapper's export let controls which are actually used
 	// The opt-in filtering happens inside renderTemplateWithProps
+	// NOTE: allContent and allLayouts are OPT-IN ONLY (via magic variables) to improve performance
 	props := map[string]interface{}{
-		"layout":        layoutName, // Name of the layout to render (e.g., "_index")
-		"content":       contentData, // Full content object
-		"allContent":    allContent,  // All site content
-		"allLayouts":    allLayouts,  // All available layouts
+		"layout":        layoutName,                   // Name of the layout to render (e.g., "_index")
+		"content":       contentData,                  // Full content object
 		"env":           make(map[string]interface{}), // Environment vars (TODO: populate if needed)
 		"user":          make(map[string]interface{}), // User data (TODO: populate if needed)
 		"shadowContent": make(map[string]interface{}), // Shadow content (TODO: populate if needed)
