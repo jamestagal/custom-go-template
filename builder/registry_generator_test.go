@@ -945,7 +945,7 @@ func TestConvertAttributeExpressions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertAttributeExpressions(tt.input)
+			result := convertAttributeExpressions(tt.input, nil)
 			if result != tt.expected {
 				t.Errorf("convertAttributeExpressions() = %q, want %q", result, tt.expected)
 			}
@@ -1015,7 +1015,7 @@ func TestConvertAttributeExpressions_ComplexExpressions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertAttributeExpressions(tt.input)
+			result := convertAttributeExpressions(tt.input, nil)
 			if result != tt.expected {
 				t.Errorf("convertAttributeExpressions() = %v, want %v", result, tt.expected)
 			}
@@ -1038,7 +1038,7 @@ func TestSkipIdentifiers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := convertAttributeExpressions(tt.input)
+		result := convertAttributeExpressions(tt.input, nil)
 		if result != tt.expected {
 			t.Errorf("convertAttributeExpressions(%q) = %v, want %v", tt.input, result, tt.expected)
 		}
@@ -1284,7 +1284,7 @@ func TestArrowFunctionBugFix(t *testing.T) {
 	// Expected: Arrow function params (sum, p) should NOT get props. prefix
 	expected := "${props.formatPrice(props.products.reduce((sum, p) => sum + p.price, 0) / props.products.length)}"
 
-	result := convertAttributeExpressions(input)
+	result := convertAttributeExpressions(input, nil)
 
 	if result != expected {
 		t.Errorf("Arrow function parameter extraction failed!\nInput:    %s\nExpected: %s\nGot:      %s",
@@ -1365,7 +1365,7 @@ func TestStringLiteralHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := prefixIdentifiersInExpression(tt.expr, nil)
+			result := prefixIdentifiersInExpression(tt.expr, nil, nil)
 			if result != tt.expected {
 				t.Errorf("String literal handling failed\nExpression: %s\nExpected:   %s\nGot:        %s",
 					tt.expr, tt.expected, result)
@@ -1406,7 +1406,7 @@ func TestStringLiteralInAttributes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertAttributeExpressions(tt.input)
+			result := convertAttributeExpressions(tt.input, nil)
 			if result != tt.expected {
 				t.Errorf("String literal in attribute failed\nInput:    %s\nExpected: %s\nGot:      %s",
 					tt.input, tt.expected, result)
@@ -1484,7 +1484,7 @@ func TestMethodChainingBugFix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := prefixIdentifiersInExpression(tt.expr, nil)
+			result := prefixIdentifiersInExpression(tt.expr, nil, nil)
 			if result != tt.expected {
 				t.Errorf("Method chaining failed\nExpression: %s\nExpected:   %s\nGot:        %s",
 					tt.expr, tt.expected, result)

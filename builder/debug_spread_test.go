@@ -11,7 +11,7 @@ func TestSpreadOperatorDebug(t *testing.T) {
 	expected := "props.animals = [props.newAnimal, ...props.animals]; props.newAnimal = ''"
 	
 	skipList := make(map[string]bool)
-	result := prefixIdentifiersInExpression(input, skipList)
+	result := prefixIdentifiersInExpression(input, skipList, nil)
 	
 	fmt.Println("Input:   ", input)
 	fmt.Println("Expected:", expected)
