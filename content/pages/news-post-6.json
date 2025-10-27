@@ -1,0 +1,21 @@
+{
+  "type": "news",
+  "path": "/news/team-expansion",
+  "title": "Team Expansion Update",
+  "fields": {
+    "title": "Team Expansion Update",
+    "post": {
+      "id": "6"
+    },
+    "publish": {
+      "date": "2025-03-05"
+    },
+    "blogImage": {
+      "src": "https://picsum.photos/400/300?random=6",
+      "alt": "Team photo",
+      "width": 400,
+      "height": 300
+    },
+    "excerpt": "We're growing our team with talented individuals..."
+  }
+}

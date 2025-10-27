@@ -1,0 +1,71 @@
+{
+  "type": "news",
+  "layout": "news",
+  "path": "/news/new-product-launch",
+  "title": "Exciting New Product Launch",
+  "published": true,
+  "fields": {
+    "title": "Exciting New Product Launch",
+    "published": true,
+    "author": {
+      "name": "John Doe",
+      "image": {
+        "src": "https://picsum.photos/32/32?random=author2",
+        "alt": "John Doe profile"
+      }
+    },
+    "publish": {
+      "date": "2025-02-01"
+    },
+    "blogImage": {
+      "src": "https://picsum.photos/1200/600?random=5",
+      "alt": "New product showcase",
+      "width": 1200,
+      "height": 600
+    },
+    "figcaption": {
+      "caption": "Our latest product innovation set to transform the industry",
+      "attribution": {
+        "text": "Product Team",
+        "link": "#"
+      }
+    },
+    "textItems": [
+      {
+        "order": 1,
+        "title": "Revolutionary Features",
+        "paragraph": "Today we're thrilled to announce the launch of our newest product. Built with cutting-edge technology and user feedback, it represents a major leap forward in our product lineup."
+      },
+      {
+        "order": 2,
+        "title": "Customer-Driven Design",
+        "paragraph": "Every feature was designed based on extensive customer research and testing. We've incorporated feedback from over 1,000 beta users to ensure this product meets real-world needs."
+      },
+      {
+        "order": 3,
+        "title": "Available Now",
+        "paragraph": "The new product is available immediately for all customers. Early adopters will receive a special launch discount and exclusive access to premium features."
+      }
+    ],
+    "photos": [
+      {
+        "src": "https://picsum.photos/400/300?random=51",
+        "alt": "Product feature showcase",
+        "width": 400,
+        "height": 300
+      },
+      {
+        "src": "https://picsum.photos/400/300?random=52",
+        "alt": "Product in use",
+        "width": 400,
+        "height": 300
+      },
+      {
+        "src": "https://picsum.photos/400/300?random=53",
+        "alt": "Customer testimonial",
+        "width": 400,
+        "height": 300
+      }
+    ]
+  }
+}

@@ -329,15 +329,6 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 		props["content"] = contentWithFields
 	}
 
-	// REMOVED: TEMPORARY WORKAROUND that was adding component fields as top-level props
-	// This workaround was causing the "this." prefix bug - field names were being added to dataScope
-	// and then replaceVarRefsWithThis was prefixing them.
-	//
-	// Now that runtime component resolution is working (go-backend agent fix on 2025-10-16),
-	// components receive their props via the spread operator: {...component.fields}
-	//
-	// See: .agent-os/specs/2025-10-15-runtime-component-resolution/ for the proper implementation
-
 	log.Printf("[renderWithWrapper] Built props map with %d keys (offered to wrapper)", len(props))
 	log.Printf("[renderWithWrapper] Props keys: %v", getKeys(props))
 

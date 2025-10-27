@@ -1,0 +1,273 @@
+---
+<!-- News Content Type Layout -->
+<!-- Maps to: content/news/*.json files -->
+<!-- Each JSON file in content/news/ becomes a page using this layout -->
+<!-- Real-world pattern from Plenti capitaltigers project -->
+
+export let title, author, publish, blogImage, figcaption, textItems, photos, published, allContent
+---
+
+{if published}
+<div class="blog-container main-content-wrapper">
+  <div class="main-content">
+    <article class="blog-article">
+      <!-- Hero Image -->
+      <picture class="blog-mainImage">
+        <img
+          alt="{blogImage?.alt || 'Blog image'}"
+          decoding="async"
+          src="{blogImage?.src}"
+          width="{blogImage?.width || 1200}"
+          height="{blogImage?.height || 600}"
+        />
+      </picture>
+
+      <!-- Image Caption -->
+      {if figcaption}
+      <figure class="image-caption">
+        <span class="caption">{figcaption.caption}</span>
+        {if figcaption.attribution}
+        <span class="attribution">
+          <a class="source" target="_blank" href="{figcaption.attribution.link}">
+            {figcaption.attribution.text}
+          </a>
+        </span>
+        {/if}
+      </figure>
+      {/if}
+
+      <!-- Article Header -->
+      <div class="article-group">
+        <h1 class="blog-h1">{title}</h1>
+
+        <div class="blog-authorGroup">
+          {if author?.image}
+          <picture class="blog-author-img">
+            <img
+              alt="{author.image.alt}"
+              decoding="async"
+              height="32"
+              src="{author.image.src}"
+              width="32"
+            />
+          </picture>
+          {/if}
+          <span class="blog-author">{author?.name || 'Author'}</span>
+          <span class="blog-dot" aria-hidden="true"></span>
+          <span class="blog-date">{publish?.date}</span>
+        </div>
+      </div>
+
+      <!-- Article Content -->
+      {if textItems}
+        {for item in textItems}
+        <section id="blog-content">
+          <h4>{item.title}</h4>
+          <p>{item.paragraph}</p>
+        </section>
+        {/for}
+      {/if}
+
+      <!-- Photo Gallery (if present) -->
+      {if photos && photos.length > 0}
+      <section id="photo-gallery">
+        <div class="photo-grid">
+          {for photo in photos}
+          <div class="photo-item">
+            <img
+              src="{photo.src}"
+              alt="{photo.alt || 'Gallery photo'}"
+              width="{photo.width || 400}"
+              height="{photo.height || 300}"
+            />
+          </div>
+          {/for}
+        </div>
+      </section>
+      {/if}
+    </article>
+  </div>
+
+  <!-- Sidebar with Featured Posts (uses allContent) -->
+  <FeaturedPostsSidebar allContent={allContent} />
+</div>
+{else}
+<div class="draft-message">
+  <h2>This post is currently a draft</h2>
+  <p>Published posts will appear here.</p>
+</div>
+{/if}
+
+<style>
+.blog-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 3rem;
+}
+
+@media (max-width: 1024px) {
+  .blog-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.main-content {
+  width: 100%;
+}
+
+.blog-article {
+  background: white;
+}
+
+.blog-mainImage {
+  display: block;
+  width: 100%;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.blog-mainImage img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.image-caption {
+  margin: 0.5rem 0 2rem;
+  padding: 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.caption {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.attribution {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.source {
+  color: #4CAF50;
+  text-decoration: none;
+}
+
+.source:hover {
+  text-decoration: underline;
+}
+
+.article-group {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.blog-h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 1rem;
+  line-height: 1.2;
+}
+
+.blog-authorGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.blog-author-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.blog-author-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blog-author {
+  font-weight: 600;
+  color: #333;
+}
+
+.blog-dot {
+  width: 4px;
+  height: 4px;
+  background: #999;
+  border-radius: 50%;
+}
+
+.blog-date {
+  color: #666;
+}
+
+#blog-content {
+  margin-bottom: 2rem;
+}
+
+#blog-content h4 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 1rem;
+}
+
+#blog-content p {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  color: #444;
+  margin: 0 0 1rem;
+}
+
+#photo-gallery {
+  margin: 3rem 0;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.photo-item {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.photo-item img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+.draft-message {
+  max-width: 800px;
+  margin: 4rem auto;
+  padding: 3rem;
+  text-align: center;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 2px dashed #ccc;
+}
+
+.draft-message h2 {
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+.draft-message p {
+  color: #999;
+}
+</style>

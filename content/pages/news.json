@@ -1,0 +1,63 @@
+{
+  "type": "news",
+  "path": "/news",
+  "title": "Quarterly Results Announced",
+  "fields": {
+    "title": "Quarterly Results Announced",
+    "published": true,
+    "author": {
+      "name": "Jane Smith",
+      "image": {
+        "src": "https://picsum.photos/32/32?random=author1",
+        "alt": "Jane Smith profile"
+      }
+    },
+    "publish": {
+      "date": "2025-01-15"
+    },
+    "blogImage": {
+      "src": "https://picsum.photos/1200/600?random=4",
+      "alt": "Quarterly results chart showing strong year-over-year growth",
+      "width": 1200,
+      "height": 600
+    },
+    "figcaption": {
+      "caption": "Q4 2024 results demonstrate strong year-over-year growth",
+      "attribution": {
+        "text": "Company Analytics Team",
+        "link": "#"
+      }
+    },
+    "textItems": [
+      {
+        "order": 1,
+        "title": "Strong Financial Performance",
+        "paragraph": "We're proud to announce our quarterly results, showing a 25% increase in revenue compared to the same period last year. This growth reflects our commitment to innovation and customer satisfaction."
+      },
+      {
+        "order": 2,
+        "title": "Key Highlights",
+        "paragraph": "Revenue reached $50M this quarter, with a net profit margin of 18%. Our customer base grew by 15,000 active users, bringing our total to over 100,000 satisfied customers worldwide."
+      },
+      {
+        "order": 3,
+        "title": "Looking Ahead",
+        "paragraph": "With this momentum, we're investing in new product features and expanding our team. We expect continued growth in the coming quarters as we execute on our strategic roadmap."
+      }
+    ],
+    "photos": [
+      {
+        "src": "https://picsum.photos/400/300?random=41",
+        "alt": "Team celebrating results",
+        "width": 400,
+        "height": 300
+      },
+      {
+        "src": "https://picsum.photos/400/300?random=42",
+        "alt": "Office celebration",
+        "width": 400,
+        "height": 300
+      }
+    ]
+  }
+}

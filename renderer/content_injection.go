@@ -3,6 +3,7 @@ package renderer
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/jimafisk/custom_go_template/ast"
 	"github.com/jimafisk/custom_go_template/utils"
@@ -56,14 +57,41 @@ func InjectContentProps(fence *ast.FenceSection, contentData map[string]interfac
 		propDefaults[prop.Name] = prop.DefaultValue
 	}
 
+	// Magic variables that should be injected later by the server (not from content)
+	magicVars := map[string]bool{
+		"allContent": true,
+		"content":    true,
+		"allLayouts": true,
+		"components": true,
+	}
+
 	// Process each exported prop
 	for _, propName := range fence.ExportedProps {
+		// Skip magic variables - they're injected later by the server
+		if magicVars[propName] {
+			log.Printf("Skipping magic variable '%s' during content injection (will be added later)", propName)
+			continue
+		}
+
 		// Check if value exists in content data
 		value, exists := contentData[propName]
 
 		if exists {
 			// Content provides value - inject it
-			jsValue := utils.AnyToJSValue(value)
+			// Convert to string representation for VariableNode
+			// For complex types (maps, arrays), use JSON; for primitives, use string representation
+			var jsValue string
+			switch v := value.(type) {
+			case bool:
+				// Store boolean as "true" or "false" without quotes
+				jsValue = fmt.Sprintf("%t", v)
+			case string:
+				// Store strings with quotes
+				jsValue = strconv.Quote(v)
+			default:
+				// For complex types, use utils.AnyToJSValue
+				jsValue = utils.AnyToJSValue(value)
+			}
 			result.Variables = append(result.Variables, ast.VariableNode{
 				Keyword: "let",
 				Name:    propName,

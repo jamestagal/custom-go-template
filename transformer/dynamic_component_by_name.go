@@ -110,15 +110,17 @@ func TransformDynamicComponentByName(node *ast.DynamicComponentByNameNode, dataS
 //
 // Runtime Wrapper Structure:
 //   <div class="dyn-comp-runtime"
-//        x-data="{compName: component.name, compProps: {...component.fields, content, allContent}}"
+//        x-data="{compName: component.name, compProps: {...component.fields}}"
 //        x-init="$renderDynamicComponent($el, compName, compProps)">
 //   </div>
 //
-// CRITICAL FIX: Spread props from component.fields must be included in compProps
+// IMPORTANT: This function does NOT auto-inject content/allContent.
+// Components access these via Alpine.js scope inheritance from parent x-data.
+// If explicit passing is needed, add content={content} to the template.
 //
 // Example:
-//   Input:  nameExpression="component.name", spread=["{...component.fields}"], props=[content, allContent]
-//   Output: <div x-data="{compName: component.name, compProps: {...component.fields, content: content, allContent: allContent}}" ...>
+//   Input:  nameExpression="component.name", spread=["component.fields"], props=[]
+//   Output: <div x-data="{compName: component.name, compProps: {...component.fields}}" ...>
 //
 // IMPORTANT: The wrapper has NO children - Alpine.js will populate it at runtime
 func emitRuntimeWrapper(node *ast.DynamicComponentByNameNode, dataScope map[string]any) []ast.Node {
@@ -128,7 +130,8 @@ func emitRuntimeWrapper(node *ast.DynamicComponentByNameNode, dataScope map[stri
 	// For runtime components, we need to keep expressions for Alpine to evaluate
 
 	// Build the compProps object as a string with proper JavaScript syntax
-	// We need to output: {...component.fields, content: content, allContent: allContent}
+	// Components access content/allContent via Alpine scope inheritance from body x-data
+	// Only include explicitly passed props (spread and regular)
 	var propsParts []string
 
 	// Step 1: Add spread operators for spread props

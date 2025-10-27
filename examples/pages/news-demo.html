@@ -1,0 +1,208 @@
+---
+<!-- News Content Type Demo Page -->
+<!-- This page demonstrates Plenti-style content type mapping -->
+<!-- Pattern: content/news/*.json → layouts/content/news.html -->
+
+import News from '../../layouts/content/news.html'
+import FeaturedPostsSidebar from '../../layouts/components/featured_posts_sidebar.html'
+
+-- Simulate loading a news content item
+let newsContent = {
+  title: "Quarterly Results Announced",
+  published: true,
+  author: {
+    name: "Jane Smith",
+    image: {
+      src: "https://picsum.photos/32/32?random=author1",
+      alt: "Jane Smith profile"
+    }
+  },
+  publish: {
+    date: "2025-01-15"
+  },
+  blogImage: {
+    src: "https://picsum.photos/1200/600?random=4",
+    alt: "Quarterly results chart",
+    width: 1200,
+    height: 600
+  },
+  figcaption: {
+    caption: "Q4 2024 results demonstrate strong year-over-year growth",
+    attribution: {
+      text: "Company Analytics Team",
+      link: "#"
+    }
+  },
+  textItems: [
+    {
+      order: 1,
+      title: "Strong Financial Performance",
+      paragraph: "We're proud to announce our quarterly results, showing a 25% increase in revenue compared to the same period last year."
+    },
+    {
+      order: 2,
+      title: "Key Highlights",
+      paragraph: "Revenue reached $50M this quarter, with a net profit margin of 18%. Our customer base grew by 15,000 active users."
+    }
+  ],
+  photos: [
+    {
+      src: "https://picsum.photos/400/300?random=41",
+      alt: "Team celebrating results",
+      width: 400,
+      height: 300
+    }
+  ]
+}
+
+-- allContent for sidebar (simulate loading all news posts)
+let allContent = {
+  "quarterly-results": {
+    type: "news",
+    path: "/news/quarterly-results",
+    title: "Quarterly Results Announced",
+    fields: {
+      post: { id: "4" },
+      publish: { date: "2025-01-15" },
+      blogImage: {
+        src: "https://picsum.photos/400/300?random=4",
+        alt: "Quarterly results",
+        width: 400,
+        height: 300
+      }
+    }
+  },
+  "new-product-launch": {
+    type: "news",
+    path: "/news/new-product-launch",
+    title: "Exciting New Product Launch",
+    fields: {
+      post: { id: "5" },
+      publish: { date: "2025-02-01" },
+      blogImage: {
+        src: "https://picsum.photos/400/300?random=5",
+        alt: "New product",
+        width: 400,
+        height: 300
+      }
+    }
+  },
+  "team-expansion": {
+    type: "news",
+    path: "/news/team-expansion",
+    title: "Growing Our Team",
+    fields: {
+      post: { id: "6" },
+      publish: { date: "2025-03-10" },
+      blogImage: {
+        src: "https://picsum.photos/400/300?random=6",
+        alt: "Team photo",
+        width: 400,
+        height: 300
+      }
+    }
+  }
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News Content Type Demo</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f5f5;
+    }
+
+    header {
+      background: #2c3e50;
+      color: white;
+      padding: 1rem 2rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+    }
+
+    .info-banner {
+      background: #e3f2fd;
+      border-left: 4px solid #2196F3;
+      padding: 1.5rem;
+      margin: 2rem auto;
+      max-width: 1280px;
+    }
+
+    .info-banner h2 {
+      color: #1976D2;
+      margin-bottom: 0.5rem;
+    }
+
+    .info-banner p {
+      color: #424242;
+      margin-bottom: 0.5rem;
+    }
+
+    .info-banner code {
+      background: #fff;
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    footer {
+      background: #2c3e50;
+      color: white;
+      text-align: center;
+      padding: 2rem;
+      margin-top: 4rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>News Content Type Demo</h1>
+  </header>
+
+  <div class="info-banner">
+    <h2>Plenti-Style Content Type Mapping</h2>
+    <p>This page demonstrates how content types work:</p>
+    <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+      <li><code>content/news/*.json</code> → <code>layouts/content/news.html</code></li>
+      <li>Each JSON file becomes a separate page using the same layout</li>
+      <li>The layout receives fields as individual props (title, author, publish, etc.)</li>
+      <li>The sidebar uses <code>allContent</code> to display featured posts from other pages</li>
+    </ul>
+  </div>
+
+  <!-- Render the news layout with content -->
+  <News
+    title={newsContent.title}
+    author={newsContent.author}
+    publish={newsContent.publish}
+    blogImage={newsContent.blogImage}
+    figcaption={newsContent.figcaption}
+    textItems={newsContent.textItems}
+    photos={newsContent.photos}
+    published={newsContent.published}
+    allContent={allContent}
+  />
+
+  <footer>
+    <p>News Content Type Demo • Custom Go Template Engine</p>
+  </footer>
+</body>
+</html>

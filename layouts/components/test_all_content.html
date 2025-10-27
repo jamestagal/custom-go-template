@@ -1,0 +1,43 @@
+---
+export let allContent
+---
+
+<div class="all-content-test">
+    <h2>All Content Test</h2>
+    <p>Total pages loaded: <span x-text="Object.keys(allContent || {}).length"></span></p>
+
+    <ul>
+        <template x-for="(pageData, pageName) in allContent" :key="pageName">
+            <li>
+                <strong x-text="pageName"></strong>:
+                <span x-text="pageData.title || 'No title'"></span>
+            </li>
+        </template>
+    </ul>
+</div>
+
+<style>
+.all-content-test {
+    border: 2px solid #4CAF50;
+    padding: 20px;
+    margin: 20px 0;
+    background-color: #f9f9f9;
+}
+
+.all-content-test h2 {
+    color: #4CAF50;
+    margin-top: 0;
+}
+
+.all-content-test ul {
+    list-style: none;
+    padding: 0;
+}
+
+.all-content-test li {
+    padding: 8px;
+    margin: 4px 0;
+    background: white;
+    border-left: 3px solid #4CAF50;
+}
+</style>

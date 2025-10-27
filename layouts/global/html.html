@@ -50,13 +50,11 @@ prop description = "A Go template engine powered by Alpine.js"
 		<!-- The server will inject the appropriate layout based on the route -->
 
 		<!-- Slot for dynamic content - replaced by server with specific layout -->
-		<!-- CRITICAL FIX: Pass content and allContent explicitly to layout component -->
-		<!-- Pages.html needs content.components for iteration -->
+		<!-- Pass content explicitly (Pages layout needs it for iteration) -->
+		<!-- allContent removed - components inherit from body x-data via Alpine scope -->
 		<Component:dynamic name={layout}
 			content={content}
-			allContent={allContent}
-			{...content.fields}
-			bind:shadowContent={shadowContent} />
+			{...content.fields} />
 
 		<!-- Newsletter Subscription (optional global component) -->
 		<!-- <Newsletter /> -->
