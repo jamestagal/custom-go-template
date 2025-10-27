@@ -193,9 +193,19 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 		}
 	}
 
-	// If we need to apply Alpine wrapper and we have data scope
+	// PHASE 1 OPTIMIZATION: Only wrap if optimization disabled OR not at root level
+	// When OptimizeXData is true, skip root wrapper (body provides scope)
 	if applyAlpineWrapper && hasDataScope {
-		return applyAlpineDataWrapper(transformedNodes, dataScope)
+		if !OptimizeXData {
+			// Legacy behavior - always wrap
+			log.Printf("[X-Data] Legacy mode: applying root wrapper")
+			return applyAlpineDataWrapper(transformedNodes, dataScope)
+		}
+
+		// Optimization mode - skip root wrapper
+		// Body tag injection (in cmd/server/main.go) handles top-level scope
+		log.Printf("[X-Data] Phase 1: Skipping root wrapper (body provides scope)")
+		return transformedNodes
 	}
 
 	return transformedNodes

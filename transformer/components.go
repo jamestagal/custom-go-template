@@ -871,7 +871,7 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 	// Recursively transform component body with its isolated scope
 	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
 
-	// PHASE 4: Wrap with x-data (Task 2.4) ✓
+	// PHASE 4: Wrap with x-data (Task 2.4 + PHASE 2 OPTIMIZATION) ✓
 
 	// Only add x-data wrapper if component has data
 	// Components with no props, variables, or functions don't need Alpine.js wrapper
@@ -879,7 +879,28 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 		return transformedNodes
 	}
 
-	// Add x-data to the root element or wrap in a div
+	// PHASE 2 OPTIMIZATION: Smart scope diffing to minimize x-data duplication
+	//
+	// CRITICAL: Components ALWAYS need their own x-data wrapper for isolation
+	// The optimization only applies to NON-component scopes (like conditional blocks, etc.)
+	//
+	// Reason: Components define an API contract via props - they expect specific
+	// variables to be in scope. Even if parent happens to have same values, component
+	// instances must be isolated for proper reactivity and encapsulation.
+	//
+	// Example that would break without component isolation:
+	//   <Age name={name} age={age} />        <!-- expects name/age in its scope -->
+	//   <Age name={"Bo"} age={age + 50} />   <!-- different values, different instance -->
+	//
+	// Without wrappers, both would share parent scope and show same values!
+	if OptimizeXData {
+		// Always wrap components with full scope (not diff)
+		log.Printf("[X-Data] Component '%s' needs wrapper (component isolation required)", componentName)
+		return wrapWithXData(transformedNodes, componentDataScope)
+	}
+
+	// Legacy behavior - always wrap with full scope
+	log.Printf("[X-Data] Legacy mode: wrapping '%s' with full scope", componentName)
 	return wrapWithXData(transformedNodes, componentDataScope)
 }
 

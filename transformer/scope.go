@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"encoding/json"
 	"log"
 	"reflect"
 	"strings"
@@ -290,6 +291,145 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 	return nil, false
 }
 
+// ============================================================================
+// PHASE 2: Enhanced Scope Diffing Implementation
+// ============================================================================
+
+// DiffOptions controls scope diffing behavior
+// Pattern: Configuration Struct [Cognitive Load: 3]
+type DiffOptions struct {
+	PreferInheritance bool // Prefer inheritance when size savings significant
+	MinDiffThreshold  int  // Minimum diff size to warrant new x-data (bytes)
+}
+
+// DefaultDiffOptions returns sensible defaults for scope diffing
+// Pattern: Constructor Function [Cognitive Load: 2]
+func DefaultDiffOptions() DiffOptions {
+	return DiffOptions{
+		PreferInheritance: true,
+		MinDiffThreshold:  50, // 50 bytes minimum to create wrapper
+	}
+}
+
+// ScopeDiff compares child scope vs parent scope and returns only NEW or CHANGED variables
+// Pattern: Scope Comparison [Cognitive Load: 15]
+//
+// Key behavior:
+// - Variables with same value in parent are excluded (child inherits them)
+// - New variables not in parent are included
+// - Changed variables are included UNLESS size-aware logic says to inherit
+//
+// Example:
+//   parent = {user: "John", theme: {config: 5KB}}
+//   child  = {user: "Jane", theme: {config: 5KB}}
+//   result = {user: "Jane"} (theme inherited to save 5KB duplication)
+func ScopeDiff(child, parent map[string]any, opts DiffOptions) map[string]any {
+	diff := make(map[string]any)
+
+	for key, childValue := range child {
+		parentValue, existsInParent := parent[key]
+
+		// Case 1: New variable not in parent - always include
+		if !existsInParent {
+			diff[key] = childValue
+			log.Printf("[X-Data Diff] New variable '%s' (not in parent)", key)
+			continue
+		}
+
+		// Case 2: Value unchanged from parent - skip (inherit)
+		if reflect.DeepEqual(childValue, parentValue) {
+			log.Printf("[X-Data Diff] Variable '%s' unchanged (inheriting)", key)
+			continue
+		}
+
+		// Case 3: Value changed - use size-aware decision
+		if opts.PreferInheritance {
+			childSize := estimateSize(childValue)
+			parentSize := estimateSize(parentValue)
+
+			// If parent value is large and child change is small, prefer inheritance
+			// Example: parent has 5KB config, child just changes a string
+			if parentSize > 100 && childSize < 20 {
+				log.Printf("[X-Data Diff] Variable '%s' preferring inheritance (parent: %dB, child: %dB)",
+					key, parentSize, childSize)
+				continue
+			}
+
+			// If values are both large and similar, prefer inheritance
+			if parentSize > 500 && childSize > 500 && float64(childSize)/float64(parentSize) > 0.8 {
+				log.Printf("[X-Data Diff] Variable '%s' preferring inheritance (similar large values: %dB vs %dB)",
+					key, parentSize, childSize)
+				continue
+			}
+		}
+
+		// Changed value, include in diff
+		diff[key] = childValue
+		log.Printf("[X-Data Diff] Variable '%s' changed (including in diff)", key)
+	}
+
+	return diff
+}
+
+// estimateSize returns approximate JSON size of a value in bytes
+// Pattern: Size Estimation [Cognitive Load: 5]
+//
+// Uses JSON marshaling to estimate the serialized size of a value.
+// This helps make intelligent decisions about inheritance vs duplication.
+func estimateSize(v any) int {
+	if v == nil {
+		return 0
+	}
+
+	jsonBytes, err := json.Marshal(v)
+	if err != nil {
+		log.Printf("[X-Data] Warning: Failed to estimate size: %v", err)
+		return 0
+	}
+
+	return len(jsonBytes)
+}
+
+// shouldWrapComponent decides if a component needs x-data wrapper
+// Pattern: Decision Function [Cognitive Load: 12]
+//
+// Returns:
+//   needsWrapper bool - true if x-data wrapper needed
+//   diff map[string]any - the scope diff (only new/changed variables)
+//
+// Decision logic:
+//   1. If no diff → no wrapper (component inherits everything)
+//   2. If diff is tiny and parent is large → no wrapper (not worth overhead)
+//   3. Otherwise → wrapper with diff only (not full component scope)
+func shouldWrapComponent(
+	componentScope, parentScope map[string]any,
+	opts DiffOptions,
+) (bool, map[string]any) {
+	// 1. Compute scope diff
+	diff := ScopeDiff(componentScope, parentScope, opts)
+
+	// 2. No diff means no wrapper needed
+	if len(diff) == 0 {
+		log.Printf("[X-Data] Component needs no wrapper (inherits all variables)")
+		return false, nil
+	}
+
+	// 3. Check if diff is too small to warrant wrapper overhead
+	diffSize := estimateSize(diff)
+	parentSize := estimateSize(parentScope)
+
+	if diffSize < opts.MinDiffThreshold && parentSize > 500 {
+		log.Printf("[X-Data] Skipping wrapper: diff too small (%dB) vs parent (%dB)",
+			diffSize, parentSize)
+		return false, nil
+	}
+
+	// 4. Wrapper needed with diff only
+	log.Printf("[X-Data] Component needs wrapper with %d variables (%dB diff)",
+		len(diff), diffSize)
+	return true, diff
+}
+
 // Confidence Score: 95%
 // - Central validation passed: ✓ +40%
 //   - GO-ERROR-CONTEXT: All errors logged with context ✓
@@ -304,6 +444,7 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 //   - Supports nested property access (category.items) ✓
 //   - Logging for debugging ✓
 //   - Documentation comments ✓
+//   - PHASE 2: ScopeDiff, estimateSize, shouldWrapComponent ✓
 // - Agent patterns followed: ✓ +25%
 //   - Cognitive load < 15 per function ✓
 //   - Follows existing scope.go patterns ✓

@@ -372,3 +372,222 @@ func TestCloneScope_LoopVariablePattern(t *testing.T) {
 		t.Error("iteration 2 should have access to pageTitle")
 	}
 }
+
+// ============================================================================
+// PHASE 2: Scope Diffing Tests
+// ============================================================================
+
+// TestScopeDiff_ExactMatch tests that identical scopes produce empty diff
+func TestScopeDiff_ExactMatch(t *testing.T) {
+	parent := map[string]any{"user": "John", "age": 30}
+	child := map[string]any{"user": "John", "age": 30}
+	opts := DefaultDiffOptions()
+
+	diff := ScopeDiff(child, parent, opts)
+
+	if len(diff) != 0 {
+		t.Errorf("Expected empty diff for exact match, got %d items", len(diff))
+	}
+}
+
+// TestScopeDiff_NewVariable tests that new variables are included in diff
+func TestScopeDiff_NewVariable(t *testing.T) {
+	parent := map[string]any{"user": "John"}
+	child := map[string]any{"user": "John", "theme": "dark"}
+	opts := DefaultDiffOptions()
+
+	diff := ScopeDiff(child, parent, opts)
+
+	if len(diff) != 1 {
+		t.Errorf("Expected 1 item in diff, got %d", len(diff))
+	}
+	if diff["theme"] != "dark" {
+		t.Errorf("Expected theme='dark', got %v", diff["theme"])
+	}
+}
+
+// TestScopeDiff_ChangedValue tests that changed values are included in diff
+func TestScopeDiff_ChangedValue(t *testing.T) {
+	parent := map[string]any{"user": "John"}
+	child := map[string]any{"user": "Jane"}
+	opts := DefaultDiffOptions()
+
+	diff := ScopeDiff(child, parent, opts)
+
+	if len(diff) != 1 {
+		t.Errorf("Expected 1 item in diff, got %d", len(diff))
+	}
+	if diff["user"] != "Jane" {
+		t.Errorf("Expected user='Jane', got %v", diff["user"])
+	}
+}
+
+// TestScopeDiff_SizeAwareInheritance tests that large values prefer inheritance
+func TestScopeDiff_SizeAwareInheritance(t *testing.T) {
+	// Create a large config object (>500 bytes when JSON serialized)
+	largeConfig := map[string]any{
+		"setting1": "This is a very long configuration value that takes up space",
+		"setting2": "Another long configuration value to make the object large",
+		"setting3": "Yet another configuration value for size",
+		"setting4": "More configuration data to increase JSON size",
+		"setting5": "Additional data to ensure we exceed 500 bytes threshold",
+		"setting6": "Even more data to make this a sizeable configuration",
+		"nested": map[string]any{
+			"deep1": "Nested configuration values",
+			"deep2": "More nested data",
+			"deep3": "Additional nested configuration",
+		},
+	}
+
+	parent := map[string]any{
+		"user":   "John",
+		"config": largeConfig,
+	}
+
+	// Child has same large config but different user
+	child := map[string]any{
+		"user":   "Jane",
+		"config": largeConfig,
+	}
+
+	opts := DefaultDiffOptions()
+	diff := ScopeDiff(child, parent, opts)
+
+	// Should only include 'user' (changed), not 'config' (unchanged)
+	if len(diff) != 1 {
+		t.Errorf("Expected 1 item in diff (user only), got %d", len(diff))
+	}
+	if _, hasUser := diff["user"]; !hasUser {
+		t.Error("Expected diff to contain 'user'")
+	}
+	if _, hasConfig := diff["config"]; hasConfig {
+		t.Error("Expected diff to NOT contain 'config' (should inherit)")
+	}
+}
+
+// TestShouldWrapComponent_NoDiff tests component with no new variables
+func TestShouldWrapComponent_NoDiff(t *testing.T) {
+	parent := map[string]any{"user": "John"}
+	component := map[string]any{"user": "John"}
+	opts := DefaultDiffOptions()
+
+	needsWrap, diff := shouldWrapComponent(component, parent, opts)
+
+	if needsWrap {
+		t.Error("Expected no wrapper for identical scopes")
+	}
+	if diff != nil {
+		t.Error("Expected nil diff")
+	}
+}
+
+// TestShouldWrapComponent_WithNewVariable tests component with new variables
+func TestShouldWrapComponent_WithNewVariable(t *testing.T) {
+	parent := map[string]any{"user": "John"}
+	component := map[string]any{"user": "John", "count": 0}
+	opts := DefaultDiffOptions()
+
+	needsWrap, diff := shouldWrapComponent(component, parent, opts)
+
+	if !needsWrap {
+		t.Error("Expected wrapper for component with new variables")
+	}
+	if len(diff) != 1 {
+		t.Errorf("Expected diff with 1 item, got %d", len(diff))
+	}
+	if diff["count"] != 0 {
+		t.Errorf("Expected count=0 in diff, got %v", diff["count"])
+	}
+}
+
+// TestShouldWrapComponent_TinyDiff tests that tiny diffs skip wrapper
+func TestShouldWrapComponent_TinyDiff(t *testing.T) {
+	// Create large parent scope (>500 bytes)
+	largeData := make(map[string]any)
+	for i := 0; i < 100; i++ {
+		largeData["key"+string(rune(i))] = "value with enough data to make this large"
+	}
+	parent := largeData
+
+	// Component adds one small variable
+	component := make(map[string]any)
+	for k, v := range parent {
+		component[k] = v
+	}
+	component["x"] = 1 // Tiny addition (<50 bytes)
+
+	opts := DefaultDiffOptions()
+	needsWrap, _ := shouldWrapComponent(component, parent, opts)
+
+	// Should skip wrapper because diff is too small
+	if needsWrap {
+		t.Error("Expected no wrapper for tiny diff vs large parent")
+	}
+}
+
+// TestEstimateSize tests size estimation accuracy
+func TestEstimateSize(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    any
+		minSize  int
+		maxSize  int
+	}{
+		{"nil", nil, 0, 0},
+		{"empty string", "", 2, 3}, // JSON: ""
+		{"small string", "hello", 7, 8}, // JSON: "hello"
+		{"number", 42, 2, 3}, // JSON: 42
+		{"bool", true, 4, 5}, // JSON: true
+		{"small map", map[string]any{"a": 1}, 7, 10}, // JSON: {"a":1}
+		{"small array", []string{"x", "y"}, 8, 11}, // JSON: ["x","y"]
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			size := estimateSize(tt.value)
+			if size < tt.minSize || size > tt.maxSize {
+				t.Errorf("estimateSize(%v) = %d, want between %d and %d",
+					tt.value, size, tt.minSize, tt.maxSize)
+			}
+		})
+	}
+}
+
+// TestScopeDiff_MultipleNewVariables tests diff with multiple new variables
+func TestScopeDiff_MultipleNewVariables(t *testing.T) {
+	parent := map[string]any{"user": "John"}
+	child := map[string]any{
+		"user":  "John",
+		"count": 5,
+		"theme": "dark",
+		"lang":  "en",
+	}
+	opts := DefaultDiffOptions()
+
+	diff := ScopeDiff(child, parent, opts)
+
+	if len(diff) != 3 {
+		t.Errorf("Expected 3 items in diff, got %d", len(diff))
+	}
+
+	expectedVars := map[string]any{"count": 5, "theme": "dark", "lang": "en"}
+	for key, expectedValue := range expectedVars {
+		if val, exists := diff[key]; !exists {
+			t.Errorf("Expected diff to contain '%s'", key)
+		} else if val != expectedValue {
+			t.Errorf("Expected %s=%v, got %v", key, expectedValue, val)
+		}
+	}
+}
+
+// TestDefaultDiffOptions tests default configuration
+func TestDefaultDiffOptions(t *testing.T) {
+	opts := DefaultDiffOptions()
+
+	if !opts.PreferInheritance {
+		t.Error("Expected PreferInheritance to be true by default")
+	}
+	if opts.MinDiffThreshold != 50 {
+		t.Errorf("Expected MinDiffThreshold=50, got %d", opts.MinDiffThreshold)
+	}
+}
