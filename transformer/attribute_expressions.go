@@ -220,6 +220,13 @@ func TryResolveBuildTimeValue(expr string, dataScope map[string]any) (string, bo
 		return "", false
 	}
 
+
+	// FIX 3: Check if value is a reactive variable reference (__VAR_REF__ or __PROP__ marker)
+	// These should remain dynamic for Alpine.js, not interpolated at build-time
+	if strVal, ok := value.(string); ok && (strings.HasPrefix(strVal, "__VAR_REF__") || strings.HasPrefix(strVal, "__PROP__")) {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Value is reactive (marked with prefix)", expr)
+		return "", false
+	}
 	// Resolve to string value
 	switch v := value.(type) {
 	case string:

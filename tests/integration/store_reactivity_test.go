@@ -180,6 +180,10 @@ store counter = {
 //
 // Pattern: Integration Test [Load: 19]
 // Cognitive Load: 19 (setup: 4, parse: 3, transform: 3, render: 3, assertions: 6)
+//
+// IMPORTANT: This test verifies RUNTIME x-for behavior when loops use store collections.
+// Store collections ($store.cart.items) cannot be resolved at build-time, so they
+// fall back to Alpine.js x-for templates for runtime evaluation.
 func TestMultipleComponentsSameStoreChanges(t *testing.T) {
 	templateStr := `---
 store cart = {
@@ -245,8 +249,9 @@ store cart = {
 	}
 
 	// Component 3: List items
-	if !strings.Contains(markup, "x-for=\"(item, ) in $store.cart.items\"") {
-		t.Errorf("List should iterate store array")
+	// UPDATED EXPECTATION: Runtime x-for without index parameter uses "item in collection" format
+	if !strings.Contains(markup, "x-for=\"item in $store.cart.items\"") {
+		t.Errorf("List should iterate store array with runtime x-for")
 	}
 
 	// Component 4: Empty state

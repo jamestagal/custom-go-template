@@ -595,7 +595,7 @@ func mergeProps(spreadProps map[string]any, regularProps []ast.ComponentProp, da
 
 	// Process regular props (these override spread props)
 	for _, prop := range regularProps {
-		propValue := resolvePropValue(prop, dataScope)
+		propValue := extractPropValue(prop, dataScope)
 		result[prop.Name] = propValue
 		log.Printf("mergeProps: added/override prop %q = %v (type: %T)", prop.Name, propValue, propValue)
 	}

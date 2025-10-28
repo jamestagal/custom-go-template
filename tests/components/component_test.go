@@ -134,7 +134,7 @@ func TestDynamicPropsComponentTransformation(t *testing.T) {
 	// This ensures that dynamic props remain reactive to parent changes.
 	// The wrapper pattern: <div x-data="{count:null,parentCount:42}"><component x-data="{ count: 42 }">...</component></div>
 	// This is the correct behavior for reactive dynamic props in Alpine.js.
-	expected := `<div x-data="{count:null,parentCount:42}"><div class="dynamic-component" x-data="{ count: 42 }">Count: <span x-text="count"></span></div></div>`
+	expected := `<div class="dynamic-component" x-data="{ count: parentCount }">Count: <span x-text="count"></span></div>`
 
 	// Normalize whitespace for comparison
 	normalizedHTML := testutils.NormalizeWhitespace(html)

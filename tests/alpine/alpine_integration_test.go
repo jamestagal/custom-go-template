@@ -21,23 +21,24 @@ func TestAlpineIntegration(t *testing.T) {
 			name: "basic_expressions",
 			template: `
 				<div>
-					<h1>{title }</h1>
-					<p>{description }</p>
+					<h1>{title}</h1>
+					<p>{description}</p>
 				</div>
 			`,
 			props: map[string]any{
 				"title":       "Hello Alpine",
 				"description": "This is a test",
 			},
-			expected: `<div x-data='{"title":"Hello Alpine","description":"This is a test"}'><div><h1><span x-text="title"></span></h1><p><span x-text="description"></span></p></div></div>`,
+			// Updated: No x-data wrapper (Phase 1 optimization - body provides scope)
+			expected: `<div><h1><span x-text="title"></span></h1><p><span x-text="description"></span></p></div>`,
 		},
 		{
 			name: "conditional_rendering",
 			template: `
 				<div>
-					<h1>{title }</h1>
-					{#if showDetails}
-						<p>{description }</p>
+					<h1>{title}</h1>
+					{if showDetails}
+						<p>{description}</p>
 					{/if}
 				</div>
 			`,
@@ -46,17 +47,18 @@ func TestAlpineIntegration(t *testing.T) {
 				"description": "Product details",
 				"showDetails": true,
 			},
-			expected: `<div x-data='{"title":"Product","description":"Product details","showDetails":true}'><div><h1><span x-text="title"></span></h1><template x-if="showDetails"><p><span x-text="description"></span></p></template></div></div>`,
+			// Updated: No x-data wrapper (Phase 1 optimization)
+			expected: `<div><h1><span x-text="title"></span></h1><template x-if="showDetails"><p><span x-text="description"></span></p></template></div>`,
 		},
 		{
 			name: "loop_rendering",
 			template: `
 				<div>
-					<h1>{title }</h1>
+					<h1>{title}</h1>
 					<ul>
-						{#each items as item}
-							<li>{item.name }</li>
-						{/each}
+						{for item in items}
+							<li>{item.name}</li>
+						{/for}
 					</ul>
 				</div>
 			`,
@@ -68,13 +70,15 @@ func TestAlpineIntegration(t *testing.T) {
 					{"name": "Oranges"},
 				},
 			},
-			expected: `<div x-data='{"title":"Shopping List","items":[{"name":"Apples"},{"name":"Bananas"},{"name":"Oranges"}]}'><div><h1><span x-text="title"></span></h1><ul><template x-for="item in items"><li><span x-text="item.name"></span></li></template></ul></div></div>`,
+			// Build-time expansion: Loop expands to 3 <li> elements
+			// No x-data wrapper (Phase 1 optimization)
+			expected: `<div><h1><span x-text="title"></span></h1><ul><li><span x-text="item.name"></span></li><li><span x-text="item.name"></span></li><li><span x-text="item.name"></span></li></ul></div>`,
 		},
 		{
 			name: "component_integration",
 			template: `
 				<div>
-					<h1>{title }</h1>
+					<h1>{title}</h1>
 					<Button label="Click me" onClick={handleClick} />
 				</div>
 			`,
@@ -82,29 +86,30 @@ func TestAlpineIntegration(t *testing.T) {
 				"title":       "Component Test",
 				"handleClick": "() => { alert('Button clicked!') }",
 			},
-			expected: `<div x-data='{"title":"Component Test","handleClick":() => { alert('Button clicked!') }'><div><h1><span x-text="title"></span></h1><div x-component="Button" data-prop-label="Click me" data-prop-onClick="handleClick"></div></div></div>`,
+			// Updated: No x-data wrapper (Phase 1 optimization)
+			expected: `<div><h1><span x-text="title"></span></h1><div x-component="Button" data-prop-label="Click me" data-prop-onClick="handleClick"></div></div>`,
 		},
 		{
 			name: "nested_conditionals_and_loops",
 			template: `
 				<div>
-					<h1>{title }</h1>
-					{#if categories.length > 0}
+					<h1>{title}</h1>
+					{if categories.length > 0}
 						<div>
-							{#each categories as category}
+							{for category in categories}
 								<div>
-									<h2>{category.name }</h2>
-									{#if category.items.length > 0}
+									<h2>{category.name}</h2>
+									{if category.items.length > 0}
 										<ul>
-											{#each category.items as item}
-												<li>{item.name } - ${item.price }</li>
-											{/each}
+											{for item in category.items}
+												<li>{item.name} - ${item.price}</li>
+											{/for}
 										</ul>
 									{else}
 										<p>No items in this category</p>
 									{/if}
 								</div>
-							{/each}
+							{/for}
 						</div>
 					{else}
 						<p>No categories found</p>
@@ -127,14 +132,21 @@ func TestAlpineIntegration(t *testing.T) {
 					},
 				},
 			},
-			expected: `<div x-data='{"title":"Product Catalog","categories":[{"name":"Electronics","items":[{"name":"Laptop","price":999.99},{"name":"Phone","price":699.99}]},{"name":"Books","items":[]}]}'><div><h1><span x-text="title"></span></h1><template x-if="categories.length > 0"><div><template x-for="category in categories"><div><h2><span x-text="category.name"></span></h2><template x-if="category.items.length > 0"><ul><template x-for="item in category.items"><li><span x-text="item.name"></span> - $<span x-text="item.price"></span></li></template></ul></template><template x-else><p>No items in this category</p></template></div></template></div></template><template x-else><p>No categories found</p></template></div></div>`,
+			// Build-time expansion (hybrid approach):
+			// - Outer conditional stays runtime (x-if)
+			// - Categories loop expands to 2 <div> elements (build-time)
+			// - Inner conditional stays runtime (x-if/x-else) - BOTH branches in each iteration
+			// - Inner items loop expands (build-time): Electronics has 2 items, Books has 0 items
+			// Note: Conditionals inside loops remain runtime, so each category gets both x-if and x-else
+			// Updated: No x-data wrapper (Phase 1 optimization)
+			expected: `<div><h1><span x-text="title"></span></h1><template x-if="categories.length > 0"><div><div><h2><span x-text="category.name"></span></h2><template x-if="category.items.length > 0"><ul><li><span x-text="item.name"></span> - $<span x-text="item.price"></span></li><li><span x-text="item.name"></span> - $<span x-text="item.price"></span></li></ul></template><template x-else><p>No items in this category</p></template></div><div><h2><span x-text="category.name"></span></h2><template x-if="category.items.length > 0"><ul></ul></template><template x-else><p>No items in this category</p></template></div></div></template><template x-else><p>No categories found</p></template></div>`,
 		},
 		{
 			name: "dynamic_components_with_conditionals",
 			template: `
 				<div>
-					<h1>{title }</h1>
-					{#if isAdmin}
+					<h1>{title}</h1>
+					{if isAdmin}
 						<AdminPanel user={currentUser} />
 					{else}
 						<UserProfile user={currentUser} />
@@ -146,7 +158,8 @@ func TestAlpineIntegration(t *testing.T) {
 				"isAdmin":     true,
 				"currentUser": map[string]any{"name": "John Doe", "role": "admin"},
 			},
-			expected: `<div x-data='{"title":"User Dashboard","isAdmin":true,"currentUser":{"name":"John Doe","role":"admin"}}'><div><h1><span x-text="title"></span></h1><template x-if="isAdmin"><div x-component="AdminPanel" data-prop-user="currentUser"></div></template><template x-else><div x-component="UserProfile" data-prop-user="currentUser"></div></template></div></div>`,
+			// Updated: No x-data wrapper (Phase 1 optimization)
+			expected: `<div><h1><span x-text="title"></span></h1><template x-if="isAdmin"><div x-component="AdminPanel" data-prop-user="currentUser"></div></template><template x-else><div x-component="UserProfile" data-prop-user="currentUser"></div></template></div>`,
 		},
 	}
 
@@ -204,12 +217,12 @@ func renderIntegrationNode(sb *strings.Builder, node ast.Node) {
 					sb.WriteString("<div x-data='")
 					sb.WriteString(attr.Value)
 					sb.WriteString("'>")
-					
+
 					// Render children
 					for _, child := range n.Children {
 						renderIntegrationNode(sb, child)
 					}
-					
+
 					sb.WriteString("</div>")
 					return
 				}
@@ -223,12 +236,12 @@ func renderIntegrationNode(sb *strings.Builder, node ast.Node) {
 					// This is an else condition (negated condition)
 					// Convert to x-else for test output
 					sb.WriteString("<template x-else>")
-					
+
 					// Render children
 					for _, child := range n.Children {
 						renderIntegrationNode(sb, child)
 					}
-					
+
 					sb.WriteString("</template>")
 					return
 				} else if attr.Name == "x-if" {
@@ -236,12 +249,12 @@ func renderIntegrationNode(sb *strings.Builder, node ast.Node) {
 					sb.WriteString("<template x-if=\"")
 					sb.WriteString(attr.Value)
 					sb.WriteString("\">")
-					
+
 					// Render children
 					for _, child := range n.Children {
 						renderIntegrationNode(sb, child)
 					}
-					
+
 					sb.WriteString("</template>")
 					return
 				} else if attr.Name == "x-else-if" {
@@ -249,12 +262,12 @@ func renderIntegrationNode(sb *strings.Builder, node ast.Node) {
 					sb.WriteString("<template x-else-if=\"")
 					sb.WriteString(attr.Value)
 					sb.WriteString("\">")
-					
+
 					// Render children
 					for _, child := range n.Children {
 						renderIntegrationNode(sb, child)
 					}
-					
+
 					sb.WriteString("</template>")
 					return
 				}
@@ -283,7 +296,7 @@ func renderIntegrationNode(sb *strings.Builder, node ast.Node) {
 				if strings.HasPrefix(attr.Name, "data-prop-") {
 					sb.WriteString(" ")
 					sb.WriteString(attr.Name)
-					
+
 					// Use the specified quote style if available, otherwise default to double quotes
 					openQuote := "\""
 					closeQuote := "\""
@@ -291,7 +304,7 @@ func renderIntegrationNode(sb *strings.Builder, node ast.Node) {
 						openQuote = "'"
 						closeQuote = "'"
 					}
-					
+
 					sb.WriteString("=")
 					sb.WriteString(openQuote)
 					sb.WriteString(attr.Value)
@@ -312,30 +325,18 @@ func renderIntegrationNode(sb *strings.Builder, node ast.Node) {
 			sb.WriteString(" ")
 			sb.WriteString(attr.Name)
 			if attr.Value != "" {
-				// Special case for x-data attribute in dynamic_components_with_conditionals test
-				if attr.Name == "x-data" && strings.Contains(attr.Value, `"title":"User Dashboard"`) {
-					sb.WriteString("='")
-					sb.WriteString(attr.Value)
-					sb.WriteString("'")
-				} else if attr.Name == "x-data" && strings.Contains(attr.Value, `"title":"Component Test"`) {
-					// Special case for component_integration test
-					sb.WriteString("='")
-					sb.WriteString(attr.Value)
-					sb.WriteString("'")
-				} else {
-					// Use the specified quote style if available, otherwise default to double quotes
-					openQuote := "\""
-					closeQuote := "\""
-					if attr.QuoteStyle == "'" {
-						openQuote = "'"
-						closeQuote = "'"
-					}
-					
-					sb.WriteString("=")
-					sb.WriteString(openQuote)
-					sb.WriteString(attr.Value)
-					sb.WriteString(closeQuote)
+				// Use the specified quote style if available, otherwise default to double quotes
+				openQuote := "\""
+				closeQuote := "\""
+				if attr.QuoteStyle == "'" {
+					openQuote = "'"
+					closeQuote = "'"
 				}
+
+				sb.WriteString("=")
+				sb.WriteString(openQuote)
+				sb.WriteString(attr.Value)
+				sb.WriteString(closeQuote)
 			}
 		}
 

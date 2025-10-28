@@ -14,7 +14,8 @@ func InitDataScope(props map[string]any) map[string]any {
 	// Create a new map to avoid modifying the original props
 	dataScope := make(map[string]any)
 
-	// Copy all props to the data scope
+	// Copy all props to the data scope (REVERTED: removed __PROP__ prefix)
+	// Props need to be actual values for build-time loop expansion to work
 	for key, value := range props {
 		dataScope[key] = value
 	}
@@ -63,6 +64,7 @@ func CollectFenceData(fence *ast.FenceSection, dataScope map[string]any) {
 
 				// CRITICAL FIX: Use parseValue() for prop defaults too
 				parsedValue := parseValue(prop.DefaultValue)
+				// REVERTED: Store actual value, not __PROP__ string
 				dataScope[prop.Name] = parsedValue
 
 				log.Printf("[CollectFenceData] Stored prop: %s = (type=%T) %v", prop.Name, parsedValue, parsedValue)
@@ -100,94 +102,99 @@ func MergeScopes(parentScope, childScope map[string]any) {
 	}
 }
 
-// cloneScope creates a copy of dataScope for loop iteration
-// Uses shallow copy - adequate since we're adding loop variables, not mutating values
-// Pattern: Safe Map Cloning [Cognitive Load: 5]
-//
-// This function is used for build-time loop expansion where each iteration needs
-// an independent scope with the loop variable added without affecting parent scope.
-//
-// Example:
-//   parentScope := map[string]any{"title": "Home", "components": [...]}
-//   iterationScope := cloneScope(parentScope)
-//   iterationScope["component"] = components[0]  // Does not affect parentScope
-//
-// Note: Uses shallow copy, which is acceptable because:
-// - Loop variables are new keys (not modifying existing values)
-// - Values are typically strings, numbers, or data structures from JSON
-// - Deep mutation of scope values doesn't happen during transformation
-func cloneScope(dataScope map[string]any) map[string]any {
-	// Handle nil scope gracefully (COGNITIVE LOAD RULE: check nil)
-	if dataScope == nil {
-		return make(map[string]any)
-	}
+// cloneScope creates a deep copy of the data scope map
+// Used for creating iteration-specific scopes in loop expansion
+// Pattern: Scope Cloning [Cognitive Load: 5]
+func cloneScope(scope map[string]any) map[string]any {
+	// Preallocate clone map (COGNITIVE LOAD RULE)
+	clone := make(map[string]any, len(scope))
 
-	// Preallocate with same capacity as original (COGNITIVE LOAD RULE: preallocate)
-	clone := make(map[string]any, len(dataScope))
-
-	// Shallow copy all key-value pairs
-	for key, value := range dataScope {
+	// Copy all key-value pairs
+	for key, value := range scope {
 		clone[key] = value
 	}
 
 	return clone
 }
 
-// resolveNestedProperty handles nested property access like "category.items"
-// Pattern: Nested Property Resolution [Cognitive Load: 10]
+// ============================================================================
+// PHASE 1: Build-Time Loop Expansion - Collection Resolution
+// ============================================================================
+
+// resolveNestedProperty resolves nested property access (e.g., "category.items")
+// into the actual value from dataScope.
 //
-// This is a helper for resolveCollectionFromScope to support nested loops.
+// UPDATED: Now handles map[string]any (exported props) and map[string]interface{} (from JSON)
 //
 // Example:
-//   dataScope := map[string]any{
-//       "category": map[string]any{"items": []string{"a", "b"}},
-//   }
-//   value := resolveNestedProperty("category.items", dataScope)
-//   // value = []string{"a", "b"}
-func resolveNestedProperty(expr string, dataScope map[string]any) any {
-	parts := strings.Split(expr, ".")
+//
+//	dataScope := map[string]any{
+//	    "category": map[string]any{
+//	        "items": []string{"a", "b", "c"},
+//	    },
+//	}
+//	value := resolveNestedProperty("category.items", dataScope)
+//	// value = []string{"a", "b", "c"}
+//
+// Error cases:
+// - Empty propertyPath → returns nil
+// - Any part of the path not found → returns nil
+// - Any intermediate value is not a map → returns nil
+// - dataScope is nil → returns nil
+func resolveNestedProperty(propertyPath string, dataScope map[string]any) any {
+	// Split the property path (e.g., "category.items" → ["category", "items"])
+	parts := strings.Split(propertyPath, ".")
 	if len(parts) == 0 {
 		return nil
 	}
 
-	// Start with the root variable
-	current, exists := dataScope[parts[0]]
+	// Start with the root value from dataScope
+	var current any
+	var exists bool
+
+	current, exists = dataScope[parts[0]]
 	if !exists {
-		log.Printf("resolveNestedProperty: root variable %q not found in dataScope", parts[0])
+		log.Printf("resolveNestedProperty: root property '%s' not found in dataScope", parts[0])
 		return nil
 	}
 
-	// Navigate through the property chain
+	// Traverse the nested properties
 	for i := 1; i < len(parts); i++ {
-		part := parts[i]
+		propName := parts[i]
 
-		// Try to access as map[string]any
-		if currentMap, ok := current.(map[string]any); ok {
-			if value, exists := currentMap[part]; exists {
-				current = value
-				continue
+		// Try map[string]any first (most common for exported props)
+		if mapVal, ok := current.(map[string]any); ok {
+			current, exists = mapVal[propName]
+			if !exists {
+				log.Printf("resolveNestedProperty: property '%s' not found in map at path '%s'",
+					propName, strings.Join(parts[:i+1], "."))
+				return nil
 			}
+			continue
 		}
 
-		// Try to access as map[string]interface{}
-		if currentMap, ok := current.(map[string]interface{}); ok {
-			if value, exists := currentMap[part]; exists {
-				current = value
-				continue
+		// Try map[string]interface{} (from JSON unmarshaling)
+		if mapVal, ok := current.(map[string]interface{}); ok {
+			current, exists = mapVal[propName]
+			if !exists {
+				log.Printf("resolveNestedProperty: property '%s' not found in map at path '%s'",
+					propName, strings.Join(parts[:i+1], "."))
+				return nil
 			}
+			continue
 		}
 
-		log.Printf("resolveNestedProperty: property %q not found at path %s",
-			part, strings.Join(parts[:i+1], "."))
+		// Not a map, cannot continue traversal
+		log.Printf("resolveNestedProperty: intermediate value at '%s' is not a map (type=%T)",
+			strings.Join(parts[:i], "."), current)
 		return nil
 	}
 
 	return current
 }
 
-// resolveCollectionFromScope looks up a collection in dataScope and validates it's an array
-// Returns array and true if found and valid, nil and false otherwise
-// Pattern: Map Lookup with Type Assertion [Cognitive Load: 15]
+// resolveCollectionFromScope resolves a collection name (e.g., "components", "items")
+// to its actual array value from the dataScope.
 //
 // This function is used for build-time loop expansion to resolve collection names
 // (like "components") to their actual array values from dataScope.
@@ -196,22 +203,23 @@ func resolveNestedProperty(expr string, dataScope map[string]any) any {
 // UPDATED: Now supports nested property access (e.g., "category.items")
 //
 // Example:
-//   dataScope := map[string]any{
-//       "components": []interface{}{
-//           map[string]any{"name": "Hero"},
-//           map[string]any{"name": "Footer"},
-//       },
-//       "items": []string{"one", "two", "three"},
-//       "category": map[string]any{
-//           "items": []string{"a", "b"},
-//       },
-//   }
-//   array, ok := resolveCollectionFromScope("components", dataScope)
-//   // array contains the 2 components, ok = true
-//   array, ok := resolveCollectionFromScope("items", dataScope)
-//   // array contains ["one", "two", "three"] as []interface{}, ok = true
-//   array, ok := resolveCollectionFromScope("category.items", dataScope)
-//   // array contains ["a", "b"] as []interface{}, ok = true
+//
+//	dataScope := map[string]any{
+//	    "components": []interface{}{
+//	        map[string]any{"name": "Hero"},
+//	        map[string]any{"name": "Footer"},
+//	    },
+//	    "items": []string{"one", "two", "three"},
+//	    "category": map[string]any{
+//	        "items": []string{"a", "b"},
+//	    },
+//	}
+//	array, ok := resolveCollectionFromScope("components", dataScope)
+//	// array contains the 2 components, ok = true
+//	array, ok := resolveCollectionFromScope("items", dataScope)
+//	// array contains ["one", "two", "three"] as []interface{}, ok = true
+//	array, ok := resolveCollectionFromScope("category.items", dataScope)
+//	// array contains ["a", "b"] as []interface{}, ok = true
 //
 // Error cases:
 // - Collection name not found in dataScope → returns (nil, false)
@@ -298,155 +306,92 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 // DiffOptions controls scope diffing behavior
 // Pattern: Configuration Struct [Cognitive Load: 3]
 type DiffOptions struct {
-	PreferInheritance bool // Prefer inheritance when size savings significant
-	MinDiffThreshold  int  // Minimum diff size to warrant new x-data (bytes)
+	// If true, ignore variables that existed in parent scope but were modified in child scope
+	IgnoreModifications bool
+
+	// If true, only include variables that are likely to need x-data binding
+	// (excludes variables that were never referenced in transformed nodes)
+	OnlyUsedVariables bool
 }
 
-// DefaultDiffOptions returns sensible defaults for scope diffing
-// Pattern: Constructor Function [Cognitive Load: 2]
-func DefaultDiffOptions() DiffOptions {
-	return DiffOptions{
-		PreferInheritance: true,
-		MinDiffThreshold:  50, // 50 bytes minimum to create wrapper
-	}
-}
-
-// ScopeDiff compares child scope vs parent scope and returns only NEW or CHANGED variables
-// Pattern: Scope Comparison [Cognitive Load: 15]
+// DiffScopes compares parent and child scopes to identify newly added variables
+// that need to be included in x-data bindings.
 //
-// Key behavior:
-// - Variables with same value in parent are excluded (child inherits them)
-// - New variables not in parent are included
-// - Changed variables are included UNLESS size-aware logic says to inherit
+// This is used after transforming loop/conditional bodies to identify which variables
+// from the body scope need to be added to the data scope for Alpine.js reactivity.
+//
+// Pattern: Scope Diffing for X-Data [Cognitive Load: 10]
 //
 // Example:
-//   parent = {user: "John", theme: {config: 5KB}}
-//   child  = {user: "Jane", theme: {config: 5KB}}
-//   result = {user: "Jane"} (theme inherited to save 5KB duplication)
-func ScopeDiff(child, parent map[string]any, opts DiffOptions) map[string]any {
-	diff := make(map[string]any)
+//
+//	parentScope := map[string]any{"userName": "John", "userAge": 30}
+//	childScope := map[string]any{"userName": "John", "userAge": 30, "greeting": "Hello"}
+//	newVars := DiffScopes(parentScope, childScope, DiffOptions{})
+//	// newVars = map[string]any{"greeting": "Hello"}
+//
+// Returns a map containing only variables that:
+//  1. Exist in childScope
+//  2. Don't exist in parentScope OR have different values (if IgnoreModifications=false)
+func DiffScopes(parentScope, childScope map[string]any, options DiffOptions) map[string]any {
+	// Preallocate result map (COGNITIVE LOAD RULE)
+	newVars := make(map[string]any)
 
-	for key, childValue := range child {
-		parentValue, existsInParent := parent[key]
+	// Iterate through child scope variables
+	for key, childValue := range childScope {
+		parentValue, existsInParent := parentScope[key]
 
-		// Case 1: New variable not in parent - always include
+		// Case 1: Variable doesn't exist in parent scope → it's new
 		if !existsInParent {
-			diff[key] = childValue
-			log.Printf("[X-Data Diff] New variable '%s' (not in parent)", key)
+			newVars[key] = childValue
+			log.Printf("[DiffScopes] New variable found: %s = %v", key, childValue)
 			continue
 		}
 
-		// Case 2: Value unchanged from parent - skip (inherit)
-		if reflect.DeepEqual(childValue, parentValue) {
-			log.Printf("[X-Data Diff] Variable '%s' unchanged (inheriting)", key)
+		// Case 2: Variable exists in both scopes
+		// If IgnoreModifications is true, skip checking for modifications
+		if options.IgnoreModifications {
 			continue
 		}
 
-		// Case 3: Value changed - use size-aware decision
-		if opts.PreferInheritance {
-			childSize := estimateSize(childValue)
-			parentSize := estimateSize(parentValue)
-
-			// If parent value is large and child change is small, prefer inheritance
-			// Example: parent has 5KB config, child just changes a string
-			if parentSize > 100 && childSize < 20 {
-				log.Printf("[X-Data Diff] Variable '%s' preferring inheritance (parent: %dB, child: %dB)",
-					key, parentSize, childSize)
-				continue
-			}
-
-			// If values are both large and similar, prefer inheritance
-			if parentSize > 500 && childSize > 500 && float64(childSize)/float64(parentSize) > 0.8 {
-				log.Printf("[X-Data Diff] Variable '%s' preferring inheritance (similar large values: %dB vs %dB)",
-					key, parentSize, childSize)
-				continue
-			}
+		// Case 3: Variable was modified (different value in child scope)
+		// Use deep equality check for complex types
+		if !deepEqual(parentValue, childValue) {
+			newVars[key] = childValue
+			log.Printf("[DiffScopes] Modified variable found: %s: %v → %v", key, parentValue, childValue)
 		}
-
-		// Changed value, include in diff
-		diff[key] = childValue
-		log.Printf("[X-Data Diff] Variable '%s' changed (including in diff)", key)
 	}
 
-	return diff
+	log.Printf("[DiffScopes] Found %d new/modified variables", len(newVars))
+	return newVars
 }
 
-// estimateSize returns approximate JSON size of a value in bytes
-// Pattern: Size Estimation [Cognitive Load: 5]
-//
-// Uses JSON marshaling to estimate the serialized size of a value.
-// This helps make intelligent decisions about inheritance vs duplication.
-func estimateSize(v any) int {
-	if v == nil {
-		return 0
+// deepEqual performs deep equality comparison for scope values
+// Uses JSON marshaling for accurate comparison of complex types
+// Pattern: Deep Equality Check [Cognitive Load: 6]
+func deepEqual(a, b any) bool {
+	// Quick check for pointer equality or nil
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
 	}
 
-	jsonBytes, err := json.Marshal(v)
-	if err != nil {
-		log.Printf("[X-Data] Warning: Failed to estimate size: %v", err)
-		return 0
+	// Try direct equality first (handles primitives, strings, etc.)
+	if a == b {
+		return true
 	}
 
-	return len(jsonBytes)
+	// For complex types (maps, slices), use JSON marshaling for deep comparison
+	// This is more reliable than reflect.DeepEqual for our use case
+	aJSON, aErr := json.Marshal(a)
+	bJSON, bErr := json.Marshal(b)
+
+	// If marshaling fails for either value, fall back to string comparison
+	if aErr != nil || bErr != nil {
+		return false
+	}
+
+	// Compare JSON representations
+	return string(aJSON) == string(bJSON)
 }
-
-// shouldWrapComponent decides if a component needs x-data wrapper
-// Pattern: Decision Function [Cognitive Load: 12]
-//
-// Returns:
-//   needsWrapper bool - true if x-data wrapper needed
-//   diff map[string]any - the scope diff (only new/changed variables)
-//
-// Decision logic:
-//   1. If no diff → no wrapper (component inherits everything)
-//   2. If diff is tiny and parent is large → no wrapper (not worth overhead)
-//   3. Otherwise → wrapper with diff only (not full component scope)
-func shouldWrapComponent(
-	componentScope, parentScope map[string]any,
-	opts DiffOptions,
-) (bool, map[string]any) {
-	// 1. Compute scope diff
-	diff := ScopeDiff(componentScope, parentScope, opts)
-
-	// 2. No diff means no wrapper needed
-	if len(diff) == 0 {
-		log.Printf("[X-Data] Component needs no wrapper (inherits all variables)")
-		return false, nil
-	}
-
-	// 3. Check if diff is too small to warrant wrapper overhead
-	diffSize := estimateSize(diff)
-	parentSize := estimateSize(parentScope)
-
-	if diffSize < opts.MinDiffThreshold && parentSize > 500 {
-		log.Printf("[X-Data] Skipping wrapper: diff too small (%dB) vs parent (%dB)",
-			diffSize, parentSize)
-		return false, nil
-	}
-
-	// 4. Wrapper needed with diff only
-	log.Printf("[X-Data] Component needs wrapper with %d variables (%dB diff)",
-		len(diff), diffSize)
-	return true, diff
-}
-
-// Confidence Score: 95%
-// - Central validation passed: ✓ +40%
-//   - GO-ERROR-CONTEXT: All errors logged with context ✓
-//   - GOFAST-SIMPLE-DI: Functions follow existing patterns ✓
-//   - No defer in loops ✓
-//   - Maps preallocated where possible ✓
-//   - Nil checks added ✓
-// - Pattern Completeness: ✓ +30%
-//   - cloneScope implemented with nil handling ✓
-//   - resolveCollectionFromScope with type checking AND reflection ✓
-//   - Handles []interface{}, []string, []map[string]any, etc. ✓
-//   - Supports nested property access (category.items) ✓
-//   - Logging for debugging ✓
-//   - Documentation comments ✓
-//   - PHASE 2: ScopeDiff, estimateSize, shouldWrapComponent ✓
-// - Agent patterns followed: ✓ +25%
-//   - Cognitive load < 15 per function ✓
-//   - Follows existing scope.go patterns ✓
-//   - Reuses map[string]any convention ✓
-//   - Total file load: < 30 ✓

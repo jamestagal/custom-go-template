@@ -186,6 +186,12 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			// Preserve HTML comments
 			transformedNodes = append(transformedNodes, n)
 
+		case *ast.StoreExpressionNode:
+			// Transform store expression nodes ($store.name.property)
+			log.Printf("transformNodes: Transforming StoreExpression node: %s.%s", n.StoreName, n.Property)
+			storeNodes := transformStoreExpressionInText(n, dataScope)
+			transformedNodes = append(transformedNodes, storeNodes...)
+
 		default:
 			// For any other node types, just add them as is
 			log.Printf("transformNodes: Unhandled node type: %T", node)

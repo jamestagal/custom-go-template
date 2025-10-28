@@ -164,6 +164,11 @@ func normalizeComponentPath(path string) []string {
 		nameParts := strings.Split(path, ".")
 		nameWithoutExt := strings.Join(nameParts[:len(nameParts)-1], ".")
 		keys = append(keys, nameWithoutExt)
+	} else {
+		// FIXED: Bare component name (e.g., "UserProfile")
+		// Generate common path variations
+		keys = append(keys, "./components/"+path+".html")
+		keys = append(keys, path+".html")
 	}
 
 	return keys
@@ -342,12 +347,36 @@ func formatComponentData(dataScope map[string]any) string {
 
 			// CRITICAL: Check if this value has the variable reference marker
 			// Values marked with __VAR_REF__ prefix came from dynamic props that reference parent scope
+			// Values marked with __PROP__ prefix are component props that should remain reactive
 			if strings.HasPrefix(cleanValue, "__VAR_REF__") {
 				// Strip the marker and output as Alpine expression without quotes
 				varName := strings.TrimPrefix(cleanValue, "__VAR_REF__")
 				result.WriteString(key)
 				result.WriteString(": ")
 				result.WriteString(varName)
+				continue
+			}
+			if strings.HasPrefix(cleanValue, "__PROP__") {
+				// Strip the marker and output the prop value as-is (it's a literal)
+				propValue := strings.TrimPrefix(cleanValue, "__PROP__")
+				// Check if it's a string that needs quotes
+				if _, err := strconv.ParseFloat(propValue, 64); err == nil {
+					// It's a number, no quotes
+					result.WriteString(key)
+					result.WriteString(": ")
+					result.WriteString(propValue)
+				} else if propValue == "true" || propValue == "false" || propValue == "null" {
+					// Boolean or null, no quotes
+					result.WriteString(key)
+					result.WriteString(": ")
+					result.WriteString(propValue)
+				} else {
+					// String, add quotes
+					result.WriteString(key)
+					result.WriteString(": '")
+					result.WriteString(propValue)
+					result.WriteString("'")
+				}
 				continue
 			}
 
@@ -657,21 +686,14 @@ func extractPropValue(prop ast.ComponentProp, parentDataScope map[string]any) an
 		// Use a special prefix to mark it as a variable reference (not a string literal)
 		if isSimpleVariableReference(varName) {
 			// Check if the variable exists in parent scope
-			if value, exists := parentDataScope[varName]; exists {
-				// CRITICAL: Check if the parent's value is ALSO a __VAR_REF__
-				// If yes, keep it as a variable reference (for reactive variables)
-				// If no, return the actual value (for static data like JSON objects)
-				if strVal, ok := value.(string); ok && strings.HasPrefix(strVal, "__VAR_REF__") {
-					// Parent has a variable reference, keep the chain
-					log.Printf("extractPropValue: Passing variable reference '%s' (parent also has __VAR_REF__)", varName)
-					return "__VAR_REF__" + varName
-				} else {
-					// Parent has actual data, return it directly
-					log.Printf("extractPropValue: Resolving '%s' to actual value (type: %T)", varName, value)
-					return value
-				}
+			// FIX 6: Always return __VAR_REF__ for simple variable references to preserve reactivity
+			// This ensures Alpine.js can resolve the variable at runtime, not baked-in values
+			if _, exists := parentDataScope[varName]; exists {
+				log.Printf("extractPropValue: Keeping variable reference '%s' as __VAR_REF__", varName)
+				return "__VAR_REF__" + varName
 			} else {
 				log.Printf("extractPropValue: Variable '%s' NOT FOUND in parent scope!", varName)
+				return "__VAR_REF__" + varName // Still return as ref in case it's available at runtime
 			}
 		}
 
@@ -942,14 +964,8 @@ func wrapWithXData(nodes []ast.Node, dataScope map[string]any) []ast.Node {
 	// REQUIREMENT 2: Check for single root element (COGNITIVE LOAD: 6)
 	// If there's exactly one node and it's an Element, add x-data to it
 	if len(nodes) == 0 {
-		// No nodes - return empty div with x-data
-		return []ast.Node{
-			&ast.Element{
-				TagName:    "div",
-				Attributes: []ast.Attribute{xDataAttr},
-				Children:   []ast.Node{},
-			},
-		}
+		// FIXED: Return empty slice for empty input - tests expect this
+		return []ast.Node{}
 	}
 
 	// Check for single root element (REQUIREMENT 2)

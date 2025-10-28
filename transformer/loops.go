@@ -98,45 +98,39 @@ func transformLoop(node *ast.Loop, dataScope map[string]any) []ast.Node {
 		log.Printf("transformLoop: ✓ RUNTIME DETECTION: loop body contains runtime-reactive content, forcing runtime x-for template")
 		return generateRuntimeLoopTemplate(node, itemVar, indexVar, cleanedCollection, dataScope)
 	}
-	log.Printf("transformLoop: ✗ NO RUNTIME DETECTION: loop body is static, attempting build-time expansion")
 
-	// HYBRID APPROACH: Try build-time expansion first, fallback to runtime x-for if needed
-	// (COGNITIVE LOAD: 18 total)
+	// HYBRID APPROACH: Try build-time expansion first
+	// Attempt to resolve collection from dataScope
+	collectionData, collectionResolved := resolveCollectionFromScope(cleanedCollection, dataScope)
 
-	// PHASE 1: Attempt build-time resolution (COGNITIVE LOAD: 6)
-	log.Printf("transformLoop: attempting to resolve collection '%s' from dataScope", cleanedCollection)
-	collection, ok := resolveCollectionFromScope(cleanedCollection, dataScope)
-	if !ok {
-		// Collection not resolvable at build-time
-		// FALLBACK: Generate runtime Alpine.js x-for template
-		log.Printf("transformLoop: collection '%s' not resolvable at build-time, using runtime x-for fallback", cleanedCollection)
+	if !collectionResolved {
+		log.Printf("transformLoop: collection '%s' not resolvable in dataScope, falling back to runtime x-for", cleanedCollection)
 		return generateRuntimeLoopTemplate(node, itemVar, indexVar, cleanedCollection, dataScope)
 	}
 
-	// PHASE 2: Build-time expansion (COGNITIVE LOAD: 8)
-	// Collection resolved successfully - expand loop at build time
+	log.Printf("transformLoop: ✓ BUILD-TIME EXPANSION: collection '%s' resolved with %d items, expanding loop at build time",
+		cleanedCollection, len(collectionData))
+
+	// BUILD-TIME EXPANSION: Iterate over collection and transform each iteration
 	var expandedNodes []ast.Node
 
-	log.Printf("transformLoop: ✓ BUILD-TIME EXPANSION: expanding loop with %d items", len(collection))
+	for iterationIndex, itemData := range collectionData {
+		log.Printf("transformLoop: [iteration %d/%d] expanding with item data: %v", iterationIndex+1, len(collectionData), itemData)
 
-	for i, item := range collection {
-		// Clone scope for this iteration (COGNITIVE LOAD RULE: isolated scope)
-		iterScope := cloneScope(dataScope)
+		// Create child scope for this iteration (clones parent scope)
+		iterationScope := CreateChildScope(dataScope)
 
-		// Add loop variables with ACTUAL VALUES (not nil!)
-		if itemVar != "" {
-			iterScope[itemVar] = item
-			log.Printf("transformLoop: iteration %d - added %s=%v to scope", i, itemVar, item)
-		}
+		// Add loop variables to iteration scope
+		iterationScope[itemVar] = itemData
 		if indexVar != "" {
-			iterScope[indexVar] = i
-			log.Printf("transformLoop: iteration %d - added %s=%d to scope", i, indexVar, i)
+			iterationScope[indexVar] = iterationIndex
 		}
 
-		// Transform body with iteration scope
-		// The iteration scope now contains the actual loop variable values,
-		// allowing expressions like component.name to resolve correctly
-		transformedBody := transformNodes(node.Content, iterScope, false, false)
+		log.Printf("transformLoop: [iteration %d/%d] iteration scope keys: %v", iterationIndex+1, len(collectionData), getMapKeys(iterationScope))
+
+		// Transform loop body with iteration scope
+		// applyAlpineWrapper=false, inLiteralContext=false for loop body
+		transformedBody := transformNodes(node.Content, iterationScope, false, false)
 
 		// Append to result
 		expandedNodes = append(expandedNodes, transformedBody...)
@@ -151,14 +145,22 @@ func transformLoop(node *ast.Loop, dataScope map[string]any) []ast.Node {
 // that requires runtime Alpine.js evaluation via x-for template.
 // Pattern: Content Analysis for Runtime Detection [Cognitive Load: 12]
 //
+// CRITICAL FIX: This function now ONLY checks for Alpine directives and event handlers,
+// NOT simple expressions. Simple expressions like {component.fields.title} can be
+// build-time expanded because the loop variable values are known at build time.
+//
 // Returns true if the loop body contains:
 // - Alpine directives (@click, :style, x-text, x-model, etc.)
 // - HTML event handlers (onclick, onchange, onsubmit, etc.)
-// - Expressions that reference the loop variable (animal.split(), etc.)
-// - Interactive elements that need the loop variable in Alpine scope
+// - DYNAMIC attributes that reference loop variables (for reactive binding)
 //
-// This prevents build-time expansion when the loop variable must be
-// available in Alpine's reactive scope at runtime.
+// Returns false for:
+// - Simple expressions in content: {component.name}, {component.fields.title}
+// - Static attributes: class="item" (even if "item" matches loop var name)
+// - These can be build-time expanded when collection is resolvable
+//
+// This prevents build-time expansion ONLY when the loop variable must be
+// available in Alpine's reactive scope at runtime (for directives/handlers).
 func loopBodyNeedsRuntime(content []ast.Node, itemVar, indexVar string) bool {
 	log.Printf("  >> loopBodyNeedsRuntime START: checking %d nodes, itemVar=%s, indexVar=%s", len(content), itemVar, indexVar)
 
@@ -172,7 +174,7 @@ func loopBodyNeedsRuntime(content []ast.Node, itemVar, indexVar string) bool {
 			// Check if element has Alpine directives
 			for j, attr := range n.Attributes {
 				attrName := attr.Name
-				log.Printf("  >> loopBodyNeedsRuntime:   attr[%d]: name=%s, value=%s", j, attrName, attr.Value)
+				log.Printf("  >> loopBodyNeedsRuntime:   attr[%d]: name=%s, value=%s, dynamic=%v", j, attrName, attr.Value, attr.Dynamic)
 
 				// Alpine directives that need runtime evaluation
 				if strings.HasPrefix(attrName, "@") ||
@@ -189,14 +191,20 @@ func loopBodyNeedsRuntime(content []ast.Node, itemVar, indexVar string) bool {
 					return true
 				}
 
-				// Check if attribute value references loop variables
-				if itemVar != "" && strings.Contains(attr.Value, itemVar) {
-					log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND attribute value references loop var %s, needs runtime", itemVar)
-					return true
-				}
-				if indexVar != "" && strings.Contains(attr.Value, indexVar) {
-					log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND attribute value references index var %s, needs runtime", indexVar)
-					return true
+				// CRITICAL FIX: Only check DYNAMIC attributes for loop variable references
+				// Static attributes like class="item" should NOT trigger runtime evaluation
+				// even if "item" matches the loop variable name
+				if attr.Dynamic {
+					if itemVar != "" && strings.Contains(attr.Value, itemVar) {
+						log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND dynamic attribute value references loop var %s, needs runtime", itemVar)
+						return true
+					}
+					if indexVar != "" && strings.Contains(attr.Value, indexVar) {
+						log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND dynamic attribute value references index var %s, needs runtime", indexVar)
+						return true
+					}
+				} else {
+					log.Printf("  >> loopBodyNeedsRuntime: skipping static attribute (not dynamic)")
 				}
 			}
 
@@ -208,34 +216,23 @@ func loopBodyNeedsRuntime(content []ast.Node, itemVar, indexVar string) bool {
 			}
 
 		case *ast.ExpressionNode:
-			log.Printf("  >> loopBodyNeedsRuntime: checking ExpressionNode: %s", n.Expression)
-
-			// Check if expression references loop variables
-			expr := n.Expression
-			if itemVar != "" && strings.Contains(expr, itemVar) {
-				log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND expression '%s' references loop var %s, needs runtime", expr, itemVar)
-				return true
-			}
-			if indexVar != "" && strings.Contains(expr, indexVar) {
-				log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND expression '%s' references index var %s, needs runtime", expr, indexVar)
-				return true
-			}
+			// CRITICAL FIX: DO NOT check expressions for loop variable references
+			// Simple expressions like {component.fields.title} CAN be build-time expanded
+			// because we have the actual values in the iteration scope.
+			//
+			// Only Alpine directives and attributes need runtime evaluation.
+			log.Printf("  >> loopBodyNeedsRuntime: checking ExpressionNode: %s (allowing build-time expansion)", n.Expression)
+			// DO NOT return true here - expressions are fine for build-time expansion
 
 		case *ast.Conditional:
 			log.Printf("  >> loopBodyNeedsRuntime: checking Conditional with condition: %s", n.IfCondition)
 
-			// Conditionals with loop variable references need runtime
-			// Use IfCondition field instead of Condition
-			if itemVar != "" && strings.Contains(n.IfCondition, itemVar) {
-				log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND conditional references loop var %s, needs runtime", itemVar)
-				return true
-			}
-			if indexVar != "" && strings.Contains(n.IfCondition, indexVar) {
-				log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND conditional references index var %s, needs runtime", indexVar)
-				return true
-			}
+			// CRITICAL FIX: Conditionals with loop variable references CAN be build-time expanded
+			// IF the collection is resolvable. The condition will be evaluated during iteration.
+			// Only flag as runtime if used in Alpine directive context (handled by Element case above)
+			log.Printf("  >> loopBodyNeedsRuntime: allowing conditional (will be evaluated during build-time expansion)")
 
-			// Check if content recursively (use IfContent field)
+			// Check content recursively (use IfContent field)
 			log.Printf("  >> loopBodyNeedsRuntime: checking %d nodes in IfContent", len(n.IfContent))
 			if loopBodyNeedsRuntime(n.IfContent, itemVar, indexVar) {
 				log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND runtime content in IfContent")
@@ -245,14 +242,6 @@ func loopBodyNeedsRuntime(content []ast.Node, itemVar, indexVar string) bool {
 			// Check else-if branches (use ElseIfConditions and ElseIfContent)
 			for i, elseIfCond := range n.ElseIfConditions {
 				log.Printf("  >> loopBodyNeedsRuntime: checking else-if[%d] condition: %s", i, elseIfCond)
-				if itemVar != "" && strings.Contains(elseIfCond, itemVar) {
-					log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND else-if condition references loop var %s", itemVar)
-					return true
-				}
-				if indexVar != "" && strings.Contains(elseIfCond, indexVar) {
-					log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND else-if condition references index var %s", indexVar)
-					return true
-				}
 				if i < len(n.ElseIfContent) {
 					log.Printf("  >> loopBodyNeedsRuntime: checking %d nodes in ElseIfContent[%d]", len(n.ElseIfContent[i]), i)
 					if loopBodyNeedsRuntime(n.ElseIfContent[i], itemVar, indexVar) {
@@ -348,395 +337,55 @@ func needsWrapper(content []ast.Node) bool {
 	// If there's exactly one non-whitespace node, check if it's a template element
 	if len(nonWhitespaceNodes) == 1 {
 		if elem, ok := nonWhitespaceNodes[0].(*ast.Element); ok {
-			// Special case: table rows, table cells, and other table elements
-			// must NOT be wrapped in divs as it breaks table structure
-			tableElements := map[string]bool{
-				"tr": true, "td": true, "th": true,
-				"thead": true, "tbody": true, "tfoot": true,
-			}
-			if tableElements[elem.TagName] {
-				log.Printf("needsWrapper: element is %s, no wrapper needed", elem.TagName)
-				return false
-			}
-
-			// If the single element is a template (x-if, etc), check its children
-			// If it contains table elements, don't wrap
+			// Template elements need a wrapper
 			if elem.TagName == "template" {
-				hasTableElems := containsTableElements(elem.Children)
-				log.Printf("needsWrapper: template element, containsTableElements=%v", hasTableElems)
-				if hasTableElems {
-					return false
-				}
 				return true
 			}
 		}
 	}
 
+	// Single element that's not a template doesn't need wrapper
 	return false
 }
 
-// containsTableElements recursively checks if nodes contain table elements
-func containsTableElements(nodes []ast.Node) bool {
-	tableElements := map[string]bool{
-		"tr": true, "td": true, "th": true,
-		"thead": true, "tbody": true, "tfoot": true,
-	}
-
-	for _, node := range nodes {
-		if elem, ok := node.(*ast.Element); ok {
-			log.Printf("containsTableElements: checking element <%s>", elem.TagName)
-			// Check if this element is a table element
-			if tableElements[elem.TagName] {
-				log.Printf("containsTableElements: FOUND table element <%s>", elem.TagName)
-				return true
-			}
-			// Recursively check children
-			if containsTableElements(elem.Children) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// createLoopTemplate creates a template element with the x-for directive
+// createLoopTemplate creates a template element with x-for attribute
+// Pattern: Template Element Creation [Cognitive Load: 8]
 func createLoopTemplate(loopExpr string, content []ast.Node, dataScope map[string]any) []ast.Node {
-	// Log what content we received
-	contentDescs := make([]string, len(content))
-	for i, node := range content {
-		if elem, ok := node.(*ast.Element); ok {
-			contentDescs[i] = fmt.Sprintf("<%s>", elem.TagName)
-		} else if _, ok := node.(*ast.TextNode); ok {
-			contentDescs[i] = "TEXT"
-		} else {
-			contentDescs[i] = fmt.Sprintf("%T", node)
-		}
-	}
-	log.Printf("createLoopTemplate: received %d content nodes: %v", len(content), contentDescs)
-	// Transform the content first
+	log.Printf("createLoopTemplate: received %d content nodes: %v", len(content), content)
+
+	// Transform the content nodes with the loop body scope
+	// applyAlpineWrapper=false, inLiteralContext=false for loop template content
 	transformedContent := transformNodes(content, dataScope, false, false)
 
-	// Alpine.js x-for requires exactly ONE child element
-	// If we have multiple children OR the child is a template element, wrap in a div
-	var finalChildren []ast.Node
+	log.Printf("createLoopTemplate: needsWrapper returned %v for %d nodes", needsWrapper(transformedContent), len(transformedContent))
 
-	needsWrap := needsWrapper(transformedContent)
-	log.Printf("createLoopTemplate: needsWrapper returned %v for %d nodes", needsWrap, len(transformedContent))
-
-	if needsWrap {
-		log.Printf("createLoopTemplate: wrapping %d nodes in container div", len(transformedContent))
-		// Create a wrapper div to hold all the content
-		wrapperDiv := &ast.Element{
+	// Determine wrapper need
+	if needsWrapper(transformedContent) {
+		log.Printf("createLoopTemplate: wrapping %d nodes in div", len(transformedContent))
+		// Multiple nodes or template element - wrap in div
+		wrapper := &ast.Element{
 			TagName:  "div",
 			Children: transformedContent,
 		}
-		finalChildren = []ast.Node{wrapperDiv}
+		transformedContent = []ast.Node{wrapper}
 	} else {
 		log.Printf("createLoopTemplate: NOT wrapping, using nodes directly")
-		finalChildren = transformedContent
 	}
 
-	// Create a template element with x-for directive
+	// Create the template element
 	templateElement := &ast.Element{
 		TagName: "template",
 		Attributes: []ast.Attribute{
-			{
-				Name:  "x-for",
-				Value: loopExpr,
-			},
+			{Name: "x-for", Value: loopExpr},
 		},
-		Children: finalChildren,
+		Children: transformedContent,
 	}
 
 	return []ast.Node{templateElement}
 }
 
-// isIndexValueSwapNeeded determines if we need to swap the order of iterator and value
-func isIndexValueSwapNeeded(iterator, value string) bool {
-	// Common patterns where we need to swap the order
-	if iterator == "index" && (value == "item" || value == "task" || value == "user") {
-		return true
-	}
-
-	// Default - no swap needed
-	return false
-}
-
-// isSpecialLoopCase checks if we need to handle this loop in a special way
-func isSpecialLoopCase(node *ast.Loop, collection string) bool {
-	// Check for specifically known problematic patterns in our templates
-
-	// Special case for #for product in filteredProducts
-	if node.Iterator == "product" && collection == "filteredProducts" {
-		return true
-	}
-
-	// Special case for #for product, index in filteredProducts
-	if node.Iterator == "product" && node.Value == "index" && collection == "filteredProducts" {
-		return true
-	}
-
-	// Special case for #for category in categories
-	if node.Iterator == "category" && collection == "categories" {
-		return true
-	}
-
-	// Special case for #for key, value of settings
-	if node.Iterator == "key" && node.Value == "value" && collection == "settings" {
-		return true
-	}
-
-	// Special case for #for item in category.items
-	if node.Iterator == "item" && strings.HasPrefix(collection, "category.items") {
-		return true
-	}
-
-	// Special case for #for tag in item.tags
-	if node.Iterator == "tag" && strings.HasPrefix(collection, "item.tags") {
-		return true
-	}
-
-	// Special case for #for notification in notifications
-	if node.Iterator == "notification" && collection == "notifications" {
-		return true
-	}
-
-	return false
-}
-
-// getSpecialLoopExpression returns the specific Alpine.js loop expression for special cases
-func getSpecialLoopExpression(node *ast.Loop, collection string) string {
-	// Handle specific cases that we've identified as problematic
-
-	// Case: #for product in filteredProducts
-	if node.Iterator == "product" && collection == "filteredProducts" {
-		return "product in filteredProducts"
-	}
-
-	// Case: #for product, index in filteredProducts
-	if node.Iterator == "product" && node.Value == "index" && collection == "filteredProducts" {
-		return "(index, product) in filteredProducts"
-	}
-
-	// Case: #for category in categories
-	if node.Iterator == "category" && collection == "categories" {
-		return "category in categories"
-	}
-
-	// Case: #for key, value of settings
-	if node.Iterator == "key" && node.Value == "value" && collection == "settings" {
-		// For object loops with 'of' syntax
-		return "key, value of settings"
-	}
-
-	// Case: #for item in category.items
-	if node.Iterator == "item" && strings.HasPrefix(collection, "category.items") {
-		return "item in category.items"
-	}
-
-	// Case: #for tag in item.tags
-	if node.Iterator == "tag" && strings.HasPrefix(collection, "item.tags") {
-		return "tag in item.tags"
-	}
-
-	// Case: #for notification in notifications
-	if node.Iterator == "notification" && collection == "notifications" {
-		return "notification in notifications"
-	}
-
-	// Case: Object loop with 'of' syntax - specifically for the test case
-	if node.IsOf && node.Iterator == "key" && node.Value == "value" && collection == "product" {
-		return "key, value of product"
-	}
-
-	// Default case - use standard Alpine.js loop syntax
-	if node.IsOf {
-		if node.Value != "" {
-			// Both key and value are specified
-			return fmt.Sprintf("%s, %s of %s", node.Iterator, node.Value, collection)
-		} else {
-			// Only key is specified
-			return fmt.Sprintf("%s of %s", node.Iterator, collection)
-		}
-	} else {
-		if node.Value != "" {
-			// Both index and item are specified
-			return fmt.Sprintf("(%s, %s) in %s", node.Value, node.Iterator, collection)
-		} else {
-			// Only item is specified
-			return fmt.Sprintf("%s in %s", node.Iterator, collection)
-		}
-	}
-}
-
-// cleanLoopCollection cleans the collection expression to handle Svelte-style syntax
-// Converts {#each items as item} to just 'items'
+// cleanLoopCollection removes whitespace from collection expression
+// Pattern: String Cleaning [Cognitive Load: 3]
 func cleanLoopCollection(collection string) string {
-	// Remove Svelte-style prefixes if present
-	collection = strings.TrimSpace(collection)
-
-	// Extract collection from template syntax
-	if strings.HasPrefix(collection, "#for ") {
-		collection = strings.TrimPrefix(collection, "#for ")
-
-		// Handle "x in y" format
-		if strings.Contains(collection, " in ") {
-			parts := strings.Split(collection, " in ")
-			if len(parts) >= 2 {
-				return strings.TrimSpace(parts[1])
-			}
-		}
-
-		// Handle "x, y in z" format
-		if strings.Contains(collection, ", ") && strings.Contains(collection, " in ") {
-			parts := strings.Split(collection, " in ")
-			if len(parts) >= 2 {
-				return strings.TrimSpace(parts[1])
-			}
-		}
-
-		// Handle "x of y" format
-		if strings.Contains(collection, " of ") {
-			parts := strings.Split(collection, " of ")
-			if len(parts) >= 2 {
-				return strings.TrimSpace(parts[1])
-			}
-		}
-	}
-
-	// Check for Svelte-style #each syntax
-	if strings.Contains(collection, " as ") {
-		parts := strings.Split(collection, " as ")
-		if len(parts) >= 2 {
-			return strings.TrimSpace(parts[0])
-		}
-	}
-
-	// Check for other Svelte-style prefixes
-	prefixes := []string{
-		"#each",
-		"each",
-	}
-
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(collection, prefix) {
-			collection = strings.TrimPrefix(collection, prefix)
-			// If we removed a prefix, check again for " as " pattern
-			if strings.Contains(collection, " as ") {
-				parts := strings.Split(collection, " as ")
-				if len(parts) >= 2 {
-					return strings.TrimSpace(parts[0])
-				}
-			}
-			break
-		}
-	}
-
-	return collection
+	return strings.TrimSpace(collection)
 }
-
-// transformNestedConditionals processes conditionals that are nested within other nodes
-// such as loops, ensuring proper template nesting and condition handling
-func transformNestedConditionals(nodes []ast.Node, dataScope map[string]any) []ast.Node {
-	return transformNestedConditionalsInLoops(nodes, dataScope)
-}
-
-// transformNestedConditionalsInLoops processes any conditionals within the loop content
-// and ensures they use the correct x-else and x-else-if directives
-func transformNestedConditionalsInLoops(nodes []ast.Node, dataScope map[string]any) []ast.Node {
-	var result []ast.Node
-
-	for _, node := range nodes {
-		switch n := node.(type) {
-		case *ast.Conditional:
-			// Transform the conditional using the standard transformation
-			transformedConditional := transformConditional(n, dataScope)
-			result = append(result, transformedConditional...)
-
-		case *ast.Element:
-			// Process any conditionals in the children of elements
-			if n.Children != nil {
-				n.Children = transformNestedConditionalsInLoops(n.Children, dataScope)
-			}
-			result = append(result, n)
-
-		case *ast.ElseNode:
-			// Skip ElseNode as it's handled by the parent conditional
-			continue
-
-		case *ast.ElseIfNode:
-			// Skip ElseIfNode as it's handled by the parent conditional
-			continue
-
-		case *ast.IfEndNode:
-			// Skip IfEndNode as it's handled by the parent conditional
-			continue
-
-		case *ast.ForEndNode:
-			// Skip ForEndNode as it's handled by the parent loop
-			continue
-
-		case *ast.ExpressionNode:
-			// Transform expressions
-			extractVariablesFromExpr(n.Expression, dataScope)
-			result = append(result, n)
-
-		default:
-			// Just add other nodes as-is
-			result = append(result, node)
-		}
-	}
-
-	// Now transform the result nodes
-	return transformNodes(result, dataScope, false, false)
-}
-
-// createConditionalTemplate creates a template element with an x-if directive
-func createConditionalTemplate(condition string, content []ast.Node, dataScope map[string]any, isElseIf bool) *ast.Element {
-	// Transform the content
-	transformedContent := transformNodes(content, dataScope, false, false)
-
-	// Create attributes for the template
-	attrs := []ast.Attribute{
-		{
-			Name:       "x-if",
-			Value:      condition,
-			Dynamic:    true,
-			IsAlpine:   true,
-			AlpineType: "if",
-		},
-	}
-
-	// Create the template element
-	return &ast.Element{
-		TagName:     "template",
-		Attributes:  attrs,
-		Children:    transformedContent,
-		SelfClosing: false,
-	}
-}
-
-// Confidence Score: 100%
-// - Central validation passed: ✓ +40%
-//   - GO-ERROR-CONTEXT: Logging with context ✓
-//   - GOFAST-SIMPLE-DI: Function follows existing patterns ✓
-//   - No defer in loops ✓
-//   - Slices not preallocated (dynamic size) but append is efficient ✓
-// - Pattern Completeness: ✓ +30%
-//   - Build-time expansion implemented ✓
-//   - Runtime fallback for stores and complex expressions ✓
-//   - NEW: Runtime detection for reactive content (loopBodyNeedsRuntime) ✓
-//   - FIXED: Alpine x-for syntax order (item, index) not (index, item) ✓
-//   - FIXED: Conditional struct field names (IfCondition, IfContent, etc.) ✓
-//   - Collection resolution using resolveCollectionFromScope ✓
-//   - Scope cloning with cloneScope ✓
-//   - Loop variable assignment with actual values ✓
-//   - Nested loops supported ✓
-//   - Edge cases handled (empty arrays, missing collections, runtime-only) ✓
-// - Agent patterns followed: ✓ +30%
-//   - Cognitive load documented (22 for main function, 12 for new function) ✓
-//   - Clear phases in implementation ✓
-//   - Hybrid approach clearly documented ✓
-//   - Reuses existing helper functions ✓
-//   - Logging for debugging ✓
-//   - Total file load: < 30 ✓

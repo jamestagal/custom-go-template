@@ -11,10 +11,10 @@ import (
 )
 
 // TestCartBadge_ActualFile tests the ACTUAL CartBadge.html component file
-// to ensure we're not missing something in our test cases
+// to ensure store expressions are properly transformed
 func TestCartBadge_ActualFile(t *testing.T) {
-	// Read the actual CartBadge.html file
-	content, err := os.ReadFile("../../examples/components/CartBadge.html")
+	// Read the actual CartBadge.html file (it's in layouts/components, not examples/components)
+	content, err := os.ReadFile("../../layouts/components/CartBadge.html")
 	if err != nil {
 		t.Fatalf("Failed to read CartBadge.html: %v", err)
 	}
@@ -40,20 +40,28 @@ func TestCartBadge_ActualFile(t *testing.T) {
 	// Print the rendered markup for manual inspection
 	t.Logf("Rendered CartBadge.html:\n%s", markup)
 
-	// Look for the x-text attribute
-	expectedAttr := `x-text="'$' + $store.cart.total.toFixed(2)"`
+	// UPDATED: The CartBadge component now uses formattedTotal from the store
+	// (line 23: <strong x-text="$store.cart.formattedTotal"></strong>)
+	// not .toFixed(2) method call
+	expectedAttr := `x-text="$store.cart.formattedTotal"`
 	if !strings.Contains(markup, expectedAttr) {
-		// Find what we actually got
-		if idx := strings.Index(markup, `x-text="`); idx != -1 {
-			// Find the closing quote
-			endIdx := idx + len(`x-text="`)
-			closeIdx := strings.Index(markup[endIdx:], `"`)
-			if closeIdx != -1 {
-				actualAttr := markup[idx : endIdx+closeIdx+1]
-				t.Errorf("x-text attribute was modified!\nExpected: %s\nGot:      %s", expectedAttr, actualAttr)
-			}
-		} else {
-			t.Error("x-text attribute not found in rendered output!")
+		t.Errorf("Expected x-text attribute not found!\nExpected: %s\nMarkup:\n%s", expectedAttr, markup)
+	}
+
+	// Verify store references are properly transformed
+	if !strings.Contains(markup, "$store.cart.items.length") {
+		t.Error("Store reference $store.cart.items.length not found")
+	}
+
+	// Verify the cart store is tracked
+	found := false
+	for _, store := range referencedStores {
+		if store == "cart" {
+			found = true
+			break
 		}
+	}
+	if !found {
+		t.Errorf("Cart store should be tracked, got: %v", referencedStores)
 	}
 }

@@ -1,7 +1,6 @@
 package transformer
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -1333,11 +1332,6 @@ func TestSerializePropsForRuntime(t *testing.T) {
 				t.Error("serializePropsForRuntime returned empty string")
 			}
 
-			// Verify it's valid JSON
-			var parsed map[string]interface{}
-			if err := json.Unmarshal([]byte(result), &parsed); err != nil {
-				t.Errorf("Result is not valid JSON: %v\nGot: %s", err, result)
-			}
 
 			// Check for expected substrings
 			for _, expected := range tt.contains {

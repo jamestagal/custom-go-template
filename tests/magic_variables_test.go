@@ -44,8 +44,8 @@ export let components
 	// Transform
 	transformed := transformer.TransformAST(tmpl, props)
 
-	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
+	// Fixed: RenderWithStores signature is (originalAST, transformedAST, storeDefinitions, templatePath, dynamicLayoutName)
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "")
 
 	// Verify components array is accessible
 	if !strings.Contains(markup, "Components array exists") {
@@ -82,8 +82,8 @@ export let content
 	// Transform
 	transformed := transformer.TransformAST(tmpl, props)
 
-	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
+	// Fixed: Remove extra parameter
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "")
 
 	// Verify content object is accessible
 	if !strings.Contains(markup, "x-text=\"content.title\"") {
@@ -124,8 +124,8 @@ export let allContent
 	// Transform
 	transformed := transformer.TransformAST(tmpl, props)
 
-	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
+	// Fixed: Remove extra parameter
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "")
 
 	// Verify allContent map is accessible
 	if !strings.Contains(markup, "All content map exists") {
@@ -162,8 +162,8 @@ export let allLayouts
 	// Transform
 	transformed := transformer.TransformAST(tmpl, props)
 
-	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
+	// Fixed: Remove extra parameter
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "")
 
 	// Verify allLayouts registry is accessible
 	if !strings.Contains(markup, "All layouts registry exists") {
@@ -196,6 +196,9 @@ export let title, content, allContent
 
 	// Register the component
 	transformer.RegisterComponent("TestComponent", componentAST, []string{"title", "content", "allContent"})
+
+	// Cleanup after test
+	defer transformer.UnregisterComponent("TestComponent")
 
 	// Template with Component:dynamic in loop
 	templateContent := `---
@@ -239,8 +242,8 @@ export let components, content, allContent, allLayouts
 	// Transform
 	transformed := transformer.TransformAST(tmpl, props)
 
-	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
+	// Fixed: Remove extra parameter
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "")
 
 	// Verify component rendered with magic variables
 	if !strings.Contains(markup, "test-component") {
@@ -253,13 +256,22 @@ export let components, content, allContent, allLayouts
 		t.Logf("Markup: %s", markup)
 	}
 
-	if !strings.Contains(markup, "Content: Page description") {
-		t.Error("Expected content magic variable to be passed to component")
+	// UPDATED: Check for runtime conditional structure with x-if
+	// Magic variables are passed as Alpine variable references (content: content)
+	// so conditionals are evaluated at runtime, not build-time
+	if !strings.Contains(markup, `x-if="content"`) {
+		t.Error("Expected content conditional to be present")
 		t.Logf("Markup: %s", markup)
 	}
 
-	if !strings.Contains(markup, "Has all content") {
-		t.Error("Expected allContent magic variable to be passed to component")
+	if !strings.Contains(markup, `x-if="allContent"`) {
+		t.Error("Expected allContent conditional to be present")
+		t.Logf("Markup: %s", markup)
+	}
+
+	// Verify the conditional content structure is present
+	if !strings.Contains(markup, "content.description") {
+		t.Error("Expected content.description reference in conditional")
 		t.Logf("Markup: %s", markup)
 	}
 }
@@ -282,6 +294,12 @@ export let title
 
 	transformer.RegisterComponent("Comp1", comp1AST, []string{"name"})
 	transformer.RegisterComponent("Comp2", comp2AST, []string{"title"})
+
+	// Cleanup after test
+	defer func() {
+		transformer.UnregisterComponent("Comp1")
+		transformer.UnregisterComponent("Comp2")
+	}()
 
 	// Template
 	templateContent := `---
@@ -320,8 +338,8 @@ export let components
 	// Transform
 	transformed := transformer.TransformAST(tmpl, props)
 
-	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
+	// Fixed: Remove extra parameter
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "")
 
 	// Verify both components rendered
 	if !strings.Contains(markup, "comp1") {
@@ -369,6 +387,9 @@ func TestMagicVariables_IntegrationWithRealFiles(t *testing.T) {
 	// Register the component
 	transformer.RegisterComponent("Hero2436", heroAST, []string{"topper", "title", "description", "buttonText", "buttonLink"})
 
+	// Cleanup after test
+	defer transformer.UnregisterComponent("Hero2436")
+
 	// Template using Component:dynamic
 	templateContent := `---
 export let components, content
@@ -410,8 +431,8 @@ export let components, content
 	// Transform
 	transformed := transformer.TransformAST(tmpl, props)
 
-	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", "")
+	// Fixed: Remove extra parameter
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "")
 
 	// Verify Hero2436 rendered with props
 	if !strings.Contains(markup, "hero-2436") {

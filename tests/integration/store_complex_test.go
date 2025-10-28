@@ -53,12 +53,12 @@ store user = {
 	if !strings.Contains(markup, "x-if=\"$store.user.isLoggedIn\"") {
 		t.Errorf("First level conditional should use $store")
 	}
-	
+
 	// Note: Quotes in string comparisons are HTML-escaped as &quot;
 	if !strings.Contains(markup, "$store.user.role === &quot;admin&quot;") {
 		t.Errorf("Second level conditional should use $store")
 	}
-	
+
 	if !strings.Contains(markup, "x-if=\"$store.user.permissions.canEdit\"") {
 		t.Errorf("Third level conditional should use $store")
 	}
@@ -68,6 +68,10 @@ store user = {
 //
 // Pattern: Integration Test [Load: 21]
 // Cognitive Load: 21 (setup: 5, parse: 4, transform: 4, render: 4, assertions: 4)
+//
+// IMPORTANT: This test verifies RUNTIME x-for behavior when loops use store collections.
+// Store collections ($store.data.categories) cannot be resolved at build-time, so they
+// fall back to Alpine.js x-for templates for runtime evaluation.
 func TestStoreInNestedLoop(t *testing.T) {
 	templateStr := `---
 store data = {
@@ -103,13 +107,15 @@ store data = {
 	// Render
 	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
-	// Verify outer loop uses $store prefix
-	if !strings.Contains(markup, "x-for=\"(category, ) in $store.data.categories\"") {
-		t.Errorf("Outer loop should iterate over $store.data.categories")
+	// UPDATED EXPECTATION: Verify outer loop uses $store prefix and runtime x-for
+	// Format is "item in collection" when no index variable is specified
+	if !strings.Contains(markup, "x-for=\"category in $store.data.categories\"") {
+		t.Errorf("Outer loop should iterate over $store.data.categories with runtime x-for")
 	}
 
-	// Verify inner loop uses loop variable (not $store)
-	if !strings.Contains(markup, "x-for=\"(item, ) in category.items\"") {
+	// UPDATED EXPECTATION: Verify inner loop uses loop variable (not $store)
+	// Format is "item in collection" when no index variable is specified
+	if !strings.Contains(markup, "x-for=\"item in category.items\"") {
 		t.Errorf("Inner loop should iterate over category.items")
 	}
 
@@ -222,7 +228,7 @@ store form = {
 	if !strings.Contains(markup, "$store.form.email") {
 		t.Errorf("Should support dot notation access")
 	}
-	
+
 	// TODO: Add support for bracket notation in future:
 	// {$form[fieldName]} → $store.form[fieldName]
 }
