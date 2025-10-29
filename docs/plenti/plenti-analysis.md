@@ -576,6 +576,190 @@ func GeneratePath(content Content, pattern string) string {
 
 ---
 
+---
+
+## TWO CRITICAL CONTENT PATTERNS (MUST UNDERSTAND)
+
+Plenti uses **TWO DISTINCT PATTERNS** for content JSON files. These patterns are **fundamentally different** and must NOT be mixed:
+
+### Pattern 1: Component-Based Pages
+
+**Identifying Characteristics:**
+- Has `components` array in JSON
+- Uses generic loop template (e.g., `pages.svelte`)
+- Component names reference REAL component files in `layouts/components/`
+
+**JSON Structure - MINIMAL:**
+```json
+{
+  "components": [
+    {"name": "sbs_1456", "fields": {}},
+    {"name": "steps_585", "fields": {"title": "...", "button": {...}}}
+  ]
+}
+```
+
+**❌ DO NOT include in component-based JSON:**
+- `"path"` - Auto-generated from filename
+- `"title"` - Goes in component fields
+- `"description"` - Goes in component fields
+- `"type"` - Determined by folder location
+
+**Template Example** (`pages.svelte`):
+```svelte
+<script>
+  export let components, allLayouts, allContent, content;
+</script>
+{#each components as { name, fields }}
+  <svelte:component
+    this={allLayouts["layouts_components_" + name + "_svelte"]}
+    {...fields}
+    {allContent}
+    {content}
+  />
+{/each}
+```
+
+**How It Works:**
+1. Template loops through `components` array
+2. For each component entry, looks up the component file by name
+3. Dynamically loads component from `allLayouts` registry
+4. Spreads `fields` object as props to the component
+5. Passes magic variables (`allContent`, `content`)
+
+**Real Example:** `/content/pages/about.json` → `/layouts/content/pages.svelte` (loop) → `/layouts/components/sbs_1456.svelte` (component)
+
+---
+
+### Pattern 2: Custom Template Pages
+
+**Identifying Characteristics:**
+- NO `components` array
+- Flat structure with all fields at root level
+- Uses custom template with specific HTML/CSS layout
+
+**JSON Structure - FLAT:**
+```json
+{
+  "title": "Capital Tigers",
+  "subtitle": "A new website...",
+  "description": [{"paragraph": "..."}],
+  "featureTitle": "Website features:",
+  "listFeatures": [{"item": "..."}],
+  "card": {...},
+  "button": {...},
+  "background": {...}
+}
+```
+
+**✅ These top-level fields ARE the page content!**
+
+**Template Example** (`portfolio.svelte`):
+```svelte
+<script>
+  export let title, subtitle, description, featureTitle, listFeatures, card, button, background;
+</script>
+
+<section id="content-page-1399">
+  <div class="cs-container">
+    <h2>{title}</h2>
+    <h3>{subtitle}</h3>
+    {#each description as d}
+      <p>{@html d.paragraph}</p>
+    {/each}
+    <!-- Custom layout structure -->
+  </div>
+</section>
+
+<style>
+  /* Custom CSS for this specific page type */
+</style>
+```
+
+**How It Works:**
+1. Template exports specific props matching JSON fields
+2. Template has custom HTML structure and styling
+3. Fields are directly used in template expressions
+4. ONE template handles ALL content of this type
+
+**Real Example:** `/content/portfolio/capital-tigers.json` → `/layouts/content/portfolio.svelte` (custom template)
+
+---
+
+## Pattern Selection Rule
+
+**The content type (folder/filename) determines which template is used.**
+
+```
+content/pages/about.json      → layouts/content/pages.svelte (Pattern 1)
+content/pages/contact.json    → layouts/content/pages.svelte (Pattern 1)
+content/portfolio/item1.json  → layouts/content/portfolio.svelte (Pattern 2)
+content/index.json            → layouts/content/index.svelte (Could be either)
+```
+
+**Ask yourself:**
+- Is the template a generic component loop? → Use Pattern 1 (components array)
+- Is the template a custom layout? → Use Pattern 2 (flat fields)
+
+---
+
+## Common Mistakes to Avoid
+
+### ❌ Mistake 1: Adding metadata to component-based JSON
+```json
+{
+  "path": "/about",        ← WRONG! Auto-generated
+  "title": "About Us",     ← WRONG! Goes in component fields
+  "type": "page",          ← WRONG! Folder determines type
+  "components": [...]
+}
+```
+
+### ✅ Correct: Components array only
+```json
+{
+  "components": [
+    {"name": "hero", "fields": {"title": "About Us", ...}}
+  ]
+}
+```
+
+### ❌ Mistake 2: Using components array with custom template
+```json
+{
+  "components": [...]  ← portfolio.svelte doesn't expect this!
+}
+```
+
+### ✅ Correct: Flat fields matching template exports
+```json
+{
+  "title": "...",
+  "subtitle": "...",
+  "description": [...]
+}
+```
+
+### ❌ Mistake 3: Fake component names
+```json
+{
+  "components": [
+    {"name": "demo_header", ...}  ← This component doesn't exist!
+  ]
+}
+```
+
+### ✅ Correct: Real component names
+```json
+{
+  "components": [
+    {"name": "hero2436", ...}  ← layouts/components/hero2436.svelte EXISTS
+  ]
+}
+```
+
+---
+
 ## Summary for LLM Agents
 
 When building Go templating solutions for Plenti-like systems, remember:
@@ -583,9 +767,14 @@ When building Go templating solutions for Plenti-like systems, remember:
 1. **Content is king**: Everything derives from JSON structure in `content/`
 2. **Convention over configuration**: Folder names, file names, and data patterns drive behavior
 3. **Template mapping is 1:1**: Each content type folder maps to one layout template
-4. **Magic happens at build time**: Analyze, generate, optimize - all before deployment
-5. **CMS is emergent**: The editing interface emerges from analyzing the data structure
-6. **Components are composable**: Signature-based loading enables content-driven UI
-7. **No database needed**: Git + JSON = version-controlled, queryable data store
+4. **Two distinct patterns exist**: Component-based (loop) vs Custom template (flat)
+5. **Component names must be real**: They reference actual files in `layouts/components/`
+6. **Don't add metadata to component JSON**: path, title, type are auto-generated or in fields
+7. **Magic happens at build time**: Analyze, generate, optimize - all before deployment
+8. **CMS is emergent**: The editing interface emerges from analyzing the data structure
+9. **Components are composable**: Signature-based loading enables content-driven UI
+10. **No database needed**: Git + JSON = version-controlled, queryable data store
 
 The core insight: **By making data structure itself the schema**, Plenti eliminates configuration overhead while maintaining flexibility. The Go implementation should preserve this discoverability while adding type safety and performance.
+
+**CRITICAL:** Always check which pattern the template uses before creating JSON content!

@@ -32,54 +32,174 @@ The template engine supports **two rendering modes**:
 - Content loaded from JSON files in `content/pages/`
 - Global HTML wrapper at `layouts/global/html.html`
 - Uses `renderWithWrapper()` function
-- Example: `/jim-test`, `/pages`, `/` (home)
+- Example: `/` (home), content pages
 
 **Plenti Pattern Flow:**
 ```
 Request → renderWithWrapper() → Load JSON → Parse Wrapper → Inject Content → Render
 ```
 
-**Migration Example (jim-test):**
-
-Before:
-```html
-<!DOCTYPE html>
-<html>
-<head>...</head>
-<body>
-  <h1>Hello Benjamin!</h1>
-</body>
-</html>
-```
-
-After:
-```html
----
-export let components
 ---
 
-{for component in components}
-  {if component.name === 'demo_header'}
-    <h1>{component.fields.salutation} {component.fields.name}!</h1>
-  {/if}
-{/for}
-```
+## Plenti Content Patterns (CRITICAL)
 
-With `content/pages/jim-test.json`:
+There are **TWO DISTINCT PATTERNS** for organizing content in Plenti:
+
+### Pattern 1: Component-Based Pages (Component Loop)
+
+**Used for:** Pages built from multiple reusable components
+
+**Content Type:** `pages` (uses `layouts/content/pages.html`)
+
+**JSON Structure - MINIMAL, components array ONLY:**
 ```json
 {
-  "path": "/jim-test",
   "components": [
-    {
-      "name": "demo_header",
-      "fields": {
-        "salutation": "Hello",
-        "name": "Benjamin"
-      }
-    }
+    {"name": "hero2436", "fields": {"title": "...", "description": "..."}},
+    {"name": "services2437", "fields": {}},
+    {"name": "whyChoose2425", "fields": {...}}
   ]
 }
 ```
+
+**❌ DO NOT include these fields in component-based JSON:**
+- `"path"` - Automatically generated from filename
+- `"title"` - Should be in component fields if needed
+- `"description"` - Should be in component fields if needed
+- `"type"` - Determined by folder location
+
+**Template:** `layouts/content/pages.html`
+```html
+---
+export let components, allContent, content
+---
+
+{for component in components}
+  <Component:dynamic name={component.name} {...component.fields} />
+{/for}
+```
+
+**Key Points:**
+- ✅ Component names reference REAL components in `layouts/components/`
+- ✅ Each component file exists (e.g., `layouts/components/hero2436.html`)
+- ✅ The `pages.html` template is generic - it just loops through components
+- ✅ NO custom template per page - the type determines the template
+
+**Real-World Example:** `/Users/benjaminwaller/Projects/PlentifyWebsites/plentify/content/pages/about.json`
+
+---
+
+### Pattern 2: Custom Template Pages (Flat Structure)
+
+**Used for:** Pages with unique, custom layouts that aren't component-based
+
+**Content Type:** Custom (e.g., `portfolio` uses `layouts/content/portfolio.html`)
+
+**JSON Structure - FLAT, all fields at root level:**
+```json
+{
+  "title": "Capital Tigers",
+  "subtitle": "A new website for the Canberra Capital Tigers",
+  "description": [{"paragraph": "..."}],
+  "featureTitle": "Website features:",
+  "listFeatures": [{"item": "..."}],
+  "card": {...},
+  "button": {...},
+  "background": {...}
+}
+```
+
+**✅ This pattern DOES include top-level fields** - they're the page content!
+
+**Template:** `layouts/content/portfolio.html`
+```html
+---
+export let title, subtitle, description, featureTitle, listFeatures, card, button, background
+---
+
+<section id="content-page">
+  <div class="cs-container">
+    <h1>{title}</h1>
+    <h3>{subtitle}</h3>
+    {for d in description}
+      <p>{@html d.paragraph}</p>
+    {/for}
+    <!-- Custom layout HTML -->
+  </div>
+</section>
+
+<style>
+  /* Custom CSS for this template */
+</style>
+```
+
+**Key Points:**
+- ✅ Each field has an `export let` in the template
+- ✅ Template has custom HTML structure and styling
+- ✅ ONE template per content type (all portfolio/*.json use portfolio.html)
+- ✅ Can still import dynamic components if needed
+
+**Real-World Example:** `/Users/benjaminwaller/Projects/PlentifyWebsites/plentify/content/portfolio/capital-tigers.json`
+
+---
+
+## How Plenti Determines Which Pattern to Use
+
+**By Content Type (Folder/Filename):**
+
+```
+content/pages/about.json      → Uses layouts/content/pages.html (Pattern 1: Component loop)
+content/pages/contact.json    → Uses layouts/content/pages.html (Pattern 1: Component loop)
+content/portfolio/item1.json  → Uses layouts/content/portfolio.html (Pattern 2: Custom template)
+content/index.json            → Uses layouts/content/index.html (Could be either pattern)
+```
+
+**The Rule:**
+- Content type (folder or filename) determines which template in `layouts/content/` is used
+- The template structure determines whether JSON needs components array or flat fields
+
+---
+
+## Common Mistake: Mixing Patterns ❌
+
+**WRONG - Component-based JSON with extra fields:**
+```json
+{
+  "path": "/about",           ← REMOVE - not needed!
+  "title": "About Page",      ← REMOVE - should be in component fields!
+  "type": "page",             ← REMOVE - determined by location!
+  "components": [
+    {"name": "hero", "fields": {...}}
+  ]
+}
+```
+
+**RIGHT - Component-based JSON, minimal:**
+```json
+{
+  "components": [
+    {"name": "hero", "fields": {"title": "About Page", ...}}
+  ]
+}
+```
+
+**WRONG - Custom template JSON with components array:**
+```json
+{
+  "components": [...]  ← Portfolio template doesn't expect this!
+}
+```
+
+**RIGHT - Custom template JSON, flat fields:**
+```json
+{
+  "title": "...",
+  "subtitle": "...",
+  "description": [...]
+}
+```
+
+---
 
 **See:** `MIGRATION_GUIDE.md` for complete migration documentation.
 
