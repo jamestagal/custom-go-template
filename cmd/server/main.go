@@ -68,16 +68,6 @@ func main() {
 		log.Printf("Runtime component resolution may not work correctly")
 	}
 
-	// TEMPORARY: Test jim-test with wrapper rendering before switching route
-	http.HandleFunc("/jim-test-new", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("[TEMP ROUTE] /jim-test-new requested")
-		if err := renderWithWrapper("jim-test", w, r); err != nil {
-			log.Printf("Error rendering jim-test-new: %v", err)
-			http.Error(w, "Failed to render page", http.StatusInternalServerError)
-		}
-	})
-
-	// Dynamically register routes for all content layouts
 	registerContentRoutes()
 
 	// Set up the HTTP server
@@ -1441,8 +1431,23 @@ func registerContentRoutes() {
 		// Build file path
 		filePath := filepath.Join(contentDir, file.Name())
 
-		// Register route (capture filePath in closure)
+		// Register route (construct route path)
 		route := "/" + routeName
+
+		// Special handling for jim-test - use wrapper rendering
+		if routeName == "jim-test" {
+			http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
+				if err := renderWithWrapper("jim-test", w, r); err != nil {
+					log.Printf("Error rendering jim-test with wrapper: %v", err)
+					http.Error(w, "Failed to render page", http.StatusInternalServerError)
+				}
+			})
+			routeCount++
+			log.Printf("Registered route (with wrapper): %s → layouts/content/%s.html", route, routeName)
+			continue
+		}
+
+		// Default handling - use direct template rendering
 		currentFilePath := filePath // Capture for closure
 		http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			renderTemplate(currentFilePath, w, r)
