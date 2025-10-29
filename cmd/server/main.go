@@ -1434,7 +1434,7 @@ func registerContentRoutes() {
 		// Register route (construct route path)
 		route := "/" + routeName
 
-		// Special handling for jim-test - use wrapper rendering
+		// Special handling for jim-test - use wrapper rendering with "pages" layout
 		if routeName == "jim-test" {
 			http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 				if err := renderWithWrapper("jim-test", w, r); err != nil {
@@ -1443,7 +1443,7 @@ func registerContentRoutes() {
 				}
 			})
 			routeCount++
-			log.Printf("Registered route (with wrapper): %s → layouts/content/%s.html", route, routeName)
+			log.Printf("Registered route (with wrapper using pages layout): %s → content/pages/jim-test.json", route)
 			continue
 		}
 

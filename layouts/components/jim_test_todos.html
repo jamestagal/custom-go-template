@@ -1,0 +1,55 @@
+---
+import Todos from "./todos.html";
+---
+
+<div style="margin: 2rem 0;">
+  <h2>Task List - First 5 Tasks</h2>
+  <Todos number={5} />
+
+  <h2 style="margin-top: 2rem;">Task List - Tasks 6-14</h2>
+  <Todos start={5} number={5} />
+</div>
+
+<style>
+  h2 {
+    color: #1f2937;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  /* Todos table styling */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  thead {
+    background-color: #f3f4f6;
+  }
+
+  th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #e5e7eb;
+    color: #1f2937;
+  }
+
+  tbody tr:hover {
+    background-color: #f9fafb;
+  }
+</style>

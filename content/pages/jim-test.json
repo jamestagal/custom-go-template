@@ -1,11 +1,7 @@
 {
-  "path": "/jim-test",
-  "title": "Jim Test Showcase Page",
-  "description": "Demonstration of multiple template engine features and components",
-  "type": "page",
   "components": [
     {
-      "name": "demo_header",
+      "name": "jim_test_greeting",
       "fields": {
         "salutation": "Hello",
         "name": "Benjamin",
@@ -13,10 +9,15 @@
       }
     },
     {
-      "name": "component_demos",
+      "name": "jim_test_age_examples",
       "fields": {
         "name": "Benjamin",
-        "age": 55,
+        "age": 55
+      }
+    },
+    {
+      "name": "jim_test_user_profiles",
+      "fields": {
         "user1": {
           "name": "Benjamin",
           "email": "benjamin@example.com",
@@ -37,21 +38,29 @@
           "role": "editor",
           "avatar": null,
           "joinDate": "2024-03-20"
-        },
-        "path": "../components/userprofile.html",
-        "comp": "userprofile"
+        }
       }
     },
     {
-      "name": "loop_demos",
+      "name": "jim_test_animals_loop",
       "fields": {
         "name": "Benjamin",
-        "animals": ["dog", "cat", "bird"],
-        "newAnimal": ""
+        "animals": ["dog", "cat", "bird"]
       }
     },
     {
-      "name": "interactive_demos",
+      "name": "jim_test_advanced_loops",
+      "fields": {
+        "name": "Benjamin",
+        "animals": ["dog", "cat", "bird"]
+      }
+    },
+    {
+      "name": "jim_test_todos",
+      "fields": {}
+    },
+    {
+      "name": "jim_test_notifications",
       "fields": {
         "notifications": [
           {
@@ -70,8 +79,7 @@
             "type": "error",
             "message": "Failed to connect to the server."
           }
-        ],
-        "currentNotification": null
+        ]
       }
     }
   ]
