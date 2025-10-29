@@ -1,0 +1,78 @@
+{
+  "path": "/jim-test",
+  "title": "Jim Test Showcase Page",
+  "description": "Demonstration of multiple template engine features and components",
+  "type": "page",
+  "components": [
+    {
+      "name": "demo_header",
+      "fields": {
+        "salutation": "Hello",
+        "name": "Benjamin",
+        "age": 55
+      }
+    },
+    {
+      "name": "component_demos",
+      "fields": {
+        "name": "Benjamin",
+        "age": 55,
+        "user1": {
+          "name": "Benjamin",
+          "email": "benjamin@example.com",
+          "role": "admin",
+          "avatar": null,
+          "joinDate": "2024-10-06"
+        },
+        "user2": {
+          "name": "Dynamic User",
+          "email": "dynamic@example.com",
+          "role": "user",
+          "avatar": null,
+          "joinDate": "2024-05-15"
+        },
+        "user3": {
+          "name": "Variable Path User",
+          "email": "variable@example.com",
+          "role": "editor",
+          "avatar": null,
+          "joinDate": "2024-03-20"
+        },
+        "path": "../components/userprofile.html",
+        "comp": "userprofile"
+      }
+    },
+    {
+      "name": "loop_demos",
+      "fields": {
+        "name": "Benjamin",
+        "animals": ["dog", "cat", "bird"],
+        "newAnimal": ""
+      }
+    },
+    {
+      "name": "interactive_demos",
+      "fields": {
+        "notifications": [
+          {
+            "type": "success",
+            "message": "Your changes have been saved successfully!"
+          },
+          {
+            "type": "info",
+            "message": "Please review the documentation for more details."
+          },
+          {
+            "type": "warning",
+            "message": "Your session will expire in 5 minutes."
+          },
+          {
+            "type": "error",
+            "message": "Failed to connect to the server."
+          }
+        ],
+        "currentNotification": null
+      }
+    }
+  ]
+}
