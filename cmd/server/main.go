@@ -1162,12 +1162,11 @@ func registerComponentsFromDir(dir string, pathPrefix string, storeRegistry map[
 
 	for _, file := range files {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".html") {
-			// Extract base name and capitalize first letter (matches Plenti/Svelte convention)
-			// e.g., "footer.html" -> "Footer", matching: import Footer from "./footer.html"
+			// Extract base name (without .html extension)
+			// e.g., "hero2436.html" -> "hero2436"
 			baseName := strings.TrimSuffix(file.Name(), ".html")
-			componentName := strings.ToUpper(baseName[:1]) + baseName[1:]
 			componentPath := fmt.Sprintf("%s/%s", dir, file.Name())
-			log.Printf("Registering component: %s from %s", componentName, componentPath)
+			log.Printf("Registering component: %s from %s", baseName, componentPath)
 
 			// Read component file
 			componentContent, err := os.ReadFile(componentPath)
@@ -1192,11 +1191,11 @@ func registerComponentsFromDir(dir string, pathPrefix string, storeRegistry map[
 						// Replace the fence section in component AST
 						componentAST.RootNodes[i] = fenceWithStores
 						log.Printf("[registerComponents] Re-parsed fence with stores for %s (stores: %d, functions: %d)",
-							componentName, len(fenceWithStores.Stores), len(fenceWithStores.Functions))
+							baseName, len(fenceWithStores.Stores), len(fenceWithStores.Functions))
 					} else {
 						// No store imports - keep the already-parsed fence with functions intact
 						log.Printf("[registerComponents] Preserved original fence for %s (functions: %d)",
-							componentName, len(fence.Functions))
+							baseName, len(fence.Functions))
 					}
 					break
 				}
@@ -1205,12 +1204,24 @@ func registerComponentsFromDir(dir string, pathPrefix string, storeRegistry map[
 			// Extract props from the component template
 			componentProps := extractComponentProps(componentAST)
 
-			// Register the component with the transformer - both by name and by path
-			transformer.RegisterComponent(componentName, componentAST, componentProps)
+			// PROPER PLENTI PATTERN: Single registration with exact filename
+			// Register with exact base name (case-sensitive, matches filename exactly)
+			// Examples:
+			//   - hero2436.html → Register as "hero2436"
+			//   - jim_test_greeting.html → Register as "jim_test_greeting"
+			//   - Footer.html → Register as "footer" (lowercased by filename)
+			//
+			// JSON files must reference components with EXACT matching names:
+			//   { "name": "hero2436", ... } ✓
+			//   { "name": "jim_test_greeting", ... } ✓
+			transformer.RegisterComponent(baseName, componentAST, componentProps)
 
-			// Also register with path prefix for import resolution (using lowercase filename)
+			// Also register with path prefix for import resolution
+			// This handles import statements: import Hero from "../components/hero2436.html"
 			pathWithPrefix := fmt.Sprintf("%s%s", pathPrefix, file.Name())
 			transformer.RegisterComponent(pathWithPrefix, componentAST, componentProps)
+
+			log.Printf("✓ Registered: '%s' and '%s'", baseName, pathWithPrefix)
 		}
 	}
 }
@@ -1322,7 +1333,6 @@ func extractComponentProps(template *ast.Template) []string {
 
 	return props
 }
-
 
 // convertJSToJSON converts JavaScript object syntax to valid JSON
 // Handles unquoted keys: {name: "value"} → {"name": "value"}
