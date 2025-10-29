@@ -17,6 +17,73 @@ This is a custom Go template engine that transforms Svelte-inspired template syn
 
 **Core Purpose**: Parse templates with syntax like `{if condition}`, `{for item in items}`, and `{variable}`, then transform them into Alpine.js directives (`x-if`, `x-for`, `x-text`, etc.).
 
+## Plenti Architecture Pattern
+
+The template engine supports **two rendering modes**:
+
+### 1. Standalone Rendering (Legacy)
+- Complete HTML pages with `<!DOCTYPE>`, `<html>`, `<body>` tags
+- All content hardcoded in template
+- Uses `renderTemplate()` function
+- Example: `/store-demo` (self-contained page)
+
+### 2. Wrapper Rendering (Plenti Pattern)
+- Content-only templates (no HTML wrapper)
+- Content loaded from JSON files in `content/pages/`
+- Global HTML wrapper at `layouts/global/html.html`
+- Uses `renderWithWrapper()` function
+- Example: `/jim-test`, `/pages`, `/` (home)
+
+**Plenti Pattern Flow:**
+```
+Request → renderWithWrapper() → Load JSON → Parse Wrapper → Inject Content → Render
+```
+
+**Migration Example (jim-test):**
+
+Before:
+```html
+<!DOCTYPE html>
+<html>
+<head>...</head>
+<body>
+  <h1>Hello Benjamin!</h1>
+</body>
+</html>
+```
+
+After:
+```html
+---
+export let components
+---
+
+{for component in components}
+  {if component.name === 'demo_header'}
+    <h1>{component.fields.salutation} {component.fields.name}!</h1>
+  {/if}
+{/for}
+```
+
+With `content/pages/jim-test.json`:
+```json
+{
+  "path": "/jim-test",
+  "components": [
+    {
+      "name": "demo_header",
+      "fields": {
+        "salutation": "Hello",
+        "name": "Benjamin"
+      }
+    }
+  ]
+}
+```
+
+**See:** `MIGRATION_GUIDE.md` for complete migration documentation.
+
+
 ## Architecture
 
 The codebase follows a pipeline architecture:
