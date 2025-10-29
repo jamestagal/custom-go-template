@@ -68,6 +68,15 @@ func main() {
 		log.Printf("Runtime component resolution may not work correctly")
 	}
 
+	// TEMPORARY: Test jim-test with wrapper rendering before switching route
+	http.HandleFunc("/jim-test-new", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("[TEMP ROUTE] /jim-test-new requested")
+		if err := renderWithWrapper("jim-test", w, r); err != nil {
+			log.Printf("Error rendering jim-test-new: %v", err)
+			http.Error(w, "Failed to render page", http.StatusInternalServerError)
+		}
+	})
+
 	// Dynamically register routes for all content layouts
 	registerContentRoutes()
 
