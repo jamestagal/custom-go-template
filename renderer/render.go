@@ -749,3 +749,12 @@ func extractStyleContent(sb *strings.Builder, node ast.Node) {
 		}
 	}
 }
+
+// GenerateMarkupForTest is a test helper that exposes generateMarkup for testing
+// Pattern: Test Helper Function [Cognitive Load: 2]
+//
+// This function allows tests to generate markup from a transformed AST without
+// needing to go through the full Render pipeline (which requires file paths).
+func GenerateMarkupForTest(template *ast.Template) string {
+	return generateMarkup(template)
+}

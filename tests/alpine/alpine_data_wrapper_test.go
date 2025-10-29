@@ -47,7 +47,8 @@ let name = "John"
 				},
 			},
 			props: map[string]any{},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;name&quot;:&quot;John&quot;}"> <div><h1>Hello, <span x-text="name"></span>!</h1><button>Count: <span x-text="count"></span></button></div> </div>`,
+			// Updated: No x-data wrapper (Phase 1 optimization - body provides scope)
+			expected: `<div><h1>Hello, <span x-text="name"></span>!</h1><button>Count: <span x-text="count"></span></button></div>`,
 		},
 		{
 			name: "Data Wrapper with Props",
@@ -79,7 +80,8 @@ let count = 0
 			props: map[string]any{
 				"name": "Alice",
 			},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;name&quot;:&quot;Alice&quot;}"> <div><h1>Hello, <span x-text="name"></span>!</h1><button>Count: <span x-text="count"></span></button></div> </div>`,
+			// Updated: No x-data wrapper (Phase 1 optimization)
+			expected: `<div><h1>Hello, <span x-text="name"></span>!</h1><button>Count: <span x-text="count"></span></button></div>`,
 		},
 		{
 			name: "Complex Data Structure",
@@ -116,7 +118,8 @@ let items = ["apple", "banana", "orange"]
 				},
 			},
 			props: map[string]any{},
-			expected: `<div x-data="{&quot;items&quot;:[&quot;apple&quot;,&quot;banana&quot;,&quot;orange&quot;],&quot;user&quot;:{&quot;age&quot;:30,&quot;name&quot;:&quot;John&quot;}}"> <div><h1>User: <span x-text="user.name"></span>, Age: <span x-text="user.age"></span></h1><ul><li>First item: <span x-text="items[0]"></span></li></ul></div> </div>`,
+			// Updated: No x-data wrapper (Phase 1 optimization)
+			expected: `<div><h1>User: <span x-text="user.name"></span>, Age: <span x-text="user.age"></span></h1><ul><li>First item: <span x-text="items[0]"></span></li></ul></div>`,
 		},
 		{
 			name: "Function Expressions",
@@ -145,7 +148,8 @@ let count = 0
 				},
 			},
 			props: map[string]any{},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;increment&quot;:function() { return count++ }}"> <div><button>Increment</button><p>Count: <span x-text="count"></span></p></div> </div>`,
+			// Updated: No x-data wrapper (Phase 1 optimization)
+			expected: `<div><button>Increment</button><p>Count: <span x-text="count"></span></p></div>`,
 		},
 		{
 			name: "Nested Variables Detection",
@@ -194,7 +198,8 @@ let count = 0
 			props: map[string]any{
 				"showReset": true,
 			},
-			expected: `<div x-data="{&quot;count&quot;:0,&quot;showReset&quot;:true}"> <div><template x-if="count > 0"><p>Count is positive: <span x-text="count"></span></p></template><template x-if="!(count > 0)"><p>Count is zero: <span x-text="count"></span></p><template x-if="showReset"><button>Reset</button></template></template></div> </div>`,
+			// Updated: No x-data wrapper + x-else (Alpine.js 3.x)
+			expected: `<div><template x-if="count > 0"><p>Count is positive: <span x-text="count"></span></p></template><template x-else><div><p>Count is zero: <span x-text="count"></span></p><template x-if="showReset"><button>Reset</button></template></div></template></div>`,
 		},
 	}
 

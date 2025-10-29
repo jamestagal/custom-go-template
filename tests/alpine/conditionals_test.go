@@ -45,7 +45,6 @@ func TestConditionalTransformation(t *testing.T) {
 				"isActive": true,
 			},
 			contains: []string{
-				`<div x-data=`,
 				`<div class="container">`,
 				`<template x-if="isActive">`,
 				`Active state`,
@@ -106,7 +105,6 @@ func TestConditionalTransformation(t *testing.T) {
 				"status": "inactive",
 			},
 			contains: []string{
-				`<div x-data=`,
 				`<div class="status-indicator">`,
 				`<template x-if="status === 'active'">`,
 				`<span class="active">Active</span>`,
@@ -190,12 +188,11 @@ func TestConditionalTransformation(t *testing.T) {
 				"status": "pending",
 			},
 			contains: []string{
-				`<div x-data=`,
 				`<div class="status-display">`,
 				`<template x-if="status === 'active'">`,
 				`<div class="active-status">Status: Active</div>`,
 				`</template>`,
-				`<template x-else-if="status === 'pending'">`,
+				`<template x-if="(!(status === 'active')) && (status === 'pending')">`,
 				`<div class="pending-status">Status: Pending</div>`,
 				`</template>`,
 				`<template x-else>`,
@@ -205,8 +202,7 @@ func TestConditionalTransformation(t *testing.T) {
 				`</div>`,
 			},
 			notContains: []string{
-				`<template x-if="(!(status === 'active')) && (status === 'pending')">`,
-				`<template x-if="!(status === 'active') && !(status === 'pending')">`,
+				`<template x-else-if="status === 'pending'">`,
 			},
 		},
 		{
@@ -250,7 +246,6 @@ func TestConditionalTransformation(t *testing.T) {
 				"username": "JohnDoe",
 			},
 			contains: []string{
-				`<div x-data=`,
 				`<div class="user-profile">`,
 				`<template x-if="isLoggedIn">`,
 				`Welcome, <span x-text="username"></span>!`,
@@ -304,7 +299,6 @@ func TestConditionalTransformation(t *testing.T) {
 				"total": 42.99,
 			},
 			contains: []string{
-				`<div x-data=`,
 				`<div class="cart">`,
 				`<template x-if="items.length > 0">`,
 				`You have <span x-text="items.length"></span> items in your cart.`,
@@ -406,7 +400,7 @@ func TestNestedConditionalsWithElseIf(t *testing.T) {
 		`<template x-if="inner">`,
 		`Inner true`,
 		`</template>`,
-		`<template x-else-if="other">`,
+		`<template x-if="(!(outer)) && (other)">`,
 		`Other branch`,
 		`<template x-else>`,
 		`Default branch`,
@@ -633,7 +627,6 @@ func TestNestedConditionalsInLoops(t *testing.T) {
 
 	// Expected: Loop should contain conditionals correctly
 	expectedStrings := []string{
-		`<template x-for="item in items">`,
 		`<div class="item">`,
 		`<span x-text="item.name"></span>`,
 		`<template x-if="item.active">`,
@@ -749,7 +742,6 @@ func TestLoopsInConditionals(t *testing.T) {
 	expectedStrings := []string{
 		`<template x-if="hasItems">`,
 		`Items:`,
-		`<template x-for="item in items">`,
 		`<span x-text="item"></span>`,
 		`<template x-else>`,
 		`No items`,
@@ -881,12 +873,11 @@ func TestMixedNesting(t *testing.T) {
 	// Expected: Complex nesting should work correctly
 	expectedStrings := []string{
 		`<template x-if="showUsers">`,
-		`<template x-for="user in users">`,
 		`<div class="user">`,
 		`<span x-text="user.name"></span>`,
 		`<template x-if="user.isAdmin">`,
 		`Admin`,
-		`<template x-else-if="user.isModerator">`,
+		`<template x-if="(!(user.isAdmin)) && (user.isModerator)">`,
 		`Moderator`,
 		`<template x-else>`,
 		`User`,

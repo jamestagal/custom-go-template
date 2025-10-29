@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,24 +42,32 @@ func isJSFunctionLiteral(s string) bool {
 //   - string for objects (e.g., "{key: 'value'}" returned as-is for Alpine.js)
 //   - string for expressions/variables (e.g., "userName", "getTotal()")
 func parseValue(value string) interface{} {
+	// CRITICAL DEBUG: Log the raw input value
+	log.Printf("[parseValue] ENTRY: input value type=%T, len=%d, raw=%q", value, len(value), value)
+
 	// Trim whitespace from input
 	value = strings.TrimSpace(value)
+	log.Printf("[parseValue] After TrimSpace: len=%d, value=%q", len(value), value)
 
 	// Handle empty string
 	if value == "" {
+		log.Printf("[parseValue] Empty string, returning empty")
 		return ""
 	}
 
 	// Handle booleans
 	if value == "true" {
+		log.Printf("[parseValue] Returning bool true")
 		return true
 	}
 	if value == "false" {
+		log.Printf("[parseValue] Returning bool false")
 		return false
 	}
 
 	// Handle null
 	if value == "null" {
+		log.Printf("[parseValue] Returning nil")
 		return nil
 	}
 
@@ -69,32 +78,50 @@ func parseValue(value string) interface{} {
 			// Check if quotes are properly closed (not unclosed strings)
 			quote := value[0]
 			if value[len(value)-1] == quote {
-				// Strip outer quotes
+				// CRITICAL: Check if the content inside quotes is an array/object literal
 				unquoted := value[1 : len(value)-1]
-				// Handle escape sequences
-				return unescapeString(unquoted)
+				unquotedTrimmed := strings.TrimSpace(unquoted)
+
+				log.Printf("[parseValue] Found quoted string, quote=%c, unquoted=%q", quote, unquoted)
+
+				// Check if this is a quoted JavaScript literal (array or object)
+				if (strings.HasPrefix(unquotedTrimmed, "[") && strings.HasSuffix(unquotedTrimmed, "]")) ||
+				   (strings.HasPrefix(unquotedTrimmed, "{") && strings.HasSuffix(unquotedTrimmed, "}")) {
+					// This is a quoted JavaScript literal - unwrap it!
+					log.Printf("[parseValue] UNWRAPPING quoted JS literal: %q", unquotedTrimmed)
+					return unquotedTrimmed
+				}
+
+				// Regular string value - handle escape sequences
+				result := unescapeString(unquoted)
+				log.Printf("[parseValue] Unquoted string result: %q", result)
+				return result
 			}
 		}
 	}
 
 	// Handle arrays - return as string for Alpine.js
 	if strings.HasPrefix(value, "[") {
+		log.Printf("[parseValue] Detected array literal, returning as-is: %q", value)
 		// Even if brackets don't match, return as string for Alpine.js to handle
 		return value
 	}
 
 	// Handle objects - return as string for Alpine.js
 	if strings.HasPrefix(value, "{") {
+		log.Printf("[parseValue] Detected object literal, returning as-is: %q", value)
 		// Even if braces don't match, return as string for Alpine.js to handle
 		return value
 	}
 
 	// Try to parse as number
 	if num, isNum := tryParseNumber(value); isNum {
+		log.Printf("[parseValue] Parsed as number: %v", num)
 		return num
 	}
 
 	// Everything else is an expression or variable reference - return as string
+	log.Printf("[parseValue] Returning as expression/variable: %q", value)
 	return value
 }
 

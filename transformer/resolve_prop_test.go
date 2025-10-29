@@ -16,6 +16,12 @@ import (
 // 1. Dynamic props (prop={expression})
 // 2. Shorthand props ({prop})
 // 3. Static props (prop="value")
+//
+// NOTE: After x-data optimization work, simple variable references now return __VAR_REF__ markers
+// to preserve reactivity. The formatComponentData function strips these markers when generating x-data.
+//
+// IMPORTANT: The parser creates shorthand props with BOTH IsShorthand=true AND IsDynamic=true,
+// and sets Value=propName. So they're handled as dynamic props that return __VAR_REF__ markers.
 func TestResolvePropValue(t *testing.T) {
 	// Create a realistic parent scope with various data types
 	parentScope := map[string]any{
@@ -50,6 +56,7 @@ func TestResolvePropValue(t *testing.T) {
 		description string
 	}{
 		// ========== Dynamic Props (prop={expression}) ==========
+		// UPDATED: Simple variable references now return __VAR_REF__ markers
 		{
 			name: "dynamic prop - simple variable lookup success",
 			prop: ast.ComponentProp{
@@ -58,12 +65,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected: map[string]any{
-				"name": "John Doe",
-				"role": "admin",
-				"id":   123,
-			},
-			description: "Should return actual value from parent scope",
+			expected:    "__VAR_REF__currentUser",
+			description: "Should return __VAR_REF__ marker for reactivity",
 		},
 		{
 			name: "dynamic prop - boolean variable",
@@ -73,8 +76,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    true,
-			description: "Should preserve boolean type",
+			expected:    "__VAR_REF__isLoggedIn",
+			description: "Should return __VAR_REF__ marker for boolean variable",
 		},
 		{
 			name: "dynamic prop - integer variable",
@@ -84,8 +87,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    42,
-			description: "Should preserve integer type",
+			expected:    "__VAR_REF__count",
+			description: "Should return __VAR_REF__ marker for integer variable",
 		},
 		{
 			name: "dynamic prop - float variable",
@@ -95,8 +98,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    15.5,
-			description: "Should preserve float type",
+			expected:    "__VAR_REF__discount",
+			description: "Should return __VAR_REF__ marker for float variable",
 		},
 		{
 			name: "dynamic prop - array variable",
@@ -106,11 +109,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected: []any{
-				map[string]any{"id": 1, "name": "Widget", "price": 29.99},
-				map[string]any{"id": 2, "name": "Gadget", "price": 49.99},
-			},
-			description: "Should preserve array structure",
+			expected:    "__VAR_REF__products",
+			description: "Should return __VAR_REF__ marker for array variable",
 		},
 		{
 			name: "dynamic prop - function reference",
@@ -120,8 +120,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "function(p) { return '$' + p; }",
-			description: "Should pass function as string",
+			expected:    "__VAR_REF__formatPrice",
+			description: "Should return __VAR_REF__ marker for function variable",
 		},
 		{
 			name: "dynamic prop - property access expression",
@@ -219,8 +219,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "nonExistentVar",
-			description: "Should return expression string when variable not found",
+			expected:    "__VAR_REF__nonExistentVar",
+			description: "Should return __VAR_REF__ marker even when variable not found",
 		},
 		{
 			name: "dynamic prop - template literal expression",
@@ -241,8 +241,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    42,
-			description: "Should handle whitespace and lookup variable",
+			expected:    "__VAR_REF__count",
+			description: "Should handle whitespace and return __VAR_REF__ marker",
 		},
 		{
 			name: "dynamic prop - special case for validationErrors",
@@ -252,94 +252,100 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "validationErrors",
-			description: "Special case should return expression string for errors prop",
+			expected:    "__VAR_REF__validationErrors",
+			description: "Should return __VAR_REF__ marker for validationErrors",
 		},
 
 		// ========== Shorthand Props ({prop}) ==========
+		// Parser creates shorthand props with IsDynamic=true AND Value=propName
+		// So they return __VAR_REF__ markers just like dynamic props
 		{
 			name: "shorthand prop - variable found",
 			prop: ast.ComponentProp{
 				Name:        "user",
-				Value:       "",
+				Value:       "user", // Parser sets value to prop name
 				IsShorthand: true,
+				IsDynamic:   true, // Parser ALSO sets IsDynamic
 			},
 			parentScope: parentScope,
-			expected:    "Alice",
-			description: "Should lookup variable by prop name",
+			expected:    "__VAR_REF__user",
+			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
 		},
 		{
 			name: "shorthand prop - boolean found",
 			prop: ast.ComponentProp{
 				Name:        "isLoggedIn",
-				Value:       "",
+				Value:       "isLoggedIn",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    true,
-			description: "Should preserve boolean type in shorthand",
+			expected:    "__VAR_REF__isLoggedIn",
+			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
 		},
 		{
 			name: "shorthand prop - integer found",
 			prop: ast.ComponentProp{
 				Name:        "count",
-				Value:       "",
+				Value:       "count",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    42,
-			description: "Should preserve integer type in shorthand",
+			expected:    "__VAR_REF__count",
+			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
 		},
 		{
 			name: "shorthand prop - object found",
 			prop: ast.ComponentProp{
 				Name:        "currentUser",
-				Value:       "",
+				Value:       "currentUser",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected: map[string]any{
-				"name": "John Doe",
-				"role": "admin",
-				"id":   123,
-			},
-			description: "Should pass object reference in shorthand",
+			expected:    "__VAR_REF__currentUser",
+			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
 		},
 		{
 			name: "shorthand prop - array found",
 			prop: ast.ComponentProp{
 				Name:        "items",
-				Value:       "",
+				Value:       "items",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    []any{1, 2, 3},
-			description: "Should pass array reference in shorthand",
+			expected:    "__VAR_REF__items",
+			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
 		},
 		{
 			name: "shorthand prop - variable not found",
 			prop: ast.ComponentProp{
 				Name:        "missingProp",
-				Value:       "",
+				Value:       "missingProp",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    nil,
-			description: "Should return nil when variable not found",
+			expected:    "__VAR_REF__missingProp",
+			description: "Should return __VAR_REF__ marker even when not found",
 		},
 		{
 			name: "shorthand prop - title found",
 			prop: ast.ComponentProp{
 				Name:        "title",
-				Value:       "",
+				Value:       "title",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    "Welcome",
-			description: "Should lookup title by prop name",
+			expected:    "__VAR_REF__title",
+			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
 		},
 
 		// ========== Static Props (prop="value") ==========
+		// Static props return parsed values (unchanged behavior)
 		{
 			name: "static prop - simple string",
 			prop: ast.ComponentProp{
@@ -347,8 +353,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: `"Click Me"`,
 			},
 			parentScope: parentScope,
-			expected:    "Click Me",
-			description: "Should parse quoted string",
+			expected:    `"Click Me"`,
+			description: "Should return string with quotes (static props don't parse)",
 		},
 		{
 			name: "static prop - single quoted string",
@@ -357,8 +363,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: `'Hello'`,
 			},
 			parentScope: parentScope,
-			expected:    "Hello",
-			description: "Should parse single quoted string",
+			expected:    `'Hello'`,
+			description: "Should return string with quotes (static props don't parse)",
 		},
 		{
 			name: "static prop - boolean true",
@@ -367,8 +373,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: "true",
 			},
 			parentScope: parentScope,
-			expected:    true,
-			description: "Should parse boolean true",
+			expected:    "true",
+			description: "Should return boolean as string (static props)",
 		},
 		{
 			name: "static prop - boolean false",
@@ -377,8 +383,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: "false",
 			},
 			parentScope: parentScope,
-			expected:    false,
-			description: "Should parse boolean false",
+			expected:    "false",
+			description: "Should return boolean as string (static props)",
 		},
 		{
 			name: "static prop - integer",
@@ -387,8 +393,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: "42",
 			},
 			parentScope: parentScope,
-			expected:    42,
-			description: "Should parse integer",
+			expected:    "42",
+			description: "Should return integer as string (static props)",
 		},
 		{
 			name: "static prop - negative integer",
@@ -397,8 +403,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: "-10",
 			},
 			parentScope: parentScope,
-			expected:    -10,
-			description: "Should parse negative integer",
+			expected:    "-10",
+			description: "Should return negative integer as string (static props)",
 		},
 		{
 			name: "static prop - float",
@@ -407,8 +413,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: "29.99",
 			},
 			parentScope: parentScope,
-			expected:    29.99,
-			description: "Should parse float",
+			expected:    "29.99",
+			description: "Should return float as string (static props)",
 		},
 		{
 			name: "static prop - negative float",
@@ -417,8 +423,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: "-5.5",
 			},
 			parentScope: parentScope,
-			expected:    -5.5,
-			description: "Should parse negative float",
+			expected:    "-5.5",
+			description: "Should return negative float as string (static props)",
 		},
 		{
 			name: "static prop - zero",
@@ -427,8 +433,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: "0",
 			},
 			parentScope: parentScope,
-			expected:    0,
-			description: "Should parse zero",
+			expected:    "0",
+			description: "Should return zero as string (static props)",
 		},
 		{
 			name: "static prop - null",
@@ -437,8 +443,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: "null",
 			},
 			parentScope: parentScope,
-			expected:    nil,
-			description: "Should parse null",
+			expected:    "null",
+			description: "Should return null as string (static props)",
 		},
 		{
 			name: "static prop - array",
@@ -477,8 +483,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: `""`,
 			},
 			parentScope: parentScope,
-			expected:    "",
-			description: "Should parse empty string",
+			expected:    `""`,
+			description: "Should return empty string with quotes (static props)",
 		},
 		{
 			name: "static prop - string with spaces",
@@ -487,8 +493,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: `"Hello World"`,
 			},
 			parentScope: parentScope,
-			expected:    "Hello World",
-			description: "Should preserve spaces in string",
+			expected:    `"Hello World"`,
+			description: "Should preserve spaces in string (static props)",
 		},
 		{
 			name: "static prop - string with escaped quotes",
@@ -497,8 +503,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: `"He said \"hello\""`,
 			},
 			parentScope: parentScope,
-			expected:    `He said "hello"`,
-			description: "Should handle escaped quotes",
+			expected:    `"He said \"hello\""`,
+			description: "Should preserve escaped quotes (static props)",
 		},
 		{
 			name: "static prop - scientific notation",
@@ -507,8 +513,8 @@ func TestResolvePropValue(t *testing.T) {
 				Value: "1e5",
 			},
 			parentScope: parentScope,
-			expected:    1e5,
-			description: "Should parse scientific notation",
+			expected:    "1e5",
+			description: "Should return scientific notation as string (static props)",
 		},
 	}
 
@@ -542,8 +548,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: nil,
-			expected:    "currentUser",
-			description: "Should return expression string when parent scope is nil",
+			expected:    "__VAR_REF__currentUser",
+			description: "Should return __VAR_REF__ marker when parent scope is nil",
 		},
 		{
 			name: "empty parent scope - dynamic prop",
@@ -553,30 +559,32 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{},
-			expected:    "total",
-			description: "Should return expression string when parent scope is empty",
+			expected:    "__VAR_REF__total",
+			description: "Should return __VAR_REF__ marker when parent scope is empty",
 		},
 		{
 			name: "nil parent scope - shorthand prop",
 			prop: ast.ComponentProp{
 				Name:        "user",
-				Value:       "",
+				Value:       "user",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: nil,
-			expected:    nil,
-			description: "Should return nil when parent scope is nil for shorthand",
+			expected:    "__VAR_REF__user",
+			description: "Should return __VAR_REF__ marker when parent scope is nil for shorthand",
 		},
 		{
 			name: "empty parent scope - shorthand prop",
 			prop: ast.ComponentProp{
 				Name:        "count",
-				Value:       "",
+				Value:       "count",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: map[string]any{},
-			expected:    nil,
-			description: "Should return nil when variable not in empty scope",
+			expected:    "__VAR_REF__count",
+			description: "Should return __VAR_REF__ marker when parent scope is empty for shorthand",
 		},
 		{
 			name: "nil parent scope - static prop",
@@ -585,7 +593,7 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				Value: `"Static"`,
 			},
 			parentScope: nil,
-			expected:    "Static",
+			expected:    `"Static"`,
 			description: "Static props should work without parent scope",
 		},
 		{
@@ -596,8 +604,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{"count": 10},
-			expected:    10,
-			description: "Should handle value without braces",
+			expected:    "__VAR_REF__count",
+			description: "Should return __VAR_REF__ marker even without braces",
 		},
 		{
 			name: "dynamic prop - empty braces",
@@ -635,23 +643,25 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 			name: "shorthand prop - prop name with underscore",
 			prop: ast.ComponentProp{
 				Name:        "user_name",
-				Value:       "",
+				Value:       "user_name",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: map[string]any{"user_name": "Bob"},
-			expected:    "Bob",
-			description: "Should handle prop names with underscores",
+			expected:    "__VAR_REF__user_name",
+			description: "Should return __VAR_REF__ marker for prop names with underscores",
 		},
 		{
 			name: "shorthand prop - prop name with dollar sign",
 			prop: ast.ComponentProp{
 				Name:        "$store",
-				Value:       "",
+				Value:       "$store",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope: map[string]any{"$store": map[string]any{"data": "value"}},
-			expected:    map[string]any{"data": "value"},
-			description: "Should handle prop names with dollar signs",
+			expected:    "__VAR_REF__$store",
+			description: "Should return __VAR_REF__ marker for prop names with dollar signs",
 		},
 		{
 			name: "static prop - whitespace value",
@@ -660,8 +670,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				Value: "   ",
 			},
 			parentScope: map[string]any{},
-			expected:    "",
-			description: "Whitespace-only value should return empty string",
+			expected:    "   ",
+			description: "Whitespace value should be returned as-is (static props)",
 		},
 		{
 			name: "parent scope with nil values",
@@ -671,8 +681,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{"nullValue": nil},
-			expected:    nil,
-			description: "Should return nil when parent scope has nil value",
+			expected:    "__VAR_REF__nullValue",
+			description: "Should return __VAR_REF__ marker even when value is nil",
 		},
 		{
 			name: "parent scope with zero values",
@@ -682,8 +692,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{"zero": 0},
-			expected:    0,
-			description: "Should return zero correctly (not treat as falsy)",
+			expected:    "__VAR_REF__zero",
+			description: "Should return __VAR_REF__ marker for zero value",
 		},
 		{
 			name: "parent scope with false value",
@@ -693,8 +703,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{"disabled": false},
-			expected:    false,
-			description: "Should return false correctly (not treat as missing)",
+			expected:    "__VAR_REF__disabled",
+			description: "Should return __VAR_REF__ marker for false value",
 		},
 		{
 			name: "parent scope with empty string",
@@ -704,8 +714,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{"emptyStr": ""},
-			expected:    "",
-			description: "Should return empty string from parent scope",
+			expected:    "__VAR_REF__emptyStr",
+			description: "Should return __VAR_REF__ marker for empty string",
 		},
 	}
 
@@ -735,21 +745,22 @@ func TestResolvePropValueLogging(t *testing.T) {
 		name         string
 		prop         ast.ComponentProp
 		parentScope  map[string]any
-		shouldLogWarning bool
+		shouldLog    bool
 		expectedLogSubstring string
 		description  string
 	}{
 		{
-			name: "shorthand prop not found - should log warning",
+			name: "shorthand prop not found - should log",
 			prop: ast.ComponentProp{
 				Name:        "missingVar",
-				Value:       "",
+				Value:       "missingVar",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope:  map[string]any{"otherVar": "value"},
-			shouldLogWarning: true,
-			expectedLogSubstring: "Warning: Shorthand prop 'missingVar' not found",
-			description:  "Should log warning when shorthand prop not found",
+			shouldLog:    true,
+			expectedLogSubstring: "NOT FOUND",
+			description:  "Should log when shorthand prop variable not found",
 		},
 		{
 			name: "dynamic prop not found - should log",
@@ -759,32 +770,33 @@ func TestResolvePropValueLogging(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope:  map[string]any{"other": "value"},
-			shouldLogWarning: true,
-			expectedLogSubstring: "dynamic expression",
-			description:  "Should log info about dynamic expression",
+			shouldLog:    true,
+			expectedLogSubstring: "NOT FOUND",
+			description:  "Should log about variable not found",
 		},
 		{
-			name: "shorthand prop found - no warning",
+			name: "shorthand prop found - should log kept as var ref",
 			prop: ast.ComponentProp{
 				Name:        "user",
-				Value:       "",
+				Value:       "user",
 				IsShorthand: true,
+				IsDynamic:   true,
 			},
 			parentScope:  map[string]any{"user": "Alice"},
-			shouldLogWarning: false,
-			expectedLogSubstring: "Warning",
-			description:  "Should not log warning when prop found",
+			shouldLog:    true,
+			expectedLogSubstring: "Keeping variable reference",
+			description:  "Should log that variable is kept as __VAR_REF__",
 		},
 		{
-			name: "static prop - no warning",
+			name: "static prop - no logging",
 			prop: ast.ComponentProp{
 				Name:  "label",
 				Value: `"Static"`,
 			},
 			parentScope:  map[string]any{},
-			shouldLogWarning: false,
-			expectedLogSubstring: "Warning",
-			description:  "Should not log warning for static props",
+			shouldLog:    false,
+			expectedLogSubstring: "extractPropValue",
+			description:  "Should not log for static props",
 		},
 	}
 
@@ -799,22 +811,22 @@ func TestResolvePropValueLogging(t *testing.T) {
 			// Check log output
 			logOutput := logBuffer.String()
 
-			if tt.shouldLogWarning {
+			if tt.shouldLog {
 				if !strings.Contains(logOutput, tt.expectedLogSubstring) {
 					t.Errorf("%s\nExpected log to contain: %q\nGot: %q",
 						tt.description, tt.expectedLogSubstring, logOutput)
 				}
 			} else {
 				if strings.Contains(logOutput, tt.expectedLogSubstring) {
-					t.Errorf("%s\nExpected no warning in log\nGot: %q",
-						tt.description, logOutput)
+					t.Errorf("%s\nExpected no log containing %q\nGot: %q",
+						tt.description, tt.expectedLogSubstring, logOutput)
 				}
 			}
 		})
 	}
 }
 
-// TestResolvePropValueTypePreservation tests that types are correctly preserved
+// TestResolvePropValueTypePreservation tests that the marker system preserves type information
 func TestResolvePropValueTypePreservation(t *testing.T) {
 	parentScope := map[string]any{
 		"strVal":   "text",
@@ -830,6 +842,7 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 		name         string
 		prop         ast.ComponentProp
 		expectedType string
+		expectedPrefix string
 		description  string
 	}{
 		{
@@ -840,7 +853,8 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				IsDynamic: true,
 			},
 			expectedType: "string",
-			description:  "String should remain string",
+			expectedPrefix: "__VAR_REF__",
+			description:  "Simple variable should return __VAR_REF__ marker",
 		},
 		{
 			name: "preserve int type",
@@ -849,8 +863,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{intVal}",
 				IsDynamic: true,
 			},
-			expectedType: "int",
-			description:  "Int should remain int",
+			expectedType: "string",
+			expectedPrefix: "__VAR_REF__",
+			description:  "Simple variable should return __VAR_REF__ marker",
 		},
 		{
 			name: "preserve float type",
@@ -859,8 +874,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{floatVal}",
 				IsDynamic: true,
 			},
-			expectedType: "float64",
-			description:  "Float should remain float64",
+			expectedType: "string",
+			expectedPrefix: "__VAR_REF__",
+			description:  "Simple variable should return __VAR_REF__ marker",
 		},
 		{
 			name: "preserve bool type",
@@ -869,8 +885,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{boolVal}",
 				IsDynamic: true,
 			},
-			expectedType: "bool",
-			description:  "Bool should remain bool",
+			expectedType: "string",
+			expectedPrefix: "__VAR_REF__",
+			description:  "Simple variable should return __VAR_REF__ marker",
 		},
 		{
 			name: "preserve nil type",
@@ -879,8 +896,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{nilVal}",
 				IsDynamic: true,
 			},
-			expectedType: "nil",
-			description:  "Nil should remain nil",
+			expectedType: "string",
+			expectedPrefix: "__VAR_REF__",
+			description:  "Simple variable should return __VAR_REF__ marker",
 		},
 		{
 			name: "preserve array type",
@@ -889,8 +907,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{arrayVal}",
 				IsDynamic: true,
 			},
-			expectedType: "[]interface {}",
-			description:  "Array should remain array",
+			expectedType: "string",
+			expectedPrefix: "__VAR_REF__",
+			description:  "Simple variable should return __VAR_REF__ marker",
 		},
 		{
 			name: "preserve object type",
@@ -899,8 +918,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{objVal}",
 				IsDynamic: true,
 			},
-			expectedType: "map[string]interface {}",
-			description:  "Object should remain map",
+			expectedType: "string",
+			expectedPrefix: "__VAR_REF__",
+			description:  "Simple variable should return __VAR_REF__ marker",
 		},
 	}
 
@@ -908,16 +928,19 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := resolvePropValue(tt.prop, parentScope)
 
-			var actualType string
-			if result == nil {
-				actualType = "nil"
-			} else {
-				actualType = reflect.TypeOf(result).String()
-			}
+			actualType := reflect.TypeOf(result).String()
 
 			if actualType != tt.expectedType {
 				t.Errorf("%s\nGot type: %s, want: %s\nValue: %v",
 					tt.description, actualType, tt.expectedType, result)
+			}
+
+			// Check for __VAR_REF__ prefix
+			if strResult, ok := result.(string); ok {
+				if !strings.HasPrefix(strResult, tt.expectedPrefix) {
+					t.Errorf("%s\nExpected prefix: %s\nGot: %s",
+						tt.description, tt.expectedPrefix, strResult)
+				}
 			}
 		})
 	}

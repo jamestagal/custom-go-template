@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session Management
+
+**IMPORTANT - Context Usage Warning**: Always warn the user about remaining context tokens before starting a new task to ensure there is enough context left to complete the task. If context is running low (below 30-40%), ask the user to use `/compact` before proceeding with complex tasks.
+
+**Context Guidelines**:
+- ✅ **>50% remaining**: Sufficient for most tasks
+- ⚠️ **30-50% remaining**: Good for small-to-medium tasks; warn before large implementations
+- 🔴 **<30% remaining**: Should compact before starting new complex work
+
 ## Project Overview
 
 This is a custom Go template engine that transforms Svelte-inspired template syntax into Alpine.js-compatible HTML. The engine parses custom template syntax, transforms it through an AST, and renders reactive HTML components.
@@ -71,10 +80,27 @@ Template Source → Parser → AST → Transformer → Rendered HTML/CSS/JS
    - Used by the export let system to inject content from JSON files
    - See: `.agent-os/specs/2025-10-11-export-let-content-injection/` for full details
 
-7. **`cmd/server/`** - Development server
+7. **`analyzer/`** - Runtime vs build-time expression analysis
+   - `scope.go` - ScopeAnalyzer for distinguishing runtime-only from build-resolvable expressions
+   - `IsRuntimeExpression()` - Detects loop variables, Alpine stores, operators
+   - Checks dataScope for nil-valued entries (loop variable markers)
+   - Used by runtime component resolution system
+   - See: `.agent-os/specs/2025-10-15-runtime-component-resolution/` for full details
+
+8. **`builder/`** - Component registry generation
+   - `registry_generator.go` - Converts component ASTs to JavaScript template functions
+   - `GenerateComponentRegistry()` - Creates ES module with all component templates
+   - Converts `{expr}` to `${props.expr}` for JavaScript template literals
+   - Preserves Alpine.js directives (x-text, x-if, etc.)
+   - Context tracking for literal content blocks (style/script tags)
+   - Auto-generates `static/js/component-registry.js` on server startup
+
+9. **`cmd/server/`** - Development server
    - Serves templates at http://localhost:3000
    - Registers components from `examples/components/`
    - Extracts props, variables, and functions from fence sections
+   - Auto-generates component registry on startup (65 components)
+   - Serves runtime JavaScript: `/js/component-registry.js`, `/js/runtime-components.js`
 
 ## Template Syntax
 
@@ -107,6 +133,59 @@ Transforms to `<template x-for="item in items">`
 <ComponentName prop1="value" prop2={dynamicValue} />
 ```
 Components are imported from `examples/components/` and registered automatically.
+
+### Runtime Component Resolution
+
+The system supports **dynamic component resolution** for components whose names are only known at runtime (e.g., in loops).
+
+**Syntax:**
+```html
+{for component in components}
+  <Component:dynamic name={component.name} {...component.fields} />
+{/for}
+```
+
+**How It Works:**
+
+1. **Scope Analysis** (`analyzer/scope.go`):
+   - Detects if component name is runtime-only (loop variable, Alpine store, operator)
+   - Checks dataScope for nil-valued entries (loop variable markers)
+   - Example: `component.name` has `component` marked as `nil` in dataScope → runtime
+
+2. **Build-Time vs Runtime:**
+   - **Build-Time**: String literals like `"Hero2436"` → component inlined directly
+   - **Runtime**: Loop variables like `component.name` → runtime wrapper emitted
+
+3. **Runtime Wrapper** (emitted for runtime expressions):
+   ```html
+   <template x-for="(component, ) in components">
+     <div class="dyn-comp-runtime"
+          x-data="{compName: component.name, compProps: {...}}"
+          x-init="$renderDynamicComponent($el, compName, compProps)">
+     </div>
+   </template>
+   ```
+
+4. **Client-Side Resolution** (`static/js/runtime-components.js`):
+   - Alpine.js magic: `$renderDynamicComponent(el, name, props)`
+   - Loads component registry from `/js/component-registry.js`
+   - Renders component template function with props
+   - Re-initializes Alpine directives with `Alpine.initTree(el)`
+
+5. **Component Registry** (`static/js/component-registry.js`):
+   - Auto-generated on server startup (65 components)
+   - ES module format: `export default { 'Hero2436': (props) => \`...\`, ... }`
+   - Template functions convert `{expr}` to `${props.expr}`
+   - Alpine directives preserved for client-side hydration
+
+**Key Files:**
+- `analyzer/scope.go` - Runtime expression detection
+- `transformer/dynamic_component_by_name.go` - Routing and wrapper emission
+- `builder/registry_generator.go` - Component registry generation
+- `static/js/runtime-components.js` - Alpine.js magic function
+- `static/js/component-registry.js` - Auto-generated component templates
+
+**See:** `.agent-os/specs/2025-10-15-runtime-component-resolution/` for full implementation details
 
 ### Fence Section
 Front matter between `---` markers containing:
@@ -308,6 +387,72 @@ Components are defined in `examples/components/` as `.html` files. Each componen
 - Is registered on server startup
 - Props are extracted via `extractComponentProps()` in `cmd/server/main.go`
 - Component AST is stored and reused when component is referenced
+
+## Build-Time Loop Expansion
+
+The template engine expands loops at build time (like Svelte) instead of generating runtime Alpine.js x-for templates. This allows loop variables to be available during transformation, enabling dynamic component name resolution.
+
+### How It Works
+
+**Template:**
+```html
+---
+export let components
+---
+
+{for component in components}
+  <Component:dynamic name={component.name} {...component.fields} />
+{/for}
+```
+
+**Build Process:**
+1. Loop transformer resolves `components` array from dataScope (from JSON)
+2. For each component, creates iteration scope with actual component data
+3. Transforms body nodes with iteration scope (component.name resolves!)
+4. Appends transformed nodes to output
+5. Result: Fully expanded HTML, no x-for templates
+
+**Output (2 components in array):**
+```html
+<div class="hero" x-data='{"title":"Welcome"}'>
+  <h1 x-text="title">Welcome</h1>
+</div>
+
+<div class="services" x-data='{"title":"Our Services"}'>
+  <h2 x-text="title">Our Services</h2>
+</div>
+```
+
+### Hybrid Approach
+
+The system uses **build-time expansion when possible**, **runtime fallback when needed**:
+
+**Build-Time Expansion** (when collection resolvable):
+- Regular arrays in dataScope: `items`, `components`, `users`
+- Collections from JSON content files
+- Produces fully expanded HTML (no x-for)
+
+**Runtime Fallback** (when collection not resolvable):
+- Store collections: `$store.cart.items`
+- Complex expressions: `Array(count)`, `filteredItems`
+- Generates Alpine x-for template for runtime evaluation
+
+### Benefits
+
+1. **Component Name Resolution** - Loop variables available during transformation
+2. **Better SEO** - Fully expanded HTML in server-rendered output
+3. **Svelte Compatibility** - Matches Svelte's build-time expansion behavior
+4. **Performance** - No runtime loop evaluation needed for static content
+5. **Flexibility** - Runtime fallback for dynamic content
+
+### Implementation Files
+
+- `transformer/loops.go` - Build-time loop expansion logic
+- `transformer/scope.go` - Scope cloning utilities (`cloneScope`, `resolveCollectionFromScope`)
+- `transformer/component_loop_integration_test.go` - Integration tests
+- `tests/build_time_loop_expansion/` - Output validation tests
+
+**See:** `.agent-os/specs/2025-10-19-build-time-loop-expansion/` for full specification
 
 ## Alpine.js Integration
 

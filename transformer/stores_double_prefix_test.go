@@ -152,7 +152,7 @@ func TestAlpineAttributeWithStoreReference(t *testing.T) {
 			dataScope := make(map[string]any)
 			attributes := []ast.Attribute{tt.attr}
 			
-			result := transformAttributesWithStores(attributes, dataScope)
+			result := transformAttributeExpressions(attributes, dataScope)
 			
 			if len(result) != 1 {
 				t.Fatalf("Expected 1 attribute, got %d", len(result))

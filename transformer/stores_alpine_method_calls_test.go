@@ -75,7 +75,7 @@ func TestAlpineAttributesWithMethodCalls(t *testing.T) {
 			attributes := []ast.Attribute{tt.inputAttr}
 			dataScope := make(map[string]any)
 
-			result := transformAttributesWithStores(attributes, dataScope)
+			result := transformAttributeExpressions(attributes, dataScope)
 
 			// Should have exactly 1 attribute
 			if len(result) != 1 {
@@ -129,7 +129,7 @@ func TestNonAlpineAttributesWithStoreExpressions(t *testing.T) {
 				IsAlpine: false,
 			},
 			expectedValue: "$store.theme.mode",
-			expectedName:  ":class", // Should get : prefix
+			expectedName:  "class", // Name stays as "class", Dynamic flag is set to true
 		},
 		{
 			name: "title with mixed content",
@@ -139,7 +139,7 @@ func TestNonAlpineAttributesWithStoreExpressions(t *testing.T) {
 				IsAlpine: false,
 			},
 			expectedValue: "'User: ' + $store.user.name",
-			expectedName:  ":title",
+			expectedName:  "title", // Name stays as "title", Dynamic flag is set to true
 		},
 	}
 
@@ -150,7 +150,7 @@ func TestNonAlpineAttributesWithStoreExpressions(t *testing.T) {
 			attributes := []ast.Attribute{tt.inputAttr}
 			dataScope := make(map[string]any)
 
-			result := transformAttributesWithStores(attributes, dataScope)
+			result := transformAttributeExpressions(attributes, dataScope)
 
 			if len(result) != 1 {
 				t.Fatalf("Expected 1 attribute, got %d", len(result))
@@ -158,12 +158,25 @@ func TestNonAlpineAttributesWithStoreExpressions(t *testing.T) {
 
 			attr := result[0]
 
+			// Check attribute name (should NOT have : prefix in AST, that's added by renderer)
 			if attr.Name != tt.expectedName {
 				t.Errorf("Attribute name: got %q, want %q", attr.Name, tt.expectedName)
 			}
 
+			// Check attribute value
 			if attr.Value != tt.expectedValue {
 				t.Errorf("Attribute value:\ngot:  %q\nwant: %q", attr.Value, tt.expectedValue)
+			}
+
+			// CRITICAL: Check that Dynamic flag is set to true
+			// The renderer will add the : prefix based on this flag
+			if !attr.Dynamic {
+				t.Errorf("Expected Dynamic=true for non-Alpine store attribute, got Dynamic=%v", attr.Dynamic)
+			}
+
+			// Should NOT be marked as Alpine
+			if attr.IsAlpine {
+				t.Errorf("Expected IsAlpine=false for regular HTML attribute, got IsAlpine=%v", attr.IsAlpine)
 			}
 		})
 	}

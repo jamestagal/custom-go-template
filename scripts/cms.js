@@ -27,10 +27,24 @@ function createInputs(obj, container) {
         }
     }
 }
-const cms = document.getElementById('plenti_cms');
-createInputs(cms_fields, cms);
 
-document.getElementById('toggle_plenti_cms').addEventListener('click', function () {
-    const menu = document.getElementById('plenti_cms');
-    menu.classList.toggle('menu-visible');
-});
+// CRITICAL FIX: Add null guard for missing #plenti_cms element
+const cms = document.getElementById('plenti_cms');
+if (cms) {
+    createInputs(cms_fields, cms);
+} else {
+    console.warn('[CMS] #plenti_cms element not found in DOM - CMS UI disabled');
+}
+
+// CRITICAL FIX: Add null guard for toggle button
+const toggleButton = document.getElementById('toggle_plenti_cms');
+if (toggleButton) {
+    toggleButton.addEventListener('click', function () {
+        const menu = document.getElementById('plenti_cms');
+        if (menu) {
+            menu.classList.toggle('menu-visible');
+        }
+    });
+} else {
+    console.warn('[CMS] #toggle_plenti_cms button not found - CMS toggle disabled');
+}

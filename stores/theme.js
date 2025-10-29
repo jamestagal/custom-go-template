@@ -1,4 +1,4 @@
-{
+export default {
   mode: 'light',
   colors: {
     light: {

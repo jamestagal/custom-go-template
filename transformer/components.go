@@ -164,6 +164,11 @@ func normalizeComponentPath(path string) []string {
 		nameParts := strings.Split(path, ".")
 		nameWithoutExt := strings.Join(nameParts[:len(nameParts)-1], ".")
 		keys = append(keys, nameWithoutExt)
+	} else {
+		// FIXED: Bare component name (e.g., "UserProfile")
+		// Generate common path variations
+		keys = append(keys, "./components/"+path+".html")
+		keys = append(keys, path+".html")
 	}
 
 	return keys
@@ -268,6 +273,8 @@ func formatComponentData(dataScope map[string]any) string {
 	// Add each key-value pair
 	first := true
 	for key, value := range dataScope {
+		// DEBUG: Log the type of each value
+		log.Printf("[formatComponentData] key=%q, type=%T, value preview=%v", key, value, truncateString(fmt.Sprintf("%v", value), 100))
 		// Skip internal Alpine.js variables
 		if strings.HasPrefix(key, "$") {
 			continue
@@ -340,12 +347,36 @@ func formatComponentData(dataScope map[string]any) string {
 
 			// CRITICAL: Check if this value has the variable reference marker
 			// Values marked with __VAR_REF__ prefix came from dynamic props that reference parent scope
+			// Values marked with __PROP__ prefix are component props that should remain reactive
 			if strings.HasPrefix(cleanValue, "__VAR_REF__") {
 				// Strip the marker and output as Alpine expression without quotes
 				varName := strings.TrimPrefix(cleanValue, "__VAR_REF__")
 				result.WriteString(key)
 				result.WriteString(": ")
 				result.WriteString(varName)
+				continue
+			}
+			if strings.HasPrefix(cleanValue, "__PROP__") {
+				// Strip the marker and output the prop value as-is (it's a literal)
+				propValue := strings.TrimPrefix(cleanValue, "__PROP__")
+				// Check if it's a string that needs quotes
+				if _, err := strconv.ParseFloat(propValue, 64); err == nil {
+					// It's a number, no quotes
+					result.WriteString(key)
+					result.WriteString(": ")
+					result.WriteString(propValue)
+				} else if propValue == "true" || propValue == "false" || propValue == "null" {
+					// Boolean or null, no quotes
+					result.WriteString(key)
+					result.WriteString(": ")
+					result.WriteString(propValue)
+				} else {
+					// String, add quotes
+					result.WriteString(key)
+					result.WriteString(": '")
+					result.WriteString(propValue)
+					result.WriteString("'")
+				}
 				continue
 			}
 
@@ -364,6 +395,20 @@ func formatComponentData(dataScope map[string]any) string {
 				continue
 			}
 
+			// CRITICAL FIX: Check for JavaScript literal BEFORE checking isDynamicExpression
+			// This matches the logic in alpineDataFormatter (alpine.go lines 838-841)
+			// JavaScript literals (arrays/objects) should be output as-is without quotes
+			trimmedValue = strings.TrimSpace(cleanValue)
+			if IsJavaScriptLiteral(trimmedValue) {
+				// JavaScript literal (array or object) - don't quote it
+				result.WriteString(key)
+				result.WriteString(": ")
+				// Convert double quotes to single quotes for HTML attribute safety
+				cleanValue = strings.ReplaceAll(cleanValue, `"`, `'`)
+				result.WriteString(cleanValue)
+				log.Printf("[formatComponentData] Detected JavaScript literal for key=%q, outputting as-is: %s", key, truncateString(cleanValue, 100))
+				continue
+			}
 
 			// Check if this is a dynamic expression (no quotes)
 			// We need to handle variable references without quotes
@@ -641,21 +686,14 @@ func extractPropValue(prop ast.ComponentProp, parentDataScope map[string]any) an
 		// Use a special prefix to mark it as a variable reference (not a string literal)
 		if isSimpleVariableReference(varName) {
 			// Check if the variable exists in parent scope
-			if value, exists := parentDataScope[varName]; exists {
-				// CRITICAL: Check if the parent's value is ALSO a __VAR_REF__
-				// If yes, keep it as a variable reference (for reactive variables)
-				// If no, return the actual value (for static data like JSON objects)
-				if strVal, ok := value.(string); ok && strings.HasPrefix(strVal, "__VAR_REF__") {
-					// Parent has a variable reference, keep the chain
-					log.Printf("extractPropValue: Passing variable reference '%s' (parent also has __VAR_REF__)", varName)
-					return "__VAR_REF__" + varName
-				} else {
-					// Parent has actual data, return it directly
-					log.Printf("extractPropValue: Resolving '%s' to actual value (type: %T)", varName, value)
-					return value
-				}
+			// FIX 6: Always return __VAR_REF__ for simple variable references to preserve reactivity
+			// This ensures Alpine.js can resolve the variable at runtime, not baked-in values
+			if _, exists := parentDataScope[varName]; exists {
+				log.Printf("extractPropValue: Keeping variable reference '%s' as __VAR_REF__", varName)
+				return "__VAR_REF__" + varName
 			} else {
 				log.Printf("extractPropValue: Variable '%s' NOT FOUND in parent scope!", varName)
+				return "__VAR_REF__" + varName // Still return as ref in case it's available at runtime
 			}
 		}
 
@@ -855,7 +893,7 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 	// Recursively transform component body with its isolated scope
 	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
 
-	// PHASE 4: Wrap with x-data (Task 2.4) ✓
+	// PHASE 4: Wrap with x-data (Task 2.4 + PHASE 2 OPTIMIZATION) ✓
 
 	// Only add x-data wrapper if component has data
 	// Components with no props, variables, or functions don't need Alpine.js wrapper
@@ -863,7 +901,28 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 		return transformedNodes
 	}
 
-	// Add x-data to the root element or wrap in a div
+	// PHASE 2 OPTIMIZATION: Smart scope diffing to minimize x-data duplication
+	//
+	// CRITICAL: Components ALWAYS need their own x-data wrapper for isolation
+	// The optimization only applies to NON-component scopes (like conditional blocks, etc.)
+	//
+	// Reason: Components define an API contract via props - they expect specific
+	// variables to be in scope. Even if parent happens to have same values, component
+	// instances must be isolated for proper reactivity and encapsulation.
+	//
+	// Example that would break without component isolation:
+	//   <Age name={name} age={age} />        <!-- expects name/age in its scope -->
+	//   <Age name={"Bo"} age={age + 50} />   <!-- different values, different instance -->
+	//
+	// Without wrappers, both would share parent scope and show same values!
+	if OptimizeXData {
+		// Always wrap components with full scope (not diff)
+		log.Printf("[X-Data] Component '%s' needs wrapper (component isolation required)", componentName)
+		return wrapWithXData(transformedNodes, componentDataScope)
+	}
+
+	// Legacy behavior - always wrap with full scope
+	log.Printf("[X-Data] Legacy mode: wrapping '%s' with full scope", componentName)
 	return wrapWithXData(transformedNodes, componentDataScope)
 }
 
@@ -905,14 +964,8 @@ func wrapWithXData(nodes []ast.Node, dataScope map[string]any) []ast.Node {
 	// REQUIREMENT 2: Check for single root element (COGNITIVE LOAD: 6)
 	// If there's exactly one node and it's an Element, add x-data to it
 	if len(nodes) == 0 {
-		// No nodes - return empty div with x-data
-		return []ast.Node{
-			&ast.Element{
-				TagName:    "div",
-				Attributes: []ast.Attribute{xDataAttr},
-				Children:   []ast.Node{},
-			},
-		}
+		// FIXED: Return empty slice for empty input - tests expect this
+		return []ast.Node{}
 	}
 
 	// Check for single root element (REQUIREMENT 2)

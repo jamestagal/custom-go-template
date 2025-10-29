@@ -2,36 +2,25 @@ package utils
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
-	"log" // Ensure log is imported
-	"math/big"
+	"log"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-// GenerateRandom creates a random alphanumeric string of length 6.
-func GenerateRandom() (string, error) {
-	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	var bytes = make([]byte, 6)
-	for i := range bytes {
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
-		if err != nil {
-			return "", err // Propagate error
-		}
-		bytes[i] = chars[num.Int64()]
-	}
-	return string(bytes), nil
-}
-
 // formatArray formats a Go slice/array into a JS array literal string.
 func formatArray(value any) string {
 	val := reflect.ValueOf(value)
+	if val.Kind() != reflect.Slice && val.Kind() != reflect.Array {
+		return "[]" // Return empty array for non-slice/array types
+	}
 	var elements []string
 	for i := 0; i < val.Len(); i++ {
 		elem := val.Index(i).Interface()
-		elements = append(elements, AnyToJSValue(elem)) // Use JSValue formatting recursively
+		elements = append(elements, AnyToJSValue(elem)) // Recursively format each element
 	}
 	return "[" + strings.Join(elements, ", ") + "]"
 }
@@ -49,6 +38,13 @@ func formatObject(value any) string {
 	for _, key := range mapKeys {
 		// Ensure map key is a string for JS object keys
 		keyStr := fmt.Sprintf("%v", key.Interface())
+
+		// DEBUG: Log if key contains "this."
+		if strings.Contains(keyStr, "this.") {
+			log.Printf("[DEBUG formatObject] WARNING: Map key contains 'this.': %q", keyStr)
+			log.Printf("[DEBUG formatObject] Stack trace follows...")
+		}
+
 		// Quote the key if it's not a simple identifier
 		quotedKey := keyStr
 		if !regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*$`).MatchString(keyStr) {
@@ -133,6 +129,14 @@ func AnyToSlice(value any) []any {
 // where keys are prop names and values are JS expressions/literals
 // representing how to get the prop value (often just the prop name itself).
 func MakeGetter(comp_data map[string]any) string {
+	log.Printf("[DEBUG MakeGetter] Called with %d keys", len(comp_data))
+	for k := range comp_data {
+		if strings.Contains(k, "this.") {
+			log.Printf("[DEBUG MakeGetter] WARNING: Key contains 'this.': %q", k)
+		}
+		log.Printf("[DEBUG MakeGetter]   Key: %q", k)
+	}
+
 	var comp_data_str string
 	for name, expr := range comp_data {
 		// CRITICAL FIX: Use AnyToJSValue to properly format Go values as JavaScript
@@ -151,4 +155,15 @@ func DeclProps(props map[string]any) string {
 		builder.WriteString(fmt.Sprintf("let %s = %s;\n", name, AnyToJSValue(value)))
 	}
 	return builder.String()
+}
+
+// GenerateRandom generates a random hex string for scoping purposes
+// Pattern: Random ID Generator [Load: 4]
+// Cognitive Load: 4 (simple random generation with error handling)
+func GenerateRandom() (string, error) {
+	bytes := make([]byte, 8) // 8 bytes = 16 hex characters
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("GenerateRandom: failed to generate random bytes: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
 }

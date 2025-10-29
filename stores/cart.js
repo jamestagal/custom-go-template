@@ -1,4 +1,4 @@
-{
+export default {
   items: [],
   total: 0,
   get formattedTotal() {

@@ -1,0 +1,334 @@
+# Session Summary: Debugging JavaScript Syntax Errors and CSS Rendering
+
+**Date**: 2025-10-22
+**Session Duration**: ~5 hours (across 2 sessions)
+**Token Usage**:
+- Session 1: 97,551/200,000 (49%)
+- Session 2: ~115,000/200,000 (58%)
+**Starting Commit**: `3bc8279` - "WIP: Attempted fixes for JS syntax errors and CSS rendering"
+**Ending Commits**:
+- `ce53277` - JavaScript literal quote conversion (partial fix)
+- `9797916` - Complete JavaScript syntax error fix
+- `6385261` - Expression debugging system
+**MANDATORY: Use go-backend agent for all Go implementation**
+
+## Initial Issues Reported
+
+1. ❌ **JavaScript Syntax Error**: `Uncaught SyntaxError: Unexpected token '}'`
+2. ❌ **Notification Buttons Regression**: 200+ duplicate "Show" buttons instead of 4-5
+3. ❌ **Component CSS Not Rendering**: Styles from UserProfile, Todos, Notification components not visible
+
+## Work Completed
+
+### ✅ **Fix 1: Notification Buttons (RESOLVED)**
+
+**Problem**: The notifications loop was showing 200+ buttons due to build-time loop expansion instead of using runtime x-for.
+
+**Root Cause**: `loopBodyNeedsRuntime()` in `transformer/loops.go` didn't detect HTML event handlers like `onclick`.
+
+**Fix Applied**:
+- File: `transformer/loops.go` (lines 161-189)
+- Added detection for HTML event handlers starting with "on" (onclick, onchange, etc.)
+- Forces runtime x-for template for loops containing event handlers
+
+**Status**: ✅ **WORKING** - Verified only 9 buttons total on page (not 200+)
+
+### ✅ **Fix 2: Unquoted JavaScript Literals (RESOLVED)**
+
+**Problem**: Multiline JavaScript objects/arrays from fence section were being treated as strings and re-quoted.
+
+**Root Cause**: `buildXDataFromProps()` in `cmd/server/main.go` checked for **quoted** literals (`"[...]"`) but fence parser stores multiline values as **unquoted** strings (`[...]`).
+
+**Investigation by go-backend agent**:
+```
+Fence: let user1 = {\n  name: "Benjamin"\n}
+  ↓
+Parser: variable.Value = "{\n  name: \"Benjamin\"\n}"  ← STRING (no outer quotes)
+  ↓
+buildXDataFromProps: Treats as regular string → '{\n  name: \'Benjamin\'\n}' ❌
+```
+
+**Fix Applied**:
+- File: `cmd/server/main.go` (lines 920-929)
+- Added check for **unquoted** JavaScript literals BEFORE checking for quoted strings
+- Calls `transformer.IsJavaScriptLiteral()` and `IsFunctionExpression()`
+- Returns unquoted literals as-is without re-quoting
+
+**Status**: ✅ **WORKING** - Verified `notifications:[` in body x-data (actual array, not quoted string)
+
+### ✅ **Fix 3: JavaScript Syntax Error (RESOLVED - 2025-10-22 New Session)**
+
+**Problem**: Double quotes in JavaScript literals within x-data attributes were breaking HTML attribute parsing.
+
+**Root Cause Identified**:
+```html
+<!-- BROKEN: Double quotes terminate the HTML attribute prematurely -->
+<div x-data="{ type: "success" }">
+                    ↑ attribute ends here, causing syntax error
+```
+
+When `FormatGoValueToJS()` in `transformer/alpine.go` returned JavaScript with double quotes, they conflicted with the double quotes used for the HTML attribute delimiter.
+
+**Investigation Process**:
+1. Initial fix applied to `cmd/server/main.go` (commit ce53277) - converted double quotes in unquoted JS literals
+2. User reported error still occurring
+3. go-backend agent identified the real issue: `FormatGoValueToJS()` in `transformer/alpine.go` was also returning double quotes
+4. Comprehensive fix applied across all code paths
+
+**Fix Applied** (commit 9797916):
+- File: `transformer/alpine.go` - Modified `FormatGoValueToJS()` to convert ALL double quotes to single quotes
+- Applied to three code paths:
+  1. Double-quoted strings containing JS literals
+  2. Single-quoted strings containing JS literals
+  3. Unquoted JavaScript literals
+- Result: All JavaScript in x-data uses single quotes, which don't conflict with HTML attribute delimiters
+
+**Verification**:
+```html
+<!-- FIXED: Single quotes are safe in double-quoted attributes -->
+<div x-data="{ type: 'success', message: 'Saved!' }">
+```
+
+**Status**: ✅ **RESOLVED** - User confirmed error is gone, Alpine.js initializes successfully
+
+### ✅ **Fix 4: Component CSS Not Rendering (RESOLVED - 2025-10-22 New Session)**
+
+**Problem**: Component styles (Notification, UserProfile, etc.) weren't being applied because dynamic class expressions weren't being transformed.
+
+**Root Cause Identified**:
+
+Template with dynamic class:
+```html
+<div class="notification notification-{type}">
+```
+
+Was rendering **literally** in HTML:
+```html
+<div class="notification notification-{type}">
+```
+
+The curly braces appeared as literal text instead of being transformed, so CSS selectors like `.notification-success` couldn't match.
+
+**Investigation Process**:
+1. Verified CSS styles ARE present in `<head>` section ✓
+2. Confirmed CSS classes defined correctly ✓
+3. Found class attributes with `{expressions}` weren't being transformed
+4. Fixed transformation logic in `transformer/stores.go`
+5. Fixed double colon bug (`::class` → `:class`)
+
+**Fix Applied** (commit from go-backend agent):
+
+Extended `transformAttributesWithStores()` in `transformer/stores.go`:
+- Added detection for **regular expressions** (not just store expressions)
+- Implemented three transformation cases:
+  1. Pure expression: `class="{className}"` → `:class="className"`
+  2. Pure store: `class="{$store.theme}"` → `:class="$store.theme"`
+  3. Mixed content: `class="notification notification-{type}"` → `:class="'notification notification-' + type"`
+- Fixed double colon bug where `Dynamic=true` attributes were getting `:` prefix twice
+
+**Files Modified**:
+- `transformer/stores.go` - Extended attribute transformation (~100 lines)
+- `transformer/class_expression_test.go` - Comprehensive test suite (4 tests)
+- `transformer/simple_attr_test.go` - Direct unit tests (2 tests)
+
+**Verification**:
+```html
+<!-- BEFORE (broken) -->
+<div class="notification notification-{type}">
+
+<!-- AFTER (working) -->
+<div :class="'notification notification-' + type">
+```
+
+**Impact**:
+- ✅ Dynamic CSS classes now work in all components
+- ✅ Notification component shows correct colors (success=green, error=red, etc.)
+- ✅ Any component with dynamic classes (e.g., `class="btn btn-{variant}"`) now supported
+- ✅ Alpine.js evaluates classes correctly at runtime
+
+**Status**: ✅ **RESOLVED** - All 6 tests pass, CSS rendering confirmed working
+
+## Files Modified This Session
+
+### Core Fixes
+1. **transformer/loops.go** - HTML event handler detection
+2. **cmd/server/main.go** - Unquoted JavaScript literal detection
+3. **transformer/alpine.go** - Exported helper functions (IsJavaScriptLiteral, IsFunctionExpression)
+4. **transformer/components.go** - Updated helper function calls
+
+### Test Files
+5. **transformer/loops_test.go** - Updated for new logic
+6. **renderer/styles.go** - Component name capitalization fix
+7. **renderer/styles_test.go** - Updated test signatures
+
+### Documentation
+8. **.agent-os/specs/2025-10-16-component-registry-debugging/FIX_APPLIED.md** - Documentation
+9. **.agent-os/debug/** - Investigation reports and extracted data
+
+## Commits Made
+
+**Previous Commit**: `3bc8279` - "WIP: Attempted fixes for JS syntax errors and CSS rendering"
+
+**New Commit** (by another agent): Included unquoted JavaScript literal fix to `cmd/server/main.go`
+
+## Known Issues for Next Session
+
+### Priority 1: JavaScript Syntax Error
+- **Error**: `Uncaught SyntaxError: Unexpected token '}'`
+- **Impact**: Alpine.js can't initialize, breaking reactive components
+- **Next Step**: Extract full body x-data, parse with JavaScript to find exact error location
+
+### Priority 2: Component CSS Rendering
+- **Issue**: Styles not visible despite being present in HTML
+- **Likely Cause**: Alpine.js initialization blocked by syntax error
+- **Next Step**: Verify CSS works once JavaScript error is fixed
+
+### Priority 3: Background Server Cleanup
+- **Issue**: Multiple background `go run` processes still running
+- **Impact**: Port conflicts, resource usage
+- **Next Step**: Kill all processes before starting new session
+
+## Recommendations for Next Session
+
+1. **Start with clean slate**:
+   ```bash
+   pkill -9 -f "go run"
+   pkill -9 -f "cmd/server"
+   lsof -ti:3000 | xargs kill -9
+   lsof -ti:3333 | xargs kill -9
+   ```
+
+2. **Extract and analyze x-data**:
+   ```bash
+   go run cmd/server/main.go &
+   sleep 5
+   curl -s http://localhost:3333/jim-test > /tmp/jim-test.html
+   # Parse body x-data with JavaScript linter to find exact error
+   ```
+
+3. **Use JavaScript validator** to find syntax errors:
+   - Extract x-data attribute value
+   - Feed to Node.js or browser console
+   - Get exact line/column of error
+
+4. **Check component registry** for arrow function issues (per CRITICAL_BLOCKER_UPDATE.md)
+
+## Key Learnings
+
+1. **Parser stores multiline values as unquoted strings** - Must check for unquoted literals BEFORE quoted strings
+2. **HTML event handlers need runtime evaluation** - `onclick="{expr}"` references loop variables
+3. **Multiple code paths generate x-data** - Both `transformer/alpine.go` and `cmd/server/main.go` must be consistent
+4. **Background processes accumulate** - Need aggressive cleanup between tests
+
+## Files to Review in Next Session
+
+1. `cmd/server/main.go` - Check if debug logging added reveals brace count issues
+2. `builder/registry_generator.go` - Check for arrow function parameter prefixing bug
+3. `static/js/component-registry.js` - Auto-generated, check for syntax errors
+4. `layouts/html.html` - Template where body x-data is injected
+
+## Questions for Next Session
+
+1. Is the extra `}` in the body x-data or somewhere else?
+2. Is component-registry.js generating invalid JavaScript?
+3. Are HTML entities (`&quot;`) breaking JavaScript parsing?
+4. Why did the build fail when testing the brace count fix?
+
+---
+
+## ✅ Session Completion Summary (2025-10-22 - Continued Session)
+
+### All Original Issues RESOLVED
+
+1. ✅ **JavaScript Syntax Error** - FIXED
+2. ✅ **Notification Buttons Regression** - FIXED (previous session)
+3. ✅ **Component CSS Not Rendering** - FIXED
+
+### Key Fixes Applied
+
+**JavaScript Syntax Error Fix:**
+- **Problem:** Double quotes in JavaScript literals conflicted with HTML attribute delimiters
+- **Solution:** Convert all double quotes to single quotes in `FormatGoValueToJS()` and `buildXDataFromProps()`
+- **Files:** `transformer/alpine.go`, `cmd/server/main.go`
+- **Result:** Alpine.js initializes successfully, no syntax errors
+
+**Component CSS Fix:**
+- **Problem:** Dynamic class expressions like `{type}` weren't being transformed
+- **Solution:** Extended `transformAttributesWithStores()` to handle regular expressions, not just store expressions
+- **Files:** `transformer/stores.go` + test files
+- **Result:** Dynamic CSS classes work correctly, components render with proper styles
+
+**Critical Regression Fix:**
+- **Problem:** Initial class expression fix transformed ALL `{expr}` to runtime bindings, breaking build-time prop interpolation (caused `ReferenceError: description is not defined`)
+- **Solution:** Added build-time vs runtime detection logic with `IsSimpleVariable()` and `TryResolveBuildTimeValue()` helpers
+- **Files:** `transformer/stores.go`, `transformer/build_time_prop_test.go`
+- **Result:** Build-time props interpolated correctly, runtime variables get Alpine.js bindings
+
+### ✨ New Feature: Expression Debugging System (Commit `6385261`)
+
+**User Request:** Better visibility into build-time vs runtime expression resolution for Plenti development (most use cases should be build-time).
+
+**Implementation:**
+- Added `DEBUG_EXPRESSIONS=true` environment variable toggle
+- Zero performance impact when disabled (default)
+- Comprehensive logging of transformation decisions
+
+**Usage:**
+```bash
+DEBUG_EXPRESSIONS=true go run cmd/server/main.go
+```
+
+**Example Output:**
+```
+[EXPR-DEBUG] Attribute 'content' expression '{description}' → BUILD-TIME
+[EXPR-DEBUG]   ↳ Resolved value: "A powerful template engine"
+
+[EXPR-DEBUG] Attribute 'class' expression '{type}' → RUNTIME
+[EXPR-DEBUG]   ↳ Generated: :class="'notification-' + type"
+```
+
+**Files Added:**
+- `EXPRESSION_DEBUGGING_README.md` - Quick start guide
+- `docs/ExpressionDebugging.md` - Comprehensive documentation
+- `cmd/test_expression_debug/main.go` - Demo program
+- `examples/test_expression_debug.html` - Test template
+- `test_expression_debug.sh` - Helper script
+
+**Benefits:**
+- Helps diagnose unexpected runtime bindings
+- Makes transformation behavior transparent
+- Aids in template performance optimization
+- Educational tool for understanding the engine
+
+### Test Results
+
+- ✅ JavaScript syntax error eliminated
+- ✅ Alpine.js initializes successfully
+- ✅ No double colons in rendered HTML
+- ✅ Dynamic class bindings use correct `:class` syntax
+- ✅ All 6 new class transformation tests pass
+- ✅ Build-time prop interpolation tests pass
+- ✅ CSS styles apply correctly to components
+- ✅ No regression errors (description is defined)
+- ✅ Expression debugging outputs clear logs
+
+### Final Status
+
+**Server:** Running on port 3333
+**Branch:** runtime-component-resolution
+**All Issues:** RESOLVED ✅
+**New Features:** Expression debugging system added
+
+### Commits Summary
+
+1. **`ce53277`** - fix: Convert double quotes to single quotes in buildXDataFromProps (partial)
+2. **`9797916`** - fix: Convert double quotes in FormatGoValueToJS (complete fix)
+3. **`cfe9e8e`** - refactor: Extract store registration to shared utility
+4. **`682050d`** - docs: Update store files to use ES module export syntax
+5. **`6385261`** - feat: Add expression transformation debugging system
+
+---
+
+**Session End**: 2025-10-22
+**Goal Achieved**: ✅ Fixed JavaScript syntax error, CSS rendering issues, and added debugging tools
+**Total Fixes**: 3 critical bugs resolved + 1 new developer tool added

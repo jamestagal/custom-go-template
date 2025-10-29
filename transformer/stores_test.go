@@ -342,7 +342,7 @@ func TestStoreExpressionInAttributes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Transform the element's attributes
-			tt.element.Attributes = transformAttributesWithStores(tt.element.Attributes, tt.dataScope)
+			tt.element.Attributes = transformAttributeExpressions(tt.element.Attributes, tt.dataScope)
 
 			// Render to string
 			var sb strings.Builder

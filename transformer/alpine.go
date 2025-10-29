@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
@@ -16,6 +17,54 @@ var componentRegistry = make(map[string]bool)
 // Reset component tracking for each transformation
 func resetComponentTracking() {
 	componentRegistry = make(map[string]bool)
+}
+
+// DetectAndFixGoSliceFormat checks if a string is in Go's slice format
+// like "[dog cat bird]" and converts it to JavaScript array format "['dog','cat','bird']"
+//
+// Go's default slice string format: [item1 item2 item3] (space-separated, no commas)
+// JavaScript array format: ['item1','item2','item3'] (comma-separated, quoted strings)
+//
+// Pattern: String Format Detection and Conversion [Load: 10]
+// Cognitive Load: 10 (detection: 4, parsing: 3, conversion: 3)
+func DetectAndFixGoSliceFormat(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+
+	// Check if it looks like a Go slice: [item1 item2 item3]
+	if !strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]") {
+		return value, false
+	}
+
+	inner := trimmed[1 : len(trimmed)-1]
+	inner = strings.TrimSpace(inner)
+
+	// If inner has commas, it's already proper JSON/JS
+	if strings.Contains(inner, ",") {
+		return value, false
+	}
+
+	// If inner is empty, return empty array
+	if inner == "" {
+		return "[]", true
+	}
+
+	// Split by whitespace (Go's slice format)
+	parts := strings.Fields(inner)
+	if len(parts) == 0 {
+		return "[]", true
+	}
+
+	// Convert to JavaScript array with quoted strings
+	quotedParts := make([]string, len(parts))
+	for i, part := range parts {
+		// Remove any existing quotes and re-quote
+		part = strings.Trim(part, `"'`)
+		quotedParts[i] = fmt.Sprintf("'%s'", part)
+	}
+
+	result := fmt.Sprintf("[%s]", strings.Join(quotedParts, ","))
+	log.Printf("[DetectAndFixGoSliceFormat] Fixed Go slice format: %q → %q", trimmed, result)
+	return result, true
 }
 
 // isFunctionExpression checks if a string contains a JavaScript function definition.
@@ -51,7 +100,7 @@ func resetComponentTracking() {
 //   - "userName" (simple variable)
 //
 // Cognitive Load: 8
-func isFunctionExpression(expr string) bool {
+func IsFunctionExpression(expr string) bool {
 	expr = strings.TrimSpace(expr)
 
 	if len(expr) == 0 {
@@ -199,7 +248,7 @@ func isJavaScriptExpression(s string) bool {
 //   - Expressions: new Date().getFullYear()
 //
 // Cognitive Load: 6
-func isJavaScriptLiteral(s string) bool {
+func IsJavaScriptLiteral(s string) bool {
 	trimmed := strings.TrimSpace(s)
 
 	if len(trimmed) == 0 {
@@ -299,33 +348,105 @@ func FormatGoValueToJS(value any) string {
 
 	switch v := value.(type) {
 	case string:
-		log.Printf("[DEBUG formatGoValueToJS] Processing string: %q (len=%d)", v, len(v))
 
-		// CRITICAL FIX: Check if string is already quoted
-		// If the fence section parser stored the value with quotes (like `"./components/UserProfile.html"`),
-		// we should return it as-is, not add another layer of quotes
+		// FIRST: Check for malformed Go slice format BEFORE other checks
+		if fixed, wasFixed := DetectAndFixGoSliceFormat(v); wasFixed {
+			log.Printf("formatGoValueToJS: Fixed Go slice format: %q → %q", v, fixed)
+			return fixed
+		}
+
+		// CRITICAL FIX: Check if string is already quoted (double quotes, single quotes, or backticks)
+		// If the fence section parser stored the value with quotes, UNWRAP them first,
+		// then check if the unwrapped content is a JavaScript literal
+		//
+		// Example: let notifications = "[{ type: 'success', ... }]"
+		//   Old behavior: Unwrap → Re-quote as string → '[{ type: 'success', ... }]' (WRONG - string!)
+		//   New behavior: Unwrap → Check if JS literal → Return as-is (CORRECT - actual JS array!)
 		if isQuotedString(v) {
-			log.Printf("formatGoValueToJS: Detected already-quoted string, returning as-is: %s", v)
+			trimmed := strings.TrimSpace(v)
+
+			// Handle double-quoted strings
+			if strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`) && len(trimmed) > 1 {
+				// Unwrap the double quotes
+				unwrapped := trimmed[1 : len(trimmed)-1]
+				log.Printf("formatGoValueToJS: Unwrapped double-quoted string: %q → %q", v, unwrapped)
+
+				// CRITICAL FIX: Check if unwrapped content is a JavaScript literal
+				if IsJavaScriptLiteral(unwrapped) {
+					log.Printf("formatGoValueToJS: Unwrapped content is JS literal, converting quotes: %s", unwrapped[:min(50, len(unwrapped))])
+					// CRITICAL FIX: Convert double quotes to single quotes for HTML attribute safety
+					// When embedded in x-data="...", double quotes break the attribute
+					result := strings.ReplaceAll(unwrapped, `"`, `'`)
+					return result
+				}
+
+				// CRITICAL FIX: Check if unwrapped content is a function expression
+				if IsFunctionExpression(unwrapped) {
+					log.Printf("formatGoValueToJS: Unwrapped content is function expression, returning as-is")
+					return unwrapped
+				}
+
+				// Regular string - re-quote with single quotes
+				escaped := strings.ReplaceAll(unwrapped, `\`, `\\`)
+				escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+				escaped = strings.ReplaceAll(escaped, "\n", `\n`)
+				escaped = strings.ReplaceAll(escaped, "\r", `\r`)
+				escaped = strings.ReplaceAll(escaped, "\t", `\t`)
+				result := fmt.Sprintf(`'%s'`, escaped)
+				log.Printf("formatGoValueToJS: Re-quoted with single quotes: %q → %s", unwrapped, result)
+				return result
+			}
+
+			// Handle single-quoted strings
+			if strings.HasPrefix(trimmed, `'`) && strings.HasSuffix(trimmed, `'`) && len(trimmed) > 1 {
+				// Unwrap the single quotes
+				unwrapped := trimmed[1 : len(trimmed)-1]
+				log.Printf("formatGoValueToJS: Unwrapped single-quoted string: %q → %q", v, unwrapped)
+
+				// CRITICAL FIX: Check if unwrapped content is a JavaScript literal
+				if IsJavaScriptLiteral(unwrapped) {
+					log.Printf("formatGoValueToJS: Unwrapped content is JS literal, converting quotes: %s", unwrapped[:min(50, len(unwrapped))])
+					// CRITICAL FIX: Convert double quotes to single quotes for HTML attribute safety
+					// When embedded in x-data="...", double quotes break the attribute
+					result := strings.ReplaceAll(unwrapped, `"`, `'`)
+					return result
+				}
+
+				// CRITICAL FIX: Check if unwrapped content is a function expression
+				if IsFunctionExpression(unwrapped) {
+					log.Printf("formatGoValueToJS: Unwrapped content is function expression, returning as-is")
+					return unwrapped
+				}
+
+				// Already single-quoted, return as-is (safe for HTML attributes)
+				log.Printf("formatGoValueToJS: Already single-quoted string, returning as-is: %s", v)
+				return v
+			}
+
+			// For backticks, return as-is (template literals are safe)
+			log.Printf("formatGoValueToJS: Detected backtick-quoted string, returning as-is: %s", v)
 			return v
 		}
 
 		// Check if this string is a function definition
-		if isFunctionExpression(v) {
+		if IsFunctionExpression(v) {
 			// Return function without quotes
 			log.Printf("formatGoValueToJS: Detected function expression, returning as-is (length: %d)", len(v))
 			return v
 		}
 
 		// CRITICAL FIX: Check if it's a JavaScript literal (array or object)
-		// Return AS-IS without any conversion - Alpine.js will handle it
+		// Return with single quotes - required for HTML attribute embedding
 		// This preserves JavaScript syntax including ternaries, property access, etc.
-		if isJavaScriptLiteral(v) {
-			log.Printf("formatGoValueToJS: Detected JavaScript literal, returning as-is (length: %d, preview: %s...)",
+		if IsJavaScriptLiteral(v) {
+			log.Printf("formatGoValueToJS: Detected JavaScript literal, converting quotes (length: %d, preview: %s...)",
 				len(v),
 				truncateString(v, 50))
-			// Return the JavaScript literal unchanged
+			// CRITICAL FIX: Convert double quotes to single quotes for HTML attribute safety
+			// When embedded in x-data="...", double quotes break the attribute
+			result := strings.ReplaceAll(v, `"`, `'`)
 			// Alpine.js accepts JavaScript object syntax: {isLoggedIn: false, navItems: isLoggedIn ? [...] : [...]}
-			return v
+			return result
 		}
 
 		// CRITICAL FIX: Check if it's a JavaScript expression that needs to be evaluated
@@ -449,13 +570,31 @@ func FormatGoValueToJS(value any) string {
 		return "{" + strings.Join(pairs, ",") + "}"
 
 	default:
-		// Fallback for unknown types - convert to string and quote with SINGLE quotes
-		// This should rarely be hit in normal operation
-		str := fmt.Sprintf("%v", value)
-		escaped := strings.ReplaceAll(str, `\`, `\\`)
-		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
-		return fmt.Sprintf(`'%s'`, escaped)
+		// CRITICAL FIX: Use JSON encoding for unknown types instead of fmt.Sprintf("%v")
+		// This prevents Go map syntax (map[key:value]) from appearing in output
+		log.Printf("FormatGoValueToJS: WARNING - Unhandled type %T, using JSON encoding", value)
+		jsonBytes, err := json.Marshal(value)
+		if err != nil {
+			log.Printf("FormatGoValueToJS: ERROR - Failed to marshal %T: %v", value, err)
+			// Fallback to string conversion as last resort
+			str := fmt.Sprintf("%v", value)
+			escaped := strings.ReplaceAll(str, `\`, `\\`)
+			escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+			return fmt.Sprintf(`'%s'`, escaped)
+		}
+		// Convert double quotes to single quotes for HTML attribute safety
+		result := strings.ReplaceAll(string(jsonBytes), `"`, `'`)
+		log.Printf("FormatGoValueToJS: JSON-encoded %T to: %s", value, truncateString(result, 100))
+		return result
 	}
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // isValidJSIdentifier checks if a string is a valid JavaScript identifier
@@ -817,23 +956,53 @@ func alpineDataFormatter(dataScope map[string]any) string {
 		// Format value based on type - handle dynamic expressions specially
 		var formattedValue string
 		if strVal, ok := value.(string); ok {
-			// CRITICAL: Check if this has the __VAR_REF__ marker
-			// This indicates a variable reference that should be output without quotes
-			if strings.HasPrefix(strVal, "__VAR_REF__") {
+			// FIRST: Check if it's malformed Go slice format
+			if fixed, wasFixed := DetectAndFixGoSliceFormat(strVal); wasFixed {
+				formattedValue = fixed
+				log.Printf("alpineDataFormatter: Fixed Go slice format for key=%s: %q → %q", key, strVal, fixed)
+			} else if strings.HasPrefix(strVal, "__VAR_REF__") {
+				// CRITICAL: Check if this has the __VAR_REF__ marker
+				// This indicates a variable reference that should be output without quotes
 				// Strip the marker and output as unquoted variable reference
 				varName := strings.TrimPrefix(strVal, "__VAR_REF__")
 				formattedValue = varName
 				log.Printf("alpineDataFormatter: Stripped __VAR_REF__ marker, outputting variable reference: %s", varName)
-			} else if isDynamicExpression(strVal, dataScope) {
-				// Don't quote dynamic expressions - Alpine.js will evaluate them
-				formattedValue = strVal
 			} else {
-				// Regular string - use formatGoValueToJS to properly quote it
-				formattedValue = FormatGoValueToJS(value)
+				// CRITICAL FIX: Check if string looks like JSON BEFORE checking isDynamicExpression
+				// This prevents arrays like ["dog", "cat", "bird"] from being treated as
+				// dynamic expressions (array access like items[0]) and output without quotes
+				trimmed := strings.TrimSpace(strVal)
+				if (strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) ||
+				   (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) {
+					// Looks like JSON - try to parse it
+					var parsedValue interface{}
+					if err := json.Unmarshal([]byte(trimmed), &parsedValue); err == nil {
+						// Successfully parsed JSON - use FormatGoValueToJS for proper formatting
+						log.Printf("alpineDataFormatter: Parsed JSON for key=%s, calling FormatGoValueToJS", key)
+						formattedValue = FormatGoValueToJS(parsedValue)
+					} else {
+						// Not valid JSON - check if it's a dynamic expression
+						if isDynamicExpression(strVal, dataScope) {
+							// Don't quote dynamic expressions - Alpine.js will evaluate them
+							formattedValue = strVal
+						} else {
+							// Regular string - use formatGoValueToJS to properly quote it
+							formattedValue = FormatGoValueToJS(value)
+						}
+					}
+				} else if isDynamicExpression(strVal, dataScope) {
+					// Don't quote dynamic expressions - Alpine.js will evaluate them
+					formattedValue = strVal
+				} else {
+					// Regular string - use formatGoValueToJS to properly quote it
+					formattedValue = FormatGoValueToJS(value)
+				}
 			}
 		} else {
 			// Non-string values - use formatGoValueToJS
+			log.Printf("alpineDataFormatter: Processing key=%s, type=%T, value=%v", key, value, value)
 			formattedValue = FormatGoValueToJS(value)
+			log.Printf("alpineDataFormatter: FormatGoValueToJS returned: %s", formattedValue)
 		}
 
 		// Build key-value pair with unquoted keys (JavaScript object syntax)

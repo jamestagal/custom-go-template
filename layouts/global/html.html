@@ -8,7 +8,7 @@ import Nav from './nav.html'
 import Footer from './footer.html'
 
 <!-- Props received from Plenti build system / Go server -->
-export let content, layout
+export let content, layout, allContent
 
 <!-- Default values for optional props -->
 prop title = "Plentico"
@@ -50,15 +50,11 @@ prop description = "A Go template engine powered by Alpine.js"
 		<!-- The server will inject the appropriate layout based on the route -->
 
 		<!-- Slot for dynamic content - replaced by server with specific layout -->
+		<!-- Pass content explicitly (Pages layout needs it for iteration) -->
+		<!-- allContent removed - components inherit from body x-data via Alpine scope -->
 		<Component:dynamic name={layout}
-			{...content.fields}
-			bind:shadowContent={shadowContent} />
-			<!-- TEMPORARILY DISABLED: Magic variables causing JS syntax errors
-			{allContent}
-			{allLayouts}
-			{content}
-			{env}
-			-->
+			content={content}
+			{...content.fields} />
 
 		<!-- Newsletter Subscription (optional global component) -->
 		<!-- <Newsletter /> -->

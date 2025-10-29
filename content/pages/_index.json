@@ -12,7 +12,98 @@
     },
     {
       "name": "services2437",
+      "fields": {}
+    },
+    {
+      "name": "whyChoose2425",
       "fields": {
+        "topper": "Our Expertise",
+        "title": "Why Choose Us?",
+        "titleBackground": {
+          "image_m": {
+            "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art2.jpg",
+            "alt": "artistic image"
+          },
+          "image": {
+            "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art2.jpg",
+            "alt": "artistic image"
+          }
+        },
+        "cta": {
+          "title": "Are You Planning to have a Body Art Soon?",
+          "button": {
+            "text": "Walk-ins Welcome",
+            "url": ""
+          },
+          "background": {
+            "image_m": {
+              "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art1.jpg",
+              "alt": "artistic image"
+            },
+            "image": {
+              "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art1.jpg",
+              "alt": "artistic image"
+            }
+          }
+        },
+        "textGroup": [
+          "ArtiStitch Body Art, helmed by the talented artist Dominick McIntosh. We focus on vibrant color realism, intricate black & grey designs, geometric patterns, fine line work, and much more in the heart of North Portland, OR.",
+          "At our studio, we are selective, our time is precious, and everything we create is treated with the highest level of care and significance. We prioritize quality over quantity, ensuring that each body art takes the time it needs."
+        ],
+        "cards": [
+          {
+            "title": "Versatility",
+            "description": "From celestial linework to tribal glow, we do it all with passion and creativity.",
+            "icon": {
+              "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/Icons/twist.svg",
+              "alt": ""
+            }
+          },
+          {
+            "title": "Versatility",
+            "description": "From celestial linework to tribal glow, we do it all with passion and creativity.",
+            "icon": {
+              "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/Icons/twist.svg",
+              "alt": ""
+            }
+          },
+          {
+            "title": "Versatility",
+            "description": "From celestial linework to tribal glow, we do it all with passion and creativity.",
+            "icon": {
+              "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/Icons/twist.svg",
+              "alt": ""
+            }
+          },
+          {
+            "title": "Versatility",
+            "description": "From celestial linework to tribal glow, we do it all with passion and creativity.",
+            "icon": {
+              "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/Icons/twist.svg",
+              "alt": ""
+            }
+          },
+          {
+            "title": "Versatility",
+            "description": "From celestial linework to tribal glow, we do it all with passion and creativity.",
+            "icon": {
+              "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/Icons/twist.svg",
+              "alt": ""
+            }
+          },
+          {
+            "title": "Versatility",
+            "description": "From celestial linework to tribal glow, we do it all with passion and creativity.",
+            "icon": {
+              "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/Icons/twist.svg",
+              "alt": ""
+            }
+          }
+        ],
+        "graphic": {
+          "src": "https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/Graphics/tribal.svg",
+          "alt": "artistic image"
+        }
       }
     }
   ]

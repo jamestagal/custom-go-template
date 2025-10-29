@@ -74,7 +74,7 @@ store auth = {
 	}
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
 	// Verify all three components reference $store.auth
 	if !strings.Contains(markup, "x-text=\"$store.auth.user.name\"") {
@@ -145,7 +145,7 @@ store counter = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
 	// Verify event handlers use $store.counter
 	if !strings.Contains(markup, "@click=\"$store.counter.increment()\"") {
@@ -180,6 +180,10 @@ store counter = {
 //
 // Pattern: Integration Test [Load: 19]
 // Cognitive Load: 19 (setup: 4, parse: 3, transform: 3, render: 3, assertions: 6)
+//
+// IMPORTANT: This test verifies RUNTIME x-for behavior when loops use store collections.
+// Store collections ($store.cart.items) cannot be resolved at build-time, so they
+// fall back to Alpine.js x-for templates for runtime evaluation.
 func TestMultipleComponentsSameStoreChanges(t *testing.T) {
 	templateStr := `---
 store cart = {
@@ -231,7 +235,7 @@ store cart = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
 	// Verify all four "components" reference the same store
 	// Component 1: Add button
@@ -245,8 +249,9 @@ store cart = {
 	}
 
 	// Component 3: List items
-	if !strings.Contains(markup, "x-for=\"(item, ) in $store.cart.items\"") {
-		t.Errorf("List should iterate store array")
+	// UPDATED EXPECTATION: Runtime x-for without index parameter uses "item in collection" format
+	if !strings.Contains(markup, "x-for=\"item in $store.cart.items\"") {
+		t.Errorf("List should iterate store array with runtime x-for")
 	}
 
 	// Component 4: Empty state
@@ -373,7 +378,7 @@ store app = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", "")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
 
 	// Verify nested property access
 	if !strings.Contains(markup, "$store.app.user.profile.name") {

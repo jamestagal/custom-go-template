@@ -1,0 +1,14 @@
+@@ -534,11 +533,10 @@
+ 						AlpineType: "",
+ 						AlpineKey:  "",
+ 					}
+-						transformedAttributes = append(transformedAttributes, transformedAttr)
+-						continue
+-					}
++					transformedAttributes = append(transformedAttributes, transformedAttr)
++					continue
+ 				}
+ 
+ 				// Runtime expression: create Alpine.js binding
+ 				// This path is taken for:
+ 				// 1. Reactive attributes (class, style) - always need runtime binding

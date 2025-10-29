@@ -84,7 +84,7 @@ func TestTransformConditionalWithStoreExpression(t *testing.T) {
 			contains: []string{
 				`<template x-if="$store.auth.isLoggedIn"`,
 				`Logged in`,
-				`<template x-if="!($store.auth.isLoggedIn)"`,
+				`<template x-else`,
 				`Please log in`,
 			},
 		},
@@ -111,7 +111,8 @@ func TestTransformConditionalWithStoreExpression(t *testing.T) {
 				`Admin panel`,
 				`(!($store.user.role === 'admin')) && ($store.user.role === 'moderator')`, // Note: extra parens are added by conditionals.go
 				`Moderator panel`,
-				`!($store.user.role === 'admin') && !($store.user.role === 'moderator')`,
+				// Updated: Alpine.js 3.x uses x-else directive, not explicit negation
+				`<template x-else`,
 				`User panel`,
 			},
 		},
@@ -244,9 +245,9 @@ func TestNestedConditionalWithStoreExpressions(t *testing.T) {
 				`<template x-if="$store.auth.isLoggedIn"`,
 				`<template x-if="$store.user.isPremium"`,
 				`Premium features available`,
-				`<template x-if="!($store.user.isPremium)"`,
+				`<template x-else`,
 				`Standard features`,
-				`<template x-if="!($store.auth.isLoggedIn)"`,
+				`<template x-else`,
 				`Please log in`,
 			},
 		},

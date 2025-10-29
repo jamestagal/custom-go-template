@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/jimafisk/custom_go_template/ast"
@@ -893,5 +894,558 @@ func TestEvaluateNameExpression(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// ======= PHASE 2: RUNTIME WRAPPER EMISSION TESTS =======
+
+// TestTransformDynamicComponentByName_RuntimePath tests runtime component resolution
+// when the component name is a loop variable or runtime-only expression.
+//
+// Pattern: Table-Driven Test [Load: 8]
+// Cognitive Load: 8 (test setup: 3, assertion logic: 5)
+//
+// This test verifies that the transformer correctly identifies runtime expressions
+// and emits a runtime wrapper instead of attempting build-time resolution.
+//
+// Runtime wrapper structure:
+//   <div class="dyn-comp-runtime"
+//        x-data="{compName: component.name, compProps: {...}}"
+//        x-init="$renderDynamicComponent($el, compName, compProps)">
+//   </div>
+func TestTransformDynamicComponentByName_RuntimePath(t *testing.T) {
+	// Note: This test is CURRENTLY EXPECTED TO FAIL until Task 2.2-2.5 are implemented
+	// It validates the runtime path behavior once ScopeAnalyzer integration is complete
+
+	t.Skip("Skipping until ScopeAnalyzer integration is complete (Task 2.2-2.5)")
+
+	tests := []struct {
+		name          string
+		node          *ast.DynamicComponentByNameNode
+		dataScope     map[string]any
+		setupScope    func(map[string]any) // Function to set up runtime variables
+		expectRuntime bool
+		checkFunc     func(*testing.T, []ast.Node)
+	}{
+		{
+			name: "runtime path: component name is loop variable",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "component.name",
+				Props: []ast.ComponentProp{
+					{Name: "theme", Value: "dark", IsDynamic: false},
+				},
+				SpreadProps: []string{"component.fields"},
+			},
+			dataScope: map[string]any{
+				// Simulate loop scope with component variable
+				"component": map[string]any{
+					"name": "Hero2436",
+					"fields": map[string]any{
+						"title":       "Welcome",
+						"description": "Test",
+					},
+				},
+			},
+			setupScope: func(scope map[string]any) {
+				// Mark "component" as a runtime loop variable
+				// This would normally be done by the transformer during loop traversal
+			},
+			expectRuntime: true,
+			checkFunc: func(t *testing.T, nodes []ast.Node) {
+				if len(nodes) != 1 {
+					t.Fatalf("Expected 1 node, got %d", len(nodes))
+				}
+
+				elem, ok := nodes[0].(*ast.Element)
+				if !ok {
+					t.Fatalf("Expected *ast.Element, got %T", nodes[0])
+				}
+
+				// Verify runtime wrapper structure
+				if elem.TagName != "div" {
+					t.Errorf("Expected tagName 'div', got %q", elem.TagName)
+				}
+
+				// Check for runtime wrapper class
+				hasRuntimeClass := false
+				hasXData := false
+				hasXInit := false
+
+				for _, attr := range elem.Attributes {
+					switch attr.Name {
+					case "class":
+						if attr.Value == "dyn-comp-runtime" {
+							hasRuntimeClass = true
+						}
+					case "x-data":
+						hasXData = true
+						// Verify x-data contains compName and compProps
+						if !strings.Contains(attr.Value, "compName") {
+							t.Errorf("x-data should contain 'compName', got: %s", attr.Value)
+						}
+						if !strings.Contains(attr.Value, "compProps") {
+							t.Errorf("x-data should contain 'compProps', got: %s", attr.Value)
+						}
+						// Verify nameExpression is preserved
+						if !strings.Contains(attr.Value, "component.name") {
+							t.Errorf("x-data should preserve name expression 'component.name', got: %s", attr.Value)
+						}
+					case "x-init":
+						hasXInit = true
+						// Verify x-init calls runtime magic
+						expected := "$renderDynamicComponent($el, compName, compProps)"
+						if attr.Value != expected {
+							t.Errorf("x-init value incorrect:\nexpected: %s\ngot: %s", expected, attr.Value)
+						}
+					}
+				}
+
+				if !hasRuntimeClass {
+					t.Error("Runtime wrapper missing class='dyn-comp-runtime'")
+				}
+				if !hasXData {
+					t.Error("Runtime wrapper missing x-data attribute")
+				}
+				if !hasXInit {
+					t.Error("Runtime wrapper missing x-init attribute")
+				}
+			},
+		},
+		{
+			name: "runtime path: loop index variable in expression",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "items[index].componentName",
+				Props:          []ast.ComponentProp{},
+				SpreadProps:    []string{},
+			},
+			dataScope: map[string]any{
+				"items": []map[string]any{
+					{"componentName": "Hero2436"},
+					{"componentName": "Services2437"},
+				},
+				"index": 0,
+			},
+			setupScope:    func(scope map[string]any) {},
+			expectRuntime: true,
+			checkFunc: func(t *testing.T, nodes []ast.Node) {
+				if len(nodes) != 1 {
+					t.Fatalf("Expected 1 node, got %d", len(nodes))
+				}
+
+				elem, ok := nodes[0].(*ast.Element)
+				if !ok {
+					t.Fatalf("Expected *ast.Element, got %T", nodes[0])
+				}
+
+				// Verify it's a runtime wrapper
+				hasClass := false
+				for _, attr := range elem.Attributes {
+					if attr.Name == "class" && attr.Value == "dyn-comp-runtime" {
+						hasClass = true
+					}
+				}
+				if !hasClass {
+					t.Error("Expected runtime wrapper for loop index expression")
+				}
+			},
+		},
+		{
+			name: "runtime path: Alpine store reference",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "$store.ui.currentComponent",
+				Props:          []ast.ComponentProp{},
+				SpreadProps:    []string{},
+			},
+			dataScope:     map[string]any{},
+			setupScope:    func(scope map[string]any) {},
+			expectRuntime: true,
+			checkFunc: func(t *testing.T, nodes []ast.Node) {
+				if len(nodes) != 1 {
+					t.Fatalf("Expected 1 node, got %d", len(nodes))
+				}
+
+				elem, ok := nodes[0].(*ast.Element)
+				if !ok {
+					t.Fatalf("Expected *ast.Element, got %T", nodes[0])
+				}
+
+				// Verify runtime wrapper emitted
+				hasClass := false
+				for _, attr := range elem.Attributes {
+					if attr.Name == "class" && attr.Value == "dyn-comp-runtime" {
+						hasClass = true
+					}
+				}
+				if !hasClass {
+					t.Error("Expected runtime wrapper for Alpine store reference")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup scope if needed
+			if tt.setupScope != nil {
+				tt.setupScope(tt.dataScope)
+			}
+
+			// Transform the node
+			result := TransformDynamicComponentByName(tt.node, tt.dataScope)
+
+			// Run test-specific checks
+			if tt.checkFunc != nil {
+				tt.checkFunc(t, result)
+			}
+		})
+	}
+}
+
+// TestTransformDynamicComponentByName_BuildTimePathRegression tests build-time component resolution
+// when the component name is a string literal or build-time resolvable expression.
+//
+// Pattern: Table-Driven Test [Load: 8]
+// Cognitive Load: 8 (test setup: 3, regression check: 5)
+//
+// This test serves as a REGRESSION CHECK to ensure that static component names
+// continue to be resolved at build-time and do NOT emit runtime wrappers.
+func TestTransformDynamicComponentByName_BuildTimePathRegression(t *testing.T) {
+	// Register a test component
+	testComponent := &ast.Template{
+		RootNodes: []ast.Node{
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "hero"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "Test Hero Component"},
+				},
+			},
+		},
+	}
+	RegisterComponent("Hero2436", testComponent, []string{})
+	defer UnregisterComponent("Hero2436")
+
+	tests := []struct {
+		name      string
+		node      *ast.DynamicComponentByNameNode
+		dataScope map[string]any
+		checkFunc func(*testing.T, []ast.Node)
+	}{
+		{
+			name: "build-time path: string literal component name",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: `"Hero2436"`,
+				Props: []ast.ComponentProp{
+					{Name: "title", Value: "Welcome", IsDynamic: false},
+				},
+				SpreadProps: []string{},
+			},
+			dataScope: map[string]any{},
+			checkFunc: func(t *testing.T, nodes []ast.Node) {
+				if len(nodes) == 0 {
+					t.Fatal("Expected at least one node")
+				}
+
+				elem, ok := nodes[0].(*ast.Element)
+				if !ok {
+					t.Fatalf("Expected *ast.Element, got %T", nodes[0])
+				}
+
+				// Verify it's NOT a runtime wrapper
+				for _, attr := range elem.Attributes {
+					if attr.Name == "class" && attr.Value == "dyn-comp-runtime" {
+						t.Error("Build-time path should NOT emit runtime wrapper")
+					}
+				}
+
+				// Verify component was resolved at build-time
+				if elem.TagName != "div" {
+					t.Errorf("Expected build-time resolved component with div, got %s", elem.TagName)
+				}
+			},
+		},
+		{
+			name: "build-time path: content prop reference",
+			node: &ast.DynamicComponentByNameNode{
+				NameExpression: "componentType",
+				Props:          []ast.ComponentProp{},
+				SpreadProps:    []string{},
+			},
+			dataScope: map[string]any{
+				"componentType": "Hero2436", // Content prop with known value
+			},
+			checkFunc: func(t *testing.T, nodes []ast.Node) {
+				if len(nodes) == 0 {
+					t.Fatal("Expected at least one node")
+				}
+
+				elem, ok := nodes[0].(*ast.Element)
+				if !ok {
+					t.Fatalf("Expected *ast.Element, got %T", nodes[0])
+				}
+
+				// Should resolve at build-time
+				for _, attr := range elem.Attributes {
+					if attr.Name == "class" && attr.Value == "dyn-comp-runtime" {
+						t.Error("Content prop with known value should resolve at build-time")
+					}
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := TransformDynamicComponentByName(tt.node, tt.dataScope)
+
+			if tt.checkFunc != nil {
+				tt.checkFunc(t, result)
+			}
+		})
+	}
+}
+
+// TestTransformDynamicComponentByName_RuntimeWrapperStructure validates the exact
+// structure of the runtime wrapper element.
+//
+// Pattern: Unit Test [Load: 6]
+// Cognitive Load: 6 (structure validation: 6)
+func TestTransformDynamicComponentByName_RuntimeWrapperStructure(t *testing.T) {
+	t.Skip("Skipping until runtime wrapper implementation is complete (Task 2.3)")
+
+	node := &ast.DynamicComponentByNameNode{
+		NameExpression: "component.name",
+		Props:          []ast.ComponentProp{},
+		SpreadProps:    []string{},
+	}
+
+	dataScope := map[string]any{
+		"component": map[string]any{
+			"name": "Hero2436",
+		},
+	}
+
+	result := TransformDynamicComponentByName(node, dataScope)
+
+	if len(result) != 1 {
+		t.Fatalf("Expected 1 node, got %d", len(result))
+	}
+
+	elem, ok := result[0].(*ast.Element)
+	if !ok {
+		t.Fatalf("Expected *ast.Element, got %T", result[0])
+	}
+
+	// Validate structure
+	if elem.TagName != "div" {
+		t.Errorf("Expected tagName 'div', got %q", elem.TagName)
+	}
+
+	// Build attribute map for easier validation
+	attrs := make(map[string]string)
+	for _, attr := range elem.Attributes {
+		attrs[attr.Name] = attr.Value
+	}
+
+	// Required attributes
+	requiredAttrs := []string{"class", "x-data", "x-init"}
+	for _, attrName := range requiredAttrs {
+		if _, exists := attrs[attrName]; !exists {
+			t.Errorf("Missing required attribute: %s", attrName)
+		}
+	}
+
+	// Validate specific values
+	if attrs["class"] != "dyn-comp-runtime" {
+		t.Errorf("class should be 'dyn-comp-runtime', got %q", attrs["class"])
+	}
+
+	if attrs["x-init"] != "$renderDynamicComponent($el, compName, compProps)" {
+		t.Errorf("x-init value incorrect, got: %s", attrs["x-init"])
+	}
+
+	// Verify wrapper has no children (runtime will populate)
+	if len(elem.Children) != 0 {
+		t.Errorf("Runtime wrapper should have no children, got %d", len(elem.Children))
+	}
+}
+
+// TestSerializePropsForRuntime tests the props serialization helper function.
+//
+// Pattern: Unit Test [Load: 8]
+// Cognitive Load: 8 (JSON serialization: 4, edge cases: 4)
+//
+// This test validates that props are correctly serialized to JSON for the x-data attribute.
+func TestSerializePropsForRuntime(t *testing.T) {
+	tests := []struct {
+		name     string
+		props    map[string]interface{}
+		contains []string // Strings that should be in the output
+	}{
+		{
+			name: "simple string props",
+			props: map[string]interface{}{
+				"title":       "Hello",
+				"description": "World",
+			},
+			contains: []string{"title", "Hello", "description", "World"},
+		},
+		{
+			name: "nested object",
+			props: map[string]interface{}{
+				"user": map[string]interface{}{
+					"name": "John",
+					"age":  30,
+				},
+			},
+			contains: []string{"user", "name", "John", "age"},
+		},
+		{
+			name: "array values",
+			props: map[string]interface{}{
+				"items": []string{"a", "b", "c"},
+			},
+			contains: []string{"items", "a", "b", "c"},
+		},
+		{
+			name: "mixed types",
+			props: map[string]interface{}{
+				"title":   "Test",
+				"count":   42,
+				"active":  true,
+				"ratio":   3.14,
+				"tags":    []string{"go", "test"},
+				"meta":    map[string]interface{}{"version": "1.0"},
+			},
+			contains: []string{"title", "Test", "count", "42", "active", "true", "ratio", "3.14", "tags", "go", "test", "meta", "version", "1.0"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := serializePropsForRuntime(tt.props, map[string]any{})
+
+			// Check that result is valid (non-empty)
+			if result == "" {
+				t.Error("serializePropsForRuntime returned empty string")
+			}
+
+
+			// Check for expected substrings
+			for _, expected := range tt.contains {
+				if !strings.Contains(result, expected) {
+					t.Errorf("Result should contain %q, got: %s", expected, result)
+				}
+			}
+
+			t.Logf("Serialized props: %s", result)
+		})
+	}
+}
+
+// TestEmitRuntimeWrapper_NoAutoContentInjection verifies that emitRuntimeWrapper
+// does NOT automatically inject content/allContent props.
+//
+// This is the critical test for the x-data duplication fix.
+func TestEmitRuntimeWrapper_NoAutoContentInjection(t *testing.T) {
+	node := &ast.DynamicComponentByNameNode{
+		NameExpression: "component.name",
+		SpreadProps:    []string{"component.fields"},
+		Props:          []ast.ComponentProp{},
+	}
+
+	dataScope := map[string]any{
+		"component": nil, // Loop variable marker (nil value indicates runtime variable)
+		"content": map[string]any{
+			"title": "Test Title",
+			"components": []any{
+				map[string]any{"name": "Hero2436"},
+				map[string]any{"name": "Services2437"},
+			},
+		},
+		"allContent": map[string]any{
+			"pages": []string{"/", "/about"},
+		},
+	}
+
+	result := emitRuntimeWrapper(node, dataScope)
+
+	// Extract x-data value from result
+	if len(result) != 1 {
+		t.Fatalf("Expected 1 element, got %d", len(result))
+	}
+
+	element, ok := result[0].(*ast.Element)
+	if !ok {
+		t.Fatalf("Expected *ast.Element, got %T", result[0])
+	}
+
+	var xDataValue string
+	for _, attr := range element.Attributes {
+		if attr.Name == "x-data" {
+			xDataValue = attr.Value
+			break
+		}
+	}
+
+	if xDataValue == "" {
+		t.Fatal("x-data attribute not found")
+	}
+
+	t.Logf("x-data value: %s", xDataValue)
+
+	// CRITICAL: Verify compProps does NOT contain "content: content" or "allContent: allContent"
+	// These should be accessed via Alpine scope inheritance, not injected
+	if strings.Contains(xDataValue, "content: content") {
+		t.Errorf("compProps should NOT auto-inject 'content: content', got: %s", xDataValue)
+	}
+
+	if strings.Contains(xDataValue, "allContent: allContent") {
+		t.Errorf("compProps should NOT auto-inject 'allContent: allContent', got: %s", xDataValue)
+	}
+
+	// Verify compProps DOES contain spread fields
+	if !strings.Contains(xDataValue, "...component.fields") {
+		t.Errorf("compProps should contain spread props, got: %s", xDataValue)
+	}
+}
+
+// TestEmitRuntimeWrapper_ExplicitContentProp verifies that explicitly passed
+// content props still work (for backward compatibility).
+func TestEmitRuntimeWrapper_ExplicitContentProp(t *testing.T) {
+	node := &ast.DynamicComponentByNameNode{
+		NameExpression: "component.name",
+		SpreadProps:    []string{"component.fields"},
+		Props: []ast.ComponentProp{
+			{Name: "content", Value: "content", IsDynamic: true},
+		},
+	}
+
+	dataScope := map[string]any{
+		"component": nil, // Loop variable marker
+		"content": map[string]any{
+			"title": "Test Title",
+		},
+	}
+
+	result := emitRuntimeWrapper(node, dataScope)
+
+	// Extract x-data value
+	element := result[0].(*ast.Element)
+	var xDataValue string
+	for _, attr := range element.Attributes {
+		if attr.Name == "x-data" {
+			xDataValue = attr.Value
+			break
+		}
+	}
+
+	t.Logf("x-data value: %s", xDataValue)
+
+	// Verify explicit content prop IS included
+	if !strings.Contains(xDataValue, "content: content") {
+		t.Errorf("Explicit content prop should be included, got: %s", xDataValue)
 	}
 }
