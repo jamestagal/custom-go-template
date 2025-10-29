@@ -52,8 +52,12 @@ prop description = "A Go template engine powered by Alpine.js"
 		<!-- Slot for dynamic content - replaced by server with specific layout -->
 		<!-- Pass content explicitly (Pages layout needs it for iteration) -->
 		<!-- allContent removed - components inherit from body x-data via Alpine scope -->
+		<!-- Pass BOTH components array AND spread fields for compatibility -->
+		<!-- - components array: for collection-type layouts (jim-test.html) -->
+		<!-- - spread fields: for single-type layouts (_index.html) -->
 		<Component:dynamic name={layout}
 			content={content}
+			components={content.components}
 			{...content.fields} />
 
 		<!-- Newsletter Subscription (optional global component) -->
