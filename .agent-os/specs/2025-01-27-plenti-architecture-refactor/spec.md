@@ -242,6 +242,28 @@ ls layouts/components/ | grep -E "(hero|todo|admin|notification)"
 
 #### Task 1.3: Create content/pages/jim-test.json
 
+**TDD Step 1 - Write Test First:**
+```go
+// Create: content/loader_test.go (if not exists) or tests/jim_test_content_test.go
+func TestLoadJimTestContent(t *testing.T) {
+    data, err := loader.LoadContentForRoute("/jim-test")
+    require.NoError(t, err)
+
+    // Verify it's a collection type
+    assert.True(t, loader.IsCollectionType(data))
+
+    // Verify components array exists
+    components := data["components"]
+    require.NotNil(t, components)
+
+    // Verify at least one component
+    componentsArray := components.([]interface{})
+    assert.Greater(t, len(componentsArray), 0)
+}
+```
+
+**TDD Step 2 - Create JSON (makes test pass):**
+
 **File:** `content/pages/jim-test.json`
 
 **Structure:**
@@ -351,6 +373,43 @@ export let components
 #### Task 1.5: Test Jim-Test with Direct Rendering (Validation)
 
 **Goal:** Verify JSON and template work BEFORE changing route registration
+
+**TDD Step 1 - Write Integration Test:**
+```go
+// Create: tests/integration/jim_test_rendering_test.go
+func TestJimTestRenderingWithWrapper(t *testing.T) {
+    // Start test server
+    server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if r.URL.Path == "/jim-test" {
+            renderWithWrapper("jim-test", w, r)
+        }
+    }))
+    defer server.Close()
+
+    // Make request
+    resp, err := http.Get(server.URL + "/jim-test")
+    require.NoError(t, err)
+    defer resp.Body.Close()
+
+    // Verify response
+    assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+    body, _ := ioutil.ReadAll(resp.Body)
+    bodyStr := string(body)
+
+    // Verify HTML structure
+    assert.Contains(t, bodyStr, "<!DOCTYPE html>")
+    assert.Contains(t, bodyStr, "Jim Test")
+
+    // Verify components rendered
+    assert.Contains(t, bodyStr, "hero") // or whatever sections exist
+
+    // Verify Alpine.js setup
+    assert.Contains(t, bodyStr, "x-data")
+}
+```
+
+**TDD Step 2 - Manual Verification:**
 
 **Test Steps:**
 
@@ -558,6 +617,53 @@ Before implementing field spreading, we need to understand:
 ---
 
 ## Testing Strategy
+
+### Test-Driven Development (TDD) Approach
+
+**CRITICAL:** This refactor MUST follow TDD principles to ensure quality and prevent regressions.
+
+#### TDD Workflow for Each Task
+
+**1. Write Tests FIRST (Red Phase)**
+- Write automated tests that define expected behavior
+- Tests should FAIL initially (red)
+- Cover both happy path and edge cases
+- Include regression tests for existing functionality
+
+**2. Implement Feature (Green Phase)**
+- Write minimal code to make tests pass
+- Focus on getting to green quickly
+- Don't over-engineer
+
+**3. Refactor (Refactor Phase)**
+- Clean up code while keeping tests green
+- Improve structure and readability
+- Ensure tests still pass after refactoring
+
+**4. Verify (Integration Phase)**
+- Run full test suite (`go test ./...`)
+- Perform manual verification
+- Check regression against other pages
+
+#### Test Types Required
+
+**Unit Tests:**
+- JSON loading and parsing
+- Component field extraction
+- Route mapping logic
+- Data injection into props
+
+**Integration Tests:**
+- Full page rendering with wrapper
+- Component loop expansion
+- Store initialization
+- Alpine.js directive generation
+
+**End-to-End Tests:**
+- Server startup with new routes
+- HTTP request/response validation
+- Browser rendering (manual)
+- Interactive features (Alpine.js)
 
 ### Manual Testing After Each Task
 
