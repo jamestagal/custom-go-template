@@ -571,11 +571,32 @@ func replaceVarRefsWithThis(expr string, dataScope map[string]any) string {
 			startIdx := match[0]
 			endIdx := match[1]
 
+			// CRITICAL FIX: Check if already preceded by 'this.' or '.'
+			// to prevent double-prefixing: content.components → this.content.this.components
+			alreadyPrefixed := false
+			if startIdx >= 5 {
+				beforeMatch := result[startIdx-5 : startIdx]
+				if strings.HasSuffix(beforeMatch, "this.") {
+					alreadyPrefixed = true
+					log.Printf("[replaceVarRefsWithThis] Skipping '%s' at index %d (already has 'this.' prefix)", varName, startIdx)
+				}
+			}
+			if !alreadyPrefixed && startIdx >= 1 {
+				if result[startIdx-1] == '.' {
+					alreadyPrefixed = true
+					log.Printf("[replaceVarRefsWithThis] Skipping '%s' at index %d (already preceded by '.')", varName, startIdx)
+				}
+			}
+
+			if alreadyPrefixed {
+				continue
+			}
+
 			// Check if it's followed by a colon (property key pattern)
 			afterMatch := result[endIdx:]
 			trimmedAfter := strings.TrimSpace(afterMatch)
 			if !strings.HasPrefix(trimmedAfter, ":") {
-				// Not a property key, replace it
+				// Not a property key and not already prefixed, replace it
 				result = result[:startIdx] + "this." + result[startIdx:endIdx] + result[endIdx:]
 			}
 		}
