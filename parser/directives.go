@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"log"
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
@@ -189,30 +190,45 @@ func IfEndParser() Parser {
 // Supports both "in" and "of" syntax: {for item in items}, {for item of items}
 func ForStartParser() Parser {
 	return func(input string) Result {
+		// DEBUG: Log entry
+		log.Printf("[ForStartParser] ==================== ENTRY ====================")
+		log.Printf("[ForStartParser] Input (first 100 chars): %q", truncate(input, 100))
+
 		// Trim leading whitespace for better matching
 		trimmedInput := strings.TrimLeft(input, " \t\n\r")
+		log.Printf("[ForStartParser] After trim (first 100 chars): %q", truncate(trimmedInput, 100))
 
 		// First try to match {for ...} syntax
 		forStart := -1
 		forPatterns := []string{"{for ", "{ for "}
 
 		for _, pattern := range forPatterns {
+			log.Printf("[ForStartParser] Trying pattern: %q", pattern)
 			if strings.HasPrefix(trimmedInput, pattern) {
+				log.Printf("[ForStartParser] ✓ Pattern MATCHED: %q", pattern)
 				forStart = 0
 				break
+			} else {
+				log.Printf("[ForStartParser] ✗ Pattern NOT matched: %q", pattern)
 			}
 		}
 
 		if forStart >= 0 {
+			log.Printf("[ForStartParser] Found {for ...} syntax")
+
 			// Find the matching closing brace
 			closeBracePos := strings.Index(trimmedInput, "}")
 			if closeBracePos < 0 {
+				log.Printf("[ForStartParser] ERROR: No closing brace found")
 				return Result{nil, input, false, "no closing brace for for directive", false}
 			}
+
+			log.Printf("[ForStartParser] Closing brace at position %d", closeBracePos)
 
 			// Extract the for expression
 			forExpr := trimmedInput[forStart+len("{for"):closeBracePos]
 			forExpr = strings.TrimSpace(forExpr)
+			log.Printf("[ForStartParser] Extracted expression: %q", forExpr)
 
 			// Parse "item in items", "item of items", or "item, index in items" pattern
 			var parts []string
@@ -220,21 +236,26 @@ func ForStartParser() Parser {
 
 			// Check for "of" syntax first
 			if strings.Contains(forExpr, " of ") {
+				log.Printf("[ForStartParser] Found ' of ' syntax")
 				parts = strings.Split(forExpr, " of ")
 				isOf = true
 			} else if strings.Contains(forExpr, " in ") {
+				log.Printf("[ForStartParser] Found ' in ' syntax")
 				parts = strings.Split(forExpr, " in ")
 				isOf = false
 			} else {
+				log.Printf("[ForStartParser] ERROR: No ' in ' or ' of ' found in expression: %q", forExpr)
 				return Result{nil, input, false, "invalid for expression: " + forExpr, false}
 			}
 
 			if len(parts) != 2 {
+				log.Printf("[ForStartParser] ERROR: Split resulted in %d parts (expected 2): %v", len(parts), parts)
 				return Result{nil, input, false, "invalid for expression: " + forExpr, false}
 			}
 
 			itemPart := strings.TrimSpace(parts[0])
 			collectionPart := strings.TrimSpace(parts[1])
+			log.Printf("[ForStartParser] Item part: %q, Collection part: %q", itemPart, collectionPart)
 
 			// Check if we have an index variable
 			var itemVar, indexVar string
@@ -244,8 +265,10 @@ func ForStartParser() Parser {
 				if len(itemParts) > 1 {
 					indexVar = strings.TrimSpace(itemParts[1])
 				}
+				log.Printf("[ForStartParser] With index - item: %q, index: %q", itemVar, indexVar)
 			} else {
 				itemVar = itemPart
+				log.Printf("[ForStartParser] No index - item: %q", itemVar)
 			}
 
 			node := &ast.Loop{
@@ -258,6 +281,14 @@ func ForStartParser() Parser {
 
 			// Calculate how much of the original input to consume
 			consumed := len(input) - len(trimmedInput) + closeBracePos + 1
+
+			log.Printf("[ForStartParser] ✓ SUCCESS! Created Loop node:")
+			log.Printf("[ForStartParser]   - Value (item): %q", node.Value)
+			log.Printf("[ForStartParser]   - Iterator (index): %q", node.Iterator)
+			log.Printf("[ForStartParser]   - Collection: %q", node.Collection)
+			log.Printf("[ForStartParser]   - IsOf: %v", node.IsOf)
+			log.Printf("[ForStartParser]   - Consumed: %d chars", consumed)
+			log.Printf("[ForStartParser] ==================== EXIT (SUCCESS) ====================")
 
 			return Result{
 				Value:      node,
@@ -272,26 +303,33 @@ func ForStartParser() Parser {
 		eachPatterns := []string{"{#each ", "{ #each "}
 
 		for _, pattern := range eachPatterns {
+			log.Printf("[ForStartParser] Trying each pattern: %q", pattern)
 			if strings.HasPrefix(trimmedInput, pattern) {
+				log.Printf("[ForStartParser] ✓ Each pattern MATCHED: %q", pattern)
 				eachStart = 0
 				break
 			}
 		}
 
 		if eachStart >= 0 {
+			log.Printf("[ForStartParser] Found {#each ...} syntax")
+
 			// Find the matching closing brace
 			closeBracePos := strings.Index(trimmedInput, "}")
 			if closeBracePos < 0 {
+				log.Printf("[ForStartParser] ERROR: No closing brace for each directive")
 				return Result{nil, input, false, "no closing brace for each directive", false}
 			}
 
 			// Extract the each expression
 			eachExpr := trimmedInput[eachStart+len("{#each"):closeBracePos]
 			eachExpr = strings.TrimSpace(eachExpr)
+			log.Printf("[ForStartParser] Extracted each expression: %q", eachExpr)
 
 			// Parse "items as item" or "items as item, index" pattern
 			parts := strings.Split(eachExpr, " as ")
 			if len(parts) != 2 {
+				log.Printf("[ForStartParser] ERROR: Invalid each expression (expected ' as '): %q", eachExpr)
 				return Result{nil, input, false, "invalid each expression: " + eachExpr, false}
 			}
 
@@ -321,6 +359,9 @@ func ForStartParser() Parser {
 			// Calculate how much of the original input to consume
 			consumed := len(input) - len(trimmedInput) + closeBracePos + 1
 
+			log.Printf("[ForStartParser] ✓ SUCCESS! Created Loop node from #each")
+			log.Printf("[ForStartParser] ==================== EXIT (SUCCESS) ====================")
+
 			return Result{
 				Value:      node,
 				Remaining:  input[consumed:],
@@ -329,6 +370,8 @@ func ForStartParser() Parser {
 			}
 		}
 
+		log.Printf("[ForStartParser] ✗ FAILED: Not a for/each directive")
+		log.Printf("[ForStartParser] ==================== EXIT (FAILED) ====================")
 		return Result{nil, input, false, "not a for/each directive", false}
 	}
 }
@@ -474,4 +517,12 @@ func LoopParser() Parser {
 		// No loop statement found
 		return Result{nil, input, false, "not a loop statement", false}
 	}
+}
+
+// Helper function to truncate strings for logging
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }

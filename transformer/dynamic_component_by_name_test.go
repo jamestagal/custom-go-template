@@ -777,8 +777,8 @@ func TestMergeProps(t *testing.T) {
 				"total": 20,
 			},
 			expected: map[string]any{
-				// Dynamic props return variable reference markers for Alpine.js
-				"count": "__VAR_REF__total",
+				// Dynamic props now resolve to actual values for build-time expansion
+				"count": 20,
 			},
 			description: "Dynamic prop should override spread",
 		},

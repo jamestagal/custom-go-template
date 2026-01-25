@@ -129,12 +129,11 @@ func TestDynamicPropsComponentTransformation(t *testing.T) {
 	// Render the transformed template to HTML
 	html := testutils.RenderNode(transformedTemplate.RootNodes[0])
 
-	// Updated expectation: When dynamic props are used, the transformer now creates a wrapper div
-	// with x-data containing both the parent scope variable (for reactivity) and the component scope.
-	// This ensures that dynamic props remain reactive to parent changes.
-	// The wrapper pattern: <div x-data="{count:null,parentCount:42}"><component x-data="{ count: 42 }">...</component></div>
-	// This is the correct behavior for reactive dynamic props in Alpine.js.
-	expected := `<div class="dynamic-component" x-data="{ count: parentCount }">Count: <span x-text="count"></span></div>`
+	// Updated 2025-01-25: With build-time expansion, props are resolved to actual values
+	// for build-time loop expansion support. The parent scope value (42) is now directly
+	// embedded in the component's x-data instead of referencing the variable name.
+	// This enables nested property access in loops (e.g., content.components).
+	expected := `<div class="dynamic-component" x-data="{ count: 42 }">Count: <span x-text="count"></span></div>`
 
 	// Normalize whitespace for comparison
 	normalizedHTML := testutils.NormalizeWhitespace(html)

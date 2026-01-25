@@ -68,22 +68,37 @@ func main() {
 		log.Printf("Runtime component resolution may not work correctly")
 	}
 
+	// Register static file handlers (must be registered first to avoid conflicts)
+	http.HandleFunc("/scripts/", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r)
+	})
+	http.HandleFunc("/styles/", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r)
+	})
+	http.HandleFunc("/images/", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r)
+	})
+	http.HandleFunc("/js/", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r)
+	})
+	http.HandleFunc("/static/", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r)
+	})
+	http.HandleFunc("/public/", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r)
+	})
+	log.Println("Registered static file handlers")
+
+	// Register routes from content/pages/*.json files (Plenti-style)
+	registerContentPageRoutes()
+
+	// Register routes from layouts/content/*.html files (custom layouts)
 	registerContentRoutes()
 
-	// Set up the HTTP server
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Serve static files from organized directories
-		if r.URL.Path != "/" {
-			serveStaticFile(w, r)
-			return
-		}
-
-		// TEST: Use pages.html layout to test dynamic component iteration
-		if err := renderWithWrapper("Pages", w, r); err != nil {
-			log.Printf("Error rendering home page: %v", err)
-			http.Error(w, "Failed to render page", http.StatusInternalServerError)
-		}
-	})
+	// Note: All routes (including "/") are now handled by:
+	// - registerContentPageRoutes() for content/pages/*.json files
+	// - registerContentRoutes() for layouts/content/*.html files
+	// Static files are served via serveStaticFile() when routes call it
 
 	// Start the server
 	port := ":3333"
@@ -248,17 +263,29 @@ func getAllContent() map[string]interface{} {
 // Pattern: Wrapper Pattern with Props Injection [Load: 20]
 // Cognitive Load: 20 (content loading: 3, allContent: 3, allLayouts: 3, props building: 5, template rendering: 6)
 func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request) error {
-	log.Printf("[renderWithWrapper] Starting wrapper render for layout: %s, route: %s", layoutName, r.URL.Path)
+	log.Printf("[TRACE-SERVER] ========== renderWithWrapper START ==========")
+	log.Printf("[TRACE-SERVER] renderWithWrapper: layout=%s, route=%s", layoutName, r.URL.Path)
 
 	// Step 1: Load content for this route (COGNITIVE LOAD RULE: wrapped error)
 	routePath := r.URL.Path
 	contentData, err := loadContentWithCache(routePath)
 	if err != nil {
 		// Content loading failure is not fatal - log warning and continue
-		log.Printf("[renderWithWrapper] Warning: failed to load content for route %s: %v", routePath, err)
+		log.Printf("[TRACE-SERVER] renderWithWrapper: WARNING - failed to load content for route %s: %v", routePath, err)
 		contentData = make(map[string]interface{}) // Empty content
 	} else if len(contentData) > 0 {
-		log.Printf("[renderWithWrapper] Loaded content for route %s: %d top-level keys", routePath, len(contentData))
+		log.Printf("[TRACE-SERVER] renderWithWrapper: ✓ Loaded content for route %s: %d top-level keys", routePath, len(contentData))
+		log.Printf("[TRACE-SERVER] renderWithWrapper: content keys: %v", getKeys(contentData))
+
+		// CRITICAL DIAGNOSTIC: Check if components array exists
+		if componentsRaw, ok := contentData["components"]; ok {
+			if components, ok := componentsRaw.([]interface{}); ok {
+				log.Printf("[TRACE-SERVER] renderWithWrapper: ✓✓✓ Found components array with %d items", len(components))
+				log.Printf("[TRACE-SERVER] renderWithWrapper: components[0] = %#v", components[0])
+			}
+		} else {
+			log.Printf("[TRACE-SERVER] renderWithWrapper: ✗✗✗ NO 'components' key in content data!")
+		}
 	}
 
 	// Step 2: allContent generation moved to opt-in only (see magic variables below)
@@ -278,7 +305,7 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 				if firstComp, ok := components[0].(map[string]interface{}); ok {
 					if fields, ok := firstComp["fields"].(map[string]interface{}); ok {
 						contentFields = fields
-						log.Printf("[renderWithWrapper] Extracted fields from first component: %d fields", len(fields))
+						log.Printf("[TRACE-SERVER] renderWithWrapper: Extracted fields from first component: %d fields", len(fields))
 					}
 				}
 			}
@@ -286,7 +313,7 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 	} else {
 		// For single type, use all content as fields
 		contentFields = contentData
-		log.Printf("[renderWithWrapper] Using full content as fields: %d keys", len(contentFields))
+		log.Printf("[TRACE-SERVER] renderWithWrapper: Using full content as fields: %d keys", len(contentFields))
 	}
 
 	// If no fields extracted, use empty map
@@ -310,7 +337,11 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 	// This is needed for pages.html which uses: {for component in components}
 	if componentsRaw, ok := contentData["components"]; ok {
 		props["components"] = componentsRaw
-		log.Printf("[renderWithWrapper] Extracted components array as top-level prop")
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[TRACE-SERVER] renderWithWrapper: ✓✓✓ Extracted components array as top-level prop (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[TRACE-SERVER] renderWithWrapper: ✗✗✗ NO components array to extract!")
 	}
 
 	// Add content.fields as a separate prop for easier access
@@ -328,13 +359,24 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 		props["content"] = contentWithFields
 	}
 
-	log.Printf("[renderWithWrapper] Built props map with %d keys (offered to wrapper)", len(props))
-	log.Printf("[renderWithWrapper] Props keys: %v", getKeys(props))
+	log.Printf("[TRACE-SERVER] renderWithWrapper: Built props map with %d keys", len(props))
+	log.Printf("[TRACE-SERVER] renderWithWrapper: Props keys: %v", getKeys(props))
+
+	// CRITICAL DIAGNOSTIC: Log what's being passed
+	if componentsRaw, ok := props["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[TRACE-SERVER] renderWithWrapper: ✓✓✓ Props INCLUDES 'components' with %d items", len(components))
+		}
+	} else {
+		log.Printf("[TRACE-SERVER] renderWithWrapper: ✗✗✗ Props MISSING 'components'!")
+	}
+
+	log.Printf("[TRACE-SERVER] renderWithWrapper: ========== END Step 1: Props Built ==========")
 
 	// Step 6: Call renderTemplate with html.html wrapper and props
 	// renderTemplateWithProps will filter these based on wrapper's export let declarations
 	wrapperPath := "layouts/global/html.html"
-	log.Printf("[renderWithWrapper] Rendering wrapper template: %s", wrapperPath)
+	log.Printf("[TRACE-SERVER] renderWithWrapper: Rendering wrapper template: %s", wrapperPath)
 
 	// Use renderTemplateWithProps (with opt-in filtering)
 	err = renderTemplateWithProps(wrapperPath, props, w, r)
@@ -342,7 +384,8 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 		return fmt.Errorf("renderWithWrapper: failed to render wrapper: %w", err)
 	}
 
-	log.Printf("[renderWithWrapper] Successfully rendered wrapper for layout: %s", layoutName)
+	log.Printf("[TRACE-SERVER] renderWithWrapper: Successfully rendered wrapper for layout: %s", layoutName)
+	log.Printf("[TRACE-SERVER] ========== renderWithWrapper END ==========")
 	return nil
 }
 
@@ -356,6 +399,19 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 // Cognitive Load: 22 (read: 2, parse: 3, props merge: 4, fence processing: 3, transform: 3, store merge: 3, render: 2, inject: 2)
 func renderTemplateWithProps(entrypoint string, explicitProps map[string]interface{}, w http.ResponseWriter, r *http.Request) error {
 	startTime := time.Now()
+
+	log.Printf("[TRACE-SERVER] ========== renderTemplateWithProps START ==========")
+	log.Printf("[TRACE-SERVER] renderTemplateWithProps: entrypoint=%s", entrypoint)
+	log.Printf("[TRACE-SERVER] renderTemplateWithProps: explicitProps keys=%v", getKeys(explicitProps))
+
+	// CRITICAL DIAGNOSTIC
+	if componentsRaw, ok := explicitProps["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[TRACE-SERVER] renderTemplateWithProps: ✓✓✓ Received 'components' prop with %d items", len(components))
+		}
+	} else {
+		log.Printf("[TRACE-SERVER] renderTemplateWithProps: ✗✗✗ NO 'components' prop received!")
+	}
 
 	// Read template file (COGNITIVE LOAD RULE: wrapped error)
 	templateContent, err := os.ReadFile(entrypoint)
@@ -394,7 +450,7 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 		for _, propName := range fenceWithStores.ExportedProps {
 			exportedPropNames[propName] = true
 		}
-		log.Printf("[renderTemplateWithProps] Template %s exports: %v", entrypoint, fenceWithStores.ExportedProps)
+		log.Printf("[TRACE-SERVER] renderTemplateWithProps: Template %s exports: %v", entrypoint, fenceWithStores.ExportedProps)
 	}
 
 	// Filter explicit props based on export let declarations (OPT-IN ONLY)
@@ -419,12 +475,12 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 		// 2. It's from content.fields (passthrough for child components)
 		if exportedPropNames[k] {
 			props[k] = v
-			log.Printf("[renderTemplateWithProps] Added prop '%s' (declared in export let)", k)
+			log.Printf("[TRACE-SERVER] renderTemplateWithProps: ✓ Added prop '%s' (declared in export let)", k)
 		} else if contentFieldsProps[k] {
 			props[k] = v
-			log.Printf("[renderTemplateWithProps] Added prop '%s' (from content.fields, passthrough to children)", k)
+			log.Printf("[TRACE-SERVER] renderTemplateWithProps: ✓ Added prop '%s' (from content.fields, passthrough to children)", k)
 		} else {
-			log.Printf("[renderTemplateWithProps] Skipped prop '%s' (not in export let or content.fields)", k)
+			log.Printf("[TRACE-SERVER] renderTemplateWithProps: ✗ Skipped prop '%s' (not in export let or content.fields)", k)
 		}
 	}
 
@@ -457,10 +513,22 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 	buildTimeMs := float64(buildTime.Microseconds()) / 1000.0
 	props["buildTime"] = fmt.Sprintf("%.2fms", buildTimeMs)
 
-	log.Printf("[renderTemplateWithProps] Final props for %s: %v", entrypoint, getKeys(props))
+	log.Printf("[TRACE-SERVER] renderTemplateWithProps: Final props for %s: %v", entrypoint, getKeys(props))
+	log.Printf("[TRACE-SERVER] renderTemplateWithProps: ========== END Step 2: Props Filtered ==========")
+
+	// DIAGNOSTIC: Check if components is in final props
+	if componentsRaw, ok := props["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[TRACE-SERVER] renderTemplateWithProps: ✓✓✓ 'components' prop PRESENT in final props (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[TRACE-SERVER] renderTemplateWithProps: ✗✗✗ 'components' prop MISSING from final props!")
+	}
 
 	// Transform template (this tracks store references)
+	log.Printf("[TRACE-SERVER] renderTemplateWithProps: Calling transformer.TransformAST with props: %v", getKeys(props))
 	transformed := transformer.TransformAST(template, props)
+	log.Printf("[TRACE-SERVER] renderTemplateWithProps: ========== END Step 3: Transform Complete ==========")
 
 	// Get tracked stores from transformer
 	referencedStores, allDefinitions := transformer.GetTrackedStores(transformed)
@@ -495,7 +563,18 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 		layoutName = layoutProp
 	}
 
-	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint, layoutName)
+	// Extract JSON component names from content data for style aggregation
+	// This allows the style aggregator to find components specified in JSON content
+	// (e.g., hero2436, services2437, whyChoose2425 in content/pages/_index.json)
+	var jsonComponentNames []string
+	if contentData, ok := explicitProps["content"].(map[string]interface{}); ok {
+		jsonComponentNames = loader.ExtractAllComponentNames(contentData)
+		if len(jsonComponentNames) > 0 {
+			log.Printf("[renderTemplateWithProps] Extracted %d JSON component names: %v", len(jsonComponentNames), jsonComponentNames)
+		}
+	}
+
+	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint, layoutName, jsonComponentNames)
 
 	// Build x-data from props
 	xDataValue := buildXDataFromProps(props)
@@ -557,6 +636,7 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(finalHTML))
 
+	log.Printf("[TRACE-SERVER] ========== renderTemplateWithProps END ==========")
 	return nil
 }
 
@@ -792,7 +872,15 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 
 	// Render with stores (Task 3.5: Use RenderWithStores instead of Render)
 	// CRITICAL: Pass original template AST and path for component style aggregation
-	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint, "")
+	// Extract JSON component names from content data for style aggregation
+	var jsonComponentNames []string
+	if contentData != nil {
+		jsonComponentNames = loader.ExtractAllComponentNames(contentData)
+		if len(jsonComponentNames) > 0 {
+			log.Printf("[renderTemplate] Extracted %d JSON component names: %v", len(jsonComponentNames), jsonComponentNames)
+		}
+	}
+	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint, "", jsonComponentNames)
 
 	// CRITICAL: Generate x-data using transformer's alpineDataFormatter
 	// This function is not exported, so we need to call Transform to get the data scope
@@ -1423,6 +1511,21 @@ func registerContentRoutes() {
 		return
 	}
 
+	// Get list of JSON files in content/pages/ to avoid conflicts
+	pagesDir := "content/pages"
+	pageFiles, err := os.ReadDir(pagesDir)
+	contentPageRoutes := make(map[string]bool)
+	if err == nil {
+		for _, pageFile := range pageFiles {
+			if !pageFile.IsDir() && strings.HasSuffix(pageFile.Name(), ".json") {
+				routeName := strings.TrimSuffix(pageFile.Name(), ".json")
+				if routeName != "_defaults" {
+					contentPageRoutes[routeName] = true
+				}
+			}
+		}
+	}
+
 	routeCount := 0
 	for _, file := range files {
 		// Skip directories and non-HTML files
@@ -1433,8 +1536,15 @@ func registerContentRoutes() {
 		// Extract route name from filename (e.g., "store-demo.html" → "store-demo")
 		routeName := strings.TrimSuffix(file.Name(), ".html")
 
-		// Skip _index.html (handled separately by the root "/" route)
+		// Skip _index.html (handled by registerContentPageRoutes via _index.json)
 		if routeName == "_index" {
+			continue
+		}
+
+		// Skip routes that are already handled by content/pages/*.json files
+		// This prevents conflicts between Pattern 1 (JSON-driven) and Pattern 2 (HTML-driven) routes
+		if contentPageRoutes[routeName] {
+			log.Printf("Skipping route %s - already registered from content/pages/%s.json", routeName, routeName)
 			continue
 		}
 
@@ -1443,19 +1553,6 @@ func registerContentRoutes() {
 
 		// Register route (construct route path)
 		route := "/" + routeName
-
-		// Special handling for jim-test - use wrapper rendering with "pages" layout
-		if routeName == "jim-test" {
-			http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
-				if err := renderWithWrapper("jim-test", w, r); err != nil {
-					log.Printf("Error rendering jim-test with wrapper: %v", err)
-					http.Error(w, "Failed to render page", http.StatusInternalServerError)
-				}
-			})
-			routeCount++
-			log.Printf("Registered route (with wrapper using pages layout): %s → content/pages/jim-test.json", route)
-			continue
-		}
 
 		// Default handling - use direct template rendering
 		currentFilePath := filePath // Capture for closure
@@ -1468,4 +1565,73 @@ func registerContentRoutes() {
 	}
 
 	log.Printf("Registered %d dynamic content routes", routeCount)
+}
+
+// registerContentPageRoutes registers HTTP routes for all .json files in content/pages/
+// This follows the Plenti pattern where routes come from content JSON files, not layout HTML files.
+// All Pattern 1 pages (with components array) use their corresponding layout via renderWithWrapper.
+//
+// Pattern: Dynamic Route Registration from Content [Load: 12]
+// Cognitive Load: 12 (directory read: 3, file filtering: 2, route creation: 4, logging: 3)
+func registerContentPageRoutes() {
+	pagesDir := "content/pages"
+
+	// Read all JSON files in content/pages/
+	files, err := os.ReadDir(pagesDir)
+	if err != nil {
+		log.Printf("Warning: Failed to read pages directory %s: %v", pagesDir, err)
+		return
+	}
+
+	routeCount := 0
+	for _, file := range files {
+		// Skip directories and non-JSON files
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+
+		// Skip _defaults.json - it's not a page
+		fileName := file.Name()
+		if fileName == "_defaults.json" {
+			continue
+		}
+
+		// Extract route name from filename
+		// "jim-test.json" → "/jim-test"
+		// "_index.json" → "/" (special case)
+		routeName := strings.TrimSuffix(fileName, ".json")
+
+		var route string
+		if routeName == "_index" {
+			route = "/" // Special case: _index.json → root route
+		} else {
+			route = "/" + routeName
+		}
+
+		// Determine layout name
+		// All content pages use "pages" layout (the generic component loop layout)
+		// except _index which uses "Pages" (capital P - note the naming convention)
+		layoutName := "pages"
+		if routeName == "_index" {
+			layoutName = "_index"
+		}
+
+		// Register route using renderWithWrapper
+		// renderWithWrapper will load content/pages/<route>.json based on URL path
+		// and render with layouts/<layoutName>.html wrapper
+		currentRoute := route
+		currentLayoutName := layoutName
+		http.HandleFunc(currentRoute, func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("[Handler] %s called for URL: %s", currentRoute, r.URL.Path)
+			if err := renderWithWrapper(currentLayoutName, w, r); err != nil{
+				log.Printf("Error rendering %s with wrapper (layout %s): %v", currentRoute, currentLayoutName, err)
+				http.Error(w, "Failed to render page", http.StatusInternalServerError)
+			}
+		})
+
+		routeCount++
+		log.Printf("Registered content page route: %s → content/pages/%s (layout: %s)", route, fileName, layoutName)
+	}
+
+	log.Printf("Registered %d content page routes from content/pages/", routeCount)
 }

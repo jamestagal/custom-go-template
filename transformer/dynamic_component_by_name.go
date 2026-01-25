@@ -86,17 +86,14 @@ func TransformDynamicComponentByName(node *ast.DynamicComponentByNameNode, dataS
 	mergedProps := mergeProps(spreadPropsMap, node.Props, dataScope)
 	log.Printf("TransformDynamicComponentByName: merged props: %d total", len(mergedProps))
 
-	// PHASE 6: Transform component (COGNITIVE LOAD: 6)
-	// Create a regular ComponentNode to reuse existing transformation logic
-	componentNode := &ast.ComponentNode{
-		Name:  componentName,
-		Props: convertPropsMapToComponentProps(mergedProps),
-	}
+	// PHASE 6: Transform component with resolved props (COGNITIVE LOAD: 6)
+	// Use TransformComponentWithResolvedProps to pass ACTUAL values (maps, arrays)
+	// This bypasses JSON serialization that would break nested property access
+	// for build-time loop expansion (e.g., content.components)
+	log.Printf("TransformDynamicComponentByName: transforming component %q with %d resolved props",
+		componentName, len(mergedProps))
 
-	log.Printf("TransformDynamicComponentByName: transforming component %q with %d props",
-		componentName, len(componentNode.Props))
-
-	return transformComponent(componentNode, dataScope)
+	return TransformComponentWithResolvedProps(componentName, mergedProps, dataScope)
 }
 
 // emitRuntimeWrapper emits a runtime wrapper element for dynamic components

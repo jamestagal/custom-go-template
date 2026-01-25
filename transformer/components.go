@@ -47,6 +47,7 @@ func UnregisterComponent(name string) {
 
 // GetComponentTemplate retrieves a component template by name
 // Supports case-insensitive lookup to match JSON component names like "hero2436" with registered "Hero2436"
+// Also handles PascalCase template names like "Head" → "head" component
 func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
 	// Try exact match first (most common case)
 	template, exists := componentTemplateRegistry[name]
@@ -62,6 +63,17 @@ func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
 		if exists {
 			log.Printf("[GetComponentTemplate] Found component via case-insensitive match: %q → %q", name, capitalizedName)
 			return template, exists
+		}
+
+		// Try lowercase first letter for PascalCase → lowercase mapping
+		// This handles: "Head" → "head", "Nav" → "nav", "Footer" → "footer"
+		lowercasedName := strings.ToLower(name[:1]) + name[1:]
+		if lowercasedName != name { // Only try if different from input
+			template, exists = componentTemplateRegistry[lowercasedName]
+			if exists {
+				log.Printf("[GetComponentTemplate] Found component via lowercase match: %q → %q", name, lowercasedName)
+				return template, exists
+			}
 		}
 	}
 
@@ -105,6 +117,7 @@ func GetAllComponentNames() map[string]bool {
 //   - head: Document metadata section
 //   - body: Document content section (x-data added by server if needed)
 //   - !doctype: Document type declaration
+//   - template: Alpine.js template element (x-for, x-if containers - should not have x-data)
 //
 // Example:
 //   isStructuralTag("head")    // Returns: true
@@ -116,6 +129,7 @@ func isStructuralTag(tagName string) bool {
 		"head":     true,
 		"body":     true,
 		"!doctype": true,
+		"template": true, // Alpine.js template elements should not get x-data
 	}
 	return structural[strings.ToLower(tagName)]
 }
@@ -670,56 +684,64 @@ func isDynamicExpression(value string, dataScope map[string]any) bool {
 
 // extractPropValue extracts the value from a component prop, handling dynamic vs static values
 //
-// CRITICAL FIX (2025-10-06): Return variable references as strings, not resolved values
+// BUILD-TIME RESOLUTION (2025-01-25): Resolve actual values for build-time expansion
 //
-// For component props that reference parent variables (e.g., user={user1}), we need to
-// pass the variable NAME as a string so Alpine.js can resolve it at runtime, NOT the
-// actual value from the parent scope.
+// For component props that reference parent variables (e.g., content={content}), we resolve
+// the ACTUAL VALUE from parent scope to enable build-time loop expansion. This allows
+// loops like {for component in content.components} to expand at build time because the
+// actual array is available in the component's dataScope.
 //
 // Example:
-//   Parent has: user1 = {name: "Alice"}
-//   Template: <UserProfile user={user1} />
+//   Parent has: content = {components: [{name: "Hero"}, {name: "Footer"}]}
+//   Template: <Component:dynamic ... content={content} />
 //
-//   BEFORE (wrong): componentDataScope["user"] = {name: "Alice"}
-//                   Output: user: { name: 'Alice' } (static object)
+//   componentDataScope["content"] = the actual map with components array
+//   → Loop can resolve content.components → build-time expansion works!
 //
-//   AFTER (correct): componentDataScope["user"] = "user1"
-//                    Output: user: user1 (Alpine expression)
+// Note: For Alpine.js reactivity, the body x-data already contains the data.
+// Components inherit from parent Alpine scope, so reactivity is preserved.
 func extractPropValue(prop ast.ComponentProp, parentDataScope map[string]any) any {
 	if prop.IsDynamic {
 		// For dynamic props ({var}), extract the variable name or expression
 		// Remove curly braces and whitespace
 		varName := strings.TrimSpace(strings.Trim(prop.Value, "{}"))
 
-
 		// CRITICAL: Check if this is a quoted string literal like {"Bo"}
 		// These should be output with quotes in the x-data
 		if (strings.HasPrefix(varName, "\"") && strings.HasSuffix(varName, "\"")) ||
 			(strings.HasPrefix(varName, "'") && strings.HasSuffix(varName, "'")) {
 			// This is a string literal expression - return as-is with quotes
-			// The quotes are part of the JavaScript expression, not fence-section quotes
 			log.Printf("extractPropValue: String literal expression '%s'", varName)
 			return varName
 		}
 
-		// CRITICAL FIX: Check if this is a simple variable reference
-		// If so, return the variable NAME (as string) for Alpine to resolve
-		// Use a special prefix to mark it as a variable reference (not a string literal)
+		// BUILD-TIME FIX: Resolve actual values from parent scope for build-time expansion
+		// This enables loops like {for component in content.components} to work at build time
+
+		// Case 1: Simple variable reference (e.g., "content", "user")
 		if isSimpleVariableReference(varName) {
-			// Check if the variable exists in parent scope
-			// FIX 6: Always return __VAR_REF__ for simple variable references to preserve reactivity
-			// This ensures Alpine.js can resolve the variable at runtime, not baked-in values
-			if _, exists := parentDataScope[varName]; exists {
-				log.Printf("extractPropValue: Keeping variable reference '%s' as __VAR_REF__", varName)
-				return "__VAR_REF__" + varName
-			} else {
-				log.Printf("extractPropValue: Variable '%s' NOT FOUND in parent scope!", varName)
-				return "__VAR_REF__" + varName // Still return as ref in case it's available at runtime
+			if value, exists := parentDataScope[varName]; exists && value != nil {
+				log.Printf("extractPropValue: Resolved variable '%s' to actual value (type: %T)", varName, value)
+				return value // Return actual value for build-time expansion
 			}
+			// Variable not found - return as string for Alpine to resolve at runtime
+			log.Printf("extractPropValue: Variable '%s' not in parent scope, keeping as reference", varName)
+			return "__VAR_REF__" + varName
 		}
 
-		// For expressions (age + 10, user.name), return as-is for Alpine.js to evaluate
-		log.Printf("extractPropValue: Passing expression '%s'", varName)
+		// Case 2: Nested property access (e.g., "content.components", "user.profile.name")
+		if strings.Contains(varName, ".") && !strings.Contains(varName, " ") {
+			// Try to resolve nested property
+			resolved := resolveNestedPropertyAccess(varName, parentDataScope)
+			if resolved != nil {
+				log.Printf("extractPropValue: Resolved nested property '%s' to actual value (type: %T)", varName, resolved)
+				return resolved // Return actual value for build-time expansion
+			}
+			log.Printf("extractPropValue: Could not resolve nested property '%s', keeping as expression", varName)
+		}
+
+		// For other expressions (age + 10, function calls), return as-is for Alpine.js
+		log.Printf("extractPropValue: Passing expression '%s' as-is", varName)
 		return varName
 	}
 
@@ -744,6 +766,102 @@ func transformComponentProps(props []ast.ComponentProp, parentDataScope map[stri
 // It's called by the main transformer for ComponentNode AST nodes
 func TransformComponent(node *ast.ComponentNode, parentDataScope map[string]any) []ast.Node {
 	return transformComponent(node, parentDataScope)
+}
+
+// TransformComponentWithResolvedProps transforms a component with already-resolved prop values
+// This bypasses the extractPropValue flow and directly uses the provided props map.
+// Used by TransformDynamicComponentByName to pass pre-resolved props from mergeProps.
+//
+// Pattern: Service Implementation Pattern [Load: 20]
+// Cognitive Load: 20 (component lookup: 5, scope creation: 5, transformation: 10)
+//
+// Example:
+//   resolvedProps := map[string]any{
+//     "content": map[string]any{"components": [...]},  // Actual map, not JSON string
+//     "name": "Benjamin",
+//   }
+//   TransformComponentWithResolvedProps("pages", resolvedProps, parentScope)
+func TransformComponentWithResolvedProps(componentName string, resolvedProps map[string]any, parentDataScope map[string]any) []ast.Node {
+	log.Printf("TransformComponentWithResolvedProps: component=%s, props=%d", componentName, len(resolvedProps))
+
+	// Look up component template from registry
+	componentTemplate, exists := GetComponentTemplate(componentName)
+	if !exists {
+		log.Printf("Warning: Component template '%s' not registered.", componentName)
+		return createComponentPlaceholder(componentName, resolvedProps)
+	}
+
+	// Create isolated data scope for this component instance
+	componentDataScope := make(map[string]any)
+	log.Printf("TransformComponentWithResolvedProps: Created isolated scope for '%s'", componentName)
+
+	// Extract component's fence data (props, variables, functions)
+	for _, rootNode := range componentTemplate.Template.RootNodes {
+		if fence, ok := rootNode.(*ast.FenceSection); ok {
+			collectComponentFenceData(fence, componentDataScope)
+			log.Printf("TransformComponentWithResolvedProps: Collected fence data, scope now has %d entries", len(componentDataScope))
+		}
+	}
+
+	// CRITICAL: Directly inject resolved props into component data scope
+	// These are ACTUAL values (maps, slices), not JSON strings
+	for propName, propValue := range resolvedProps {
+		componentDataScope[propName] = propValue
+		log.Printf("TransformComponentWithResolvedProps: Injected prop '%s' (type: %T)", propName, propValue)
+	}
+
+	log.Printf("TransformComponentWithResolvedProps: Final scope for '%s': %d entries", componentName, len(componentDataScope))
+
+	// Filter out fence section and style section from component body
+	componentBodyNodes := []ast.Node{}
+	for _, node := range componentTemplate.Template.RootNodes {
+		_, isFence := node.(*ast.FenceSection)
+		_, isStyle := node.(*ast.StyleSection)
+		if !isFence && !isStyle {
+			componentBodyNodes = append(componentBodyNodes, node)
+		}
+	}
+
+	// Recursively transform component body with its isolated scope
+	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
+
+	// Wrap with x-data if component has data
+	if len(componentDataScope) == 0 {
+		return transformedNodes
+	}
+
+	log.Printf("[X-Data] TransformComponentWithResolvedProps: wrapping '%s' with scope", componentName)
+	return wrapWithXData(transformedNodes, componentDataScope)
+}
+
+// createComponentPlaceholder creates a placeholder for unregistered components
+func createComponentPlaceholder(componentName string, props map[string]any) []ast.Node {
+	placeholderAttrs := []ast.Attribute{
+		{
+			Name:  "x-component",
+			Value: componentName,
+		},
+	}
+
+	// Add props as data-prop-* attributes
+	for propName, propValue := range props {
+		valueStr := fmt.Sprintf("%v", propValue)
+		if str, ok := propValue.(string); ok {
+			valueStr = str
+		}
+		placeholderAttrs = append(placeholderAttrs, ast.Attribute{
+			Name:  "data-prop-" + propName,
+			Value: valueStr,
+		})
+	}
+
+	return []ast.Node{
+		&ast.Element{
+			TagName:    "div",
+			Attributes: placeholderAttrs,
+			Children:   []ast.Node{},
+		},
+	}
 }
 
 // transformComponent handles both regular and dynamic component transformation

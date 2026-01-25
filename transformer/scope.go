@@ -11,6 +11,9 @@ import (
 
 // InitDataScope initializes the data scope with provided props
 func InitDataScope(props map[string]any) map[string]any {
+	log.Printf("[DIAGNOSTIC] ========== InitDataScope START ==========")
+	log.Printf("[DIAGNOSTIC] InitDataScope: received %d props", len(props))
+
 	// Create a new map to avoid modifying the original props
 	dataScope := make(map[string]any)
 
@@ -18,8 +21,18 @@ func InitDataScope(props map[string]any) map[string]any {
 	// Props need to be actual values for build-time loop expansion to work
 	for key, value := range props {
 		dataScope[key] = value
+		log.Printf("[DIAGNOSTIC] InitDataScope: copied prop '%s' (type=%T)", key, value)
+
+		// DIAGNOSTIC: Log arrays in detail
+		if key == "components" {
+			if arr, ok := value.([]interface{}); ok {
+				log.Printf("[DIAGNOSTIC] InitDataScope: ✓ 'components' is array with %d items", len(arr))
+			}
+		}
 	}
 
+	log.Printf("[DIAGNOSTIC] InitDataScope: returning dataScope with %d keys", len(dataScope))
+	log.Printf("[DIAGNOSTIC] ========== InitDataScope END ==========")
 	return dataScope
 }
 
@@ -37,6 +50,18 @@ func FindFenceSection(nodes []ast.Node) *ast.FenceSection {
 // CRITICAL FIX: Now uses parseValue() for consistent handling of JavaScript literals.
 // This ensures quoted arrays/objects like let animals = "[...]" are unwrapped properly.
 func CollectFenceData(fence *ast.FenceSection, dataScope map[string]any) {
+	log.Printf("[DIAGNOSTIC] ========== CollectFenceData START ==========")
+	log.Printf("[DIAGNOSTIC] CollectFenceData: dataScope has %d keys BEFORE processing fence", len(dataScope))
+
+	// DIAGNOSTIC: Check if components exists before fence processing
+	if componentsRaw, ok := dataScope["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[DIAGNOSTIC] CollectFenceData: ✓ 'components' exists BEFORE fence processing (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[DIAGNOSTIC] CollectFenceData: ✗ 'components' does NOT exist before fence processing")
+	}
+
 	// Process variables directly from the FenceSection struct
 	for _, variable := range fence.Variables {
 		varName := variable.Name
@@ -71,11 +96,25 @@ func CollectFenceData(fence *ast.FenceSection, dataScope map[string]any) {
 			} else {
 				dataScope[prop.Name] = nil
 			}
+		} else {
+			log.Printf("[CollectFenceData] Skipping prop '%s' - already in dataScope (from props)", prop.Name)
 		}
 	}
 
 	// Extract variables from raw content in the fence
 	extractVariablesFromExpr(fence.RawContent, dataScope)
+
+	// DIAGNOSTIC: Check if components still exists after fence processing
+	if componentsRaw, ok := dataScope["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[DIAGNOSTIC] CollectFenceData: ✓ 'components' STILL exists after fence processing (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[DIAGNOSTIC] CollectFenceData: ✗ 'components' LOST during fence processing!")
+	}
+
+	log.Printf("[DIAGNOSTIC] CollectFenceData: dataScope has %d keys AFTER processing fence", len(dataScope))
+	log.Printf("[DIAGNOSTIC] ========== CollectFenceData END ==========")
 }
 
 // CreateChildScope creates a new scope that inherits from the parent scope
@@ -227,6 +266,15 @@ func resolveNestedProperty(propertyPath string, dataScope map[string]any) any {
 // - Collection is nil → returns (nil, false)
 // - dataScope is nil → returns (nil, false)
 func resolveCollectionFromScope(collectionName string, dataScope map[string]any) ([]interface{}, bool) {
+	log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope START ==========")
+	log.Printf("[DIAGNOSTIC] resolveCollectionFromScope: looking for collection '%s'", collectionName)
+	log.Printf("[DIAGNOSTIC] resolveCollectionFromScope: dataScope has %d keys", len(dataScope))
+
+	// DIAGNOSTIC: Log all keys
+	for key := range dataScope {
+		log.Printf("[DIAGNOSTIC] resolveCollectionFromScope: - dataScope key: '%s'", key)
+	}
+
 	// Handle nil dataScope gracefully (COGNITIVE LOAD RULE: check nil)
 	if dataScope == nil {
 		log.Printf("resolveCollectionFromScope: dataScope is nil, cannot resolve '%s'", collectionName)
@@ -238,6 +286,7 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 
 	// Check if this is a nested property access (e.g., "category.items")
 	if strings.Contains(collectionName, ".") {
+		log.Printf("[DIAGNOSTIC] resolveCollectionFromScope: detected nested property path '%s'", collectionName)
 		value = resolveNestedProperty(collectionName, dataScope)
 		exists = (value != nil)
 		if !exists {
@@ -255,6 +304,7 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 			}
 			log.Printf("resolveCollectionFromScope: collection '%s' not found in dataScope, available keys: %v",
 				collectionName, availableKeys)
+			log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope END (NOT FOUND) ==========")
 			return nil, false
 		}
 	}
@@ -269,6 +319,7 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 	if array, ok := value.([]interface{}); ok {
 		log.Printf("resolveCollectionFromScope: successfully resolved collection '%s' with %d items ([]interface{})",
 			collectionName, len(array))
+		log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope END (SUCCESS) ==========")
 		return array, true
 	}
 
@@ -290,12 +341,14 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 
 		log.Printf("resolveCollectionFromScope: successfully resolved collection '%s' with %d items (%s)",
 			collectionName, length, valueType.String())
+		log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope END (SUCCESS via reflection) ==========")
 		return result, true
 	}
 
 	// Not a slice/array type
 	log.Printf("resolveCollectionFromScope: collection '%s' is not an array, got type %T",
 		collectionName, value)
+	log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope END (NOT AN ARRAY) ==========")
 	return nil, false
 }
 

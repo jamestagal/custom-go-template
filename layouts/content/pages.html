@@ -1,6 +1,28 @@
+---
 <!-- Pages Layout - Renders dynamic components from content JSON -->
-<!-- NOTE: <head> provided by wrapper layout (includes Alpine.js + runtime-components.js) -->
-<!-- NOTE: No fence section - uses variables from parent scope (html.html wrapper) -->
-{for component in content.components}
-    <Component:dynamic name={component.name} {...component.fields} />
-{/for}
+<!-- Receives content from html.html wrapper via export let -->
+export let content, components
+---
+
+<div class="page-content-container">
+  {for component in content.components}
+      <Component:dynamic name={component.name} {...component.fields} />
+  {/for}
+</div>
+
+<style>
+  /* Container for page content - centers and constrains text-heavy pages */
+  .page-content-container {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 10rem 2rem 2rem 2rem;
+  }
+
+  /* Full-width sections break out of the container */
+  .page-content-container > section {
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    padding-left: 0;
+    padding-right: 0;
+  }
+</style>

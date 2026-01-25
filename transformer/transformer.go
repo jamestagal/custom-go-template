@@ -9,6 +9,18 @@ import (
 
 // TransformAST transforms the AST to Alpine.js compatible nodes
 func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
+	log.Printf("[DIAGNOSTIC] ========== TransformAST START ==========")
+	log.Printf("[DIAGNOSTIC] TransformAST: props keys=%v", getMapKeys(props))
+
+	// DIAGNOSTIC: Check if components is in props
+	if componentsRaw, ok := props["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[DIAGNOSTIC] TransformAST: ✓ 'components' prop is in props (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[DIAGNOSTIC] TransformAST: ✗ 'components' prop MISSING from props!")
+	}
+
 	// Reset component tracking for each transformation
 	resetComponentTracking()
 
@@ -17,6 +29,17 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 
 	// Initialize the data scope with the provided props
 	dataScope := InitDataScope(props)
+
+	log.Printf("[DIAGNOSTIC] TransformAST: dataScope initialized with keys=%v", getMapKeys(dataScope))
+
+	// DIAGNOSTIC: Check if components is in dataScope after initialization
+	if componentsRaw, ok := dataScope["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[DIAGNOSTIC] TransformAST: ✓ 'components' in dataScope after InitDataScope (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[DIAGNOSTIC] TransformAST: ✗ 'components' MISSING from dataScope after InitDataScope!")
+	}
 
 	// Find fence section if it exists
 	fence := FindFenceSection(template.RootNodes)
@@ -32,6 +55,8 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 		// No fence section, initialize empty store tracking
 		InitStoreTracking(map[string]string{})
 	}
+
+	log.Printf("[DIAGNOSTIC] TransformAST: dataScope after CollectFenceData keys=%v", getMapKeys(dataScope))
 
 	// Start the transformation process
 	log.Printf("TransformAST: Starting node transformation")
@@ -49,6 +74,7 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 	log.Printf("TransformAST: Applied whitespace preservation")
 
 	log.Printf("TransformAST: Transformation complete, generated %d nodes", len(transformedNodes))
+	log.Printf("[DIAGNOSTIC] ========== TransformAST END ==========")
 
 	return transformedTemplate
 }
@@ -137,30 +163,38 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 
 		case *ast.ExpressionNode:
 			// Transform expression nodes
-			log.Printf("transformNodes: Transforming Expression node")
 			// Clean the expression by removing any extra curly braces
 			cleanedExpr := n.Expression
 			cleanedExpr = strings.TrimPrefix(cleanedExpr, "{")
 			cleanedExpr = strings.TrimSuffix(cleanedExpr, "}")
 			cleanedExpr = strings.TrimSpace(cleanedExpr)
 
-			// Add variables from the expression to the data scope
-			extractVariablesFromExpr(cleanedExpr, dataScope)
+			// CRITICAL FIX: Try build-time resolution first for property access expressions
+			// This handles cases like {card.title}, {cta.button.text}, {text} in loops
+			// where the loop variable is resolved at build-time during loop expansion
+			if resolvedValue, resolvable := TryResolveBuildTimeValue(cleanedExpr, dataScope); resolvable {
+				// Build-time interpolation: replace with the actual text value
+				transformedNodes = append(transformedNodes, &ast.TextNode{Content: resolvedValue})
+			} else {
+				// Runtime expression: create Alpine.js x-text binding
+				// Add variables from the expression to the data scope
+				extractVariablesFromExpr(cleanedExpr, dataScope)
 
-			// Create an Alpine.js x-text element
-			xTextElement := &ast.Element{
-				TagName: "span",
-				Attributes: []ast.Attribute{
-					{
-						Name:       "x-text",
-						Value:      cleanedExpr,
-						Dynamic:    true,
-						IsAlpine:   true,
-						AlpineType: "text",
+				// Create an Alpine.js x-text element
+				xTextElement := &ast.Element{
+					TagName: "span",
+					Attributes: []ast.Attribute{
+						{
+							Name:       "x-text",
+							Value:      cleanedExpr,
+							Dynamic:    true,
+							IsAlpine:   true,
+							AlpineType: "text",
+						},
 					},
-				},
+				}
+				transformedNodes = append(transformedNodes, xTextElement)
 			}
-			transformedNodes = append(transformedNodes, xTextElement)
 
 		case *ast.ComponentNode:
 			// Transform component nodes

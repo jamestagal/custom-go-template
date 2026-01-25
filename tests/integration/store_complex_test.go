@@ -47,7 +47,7 @@ store user = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", nil)
 
 	// Verify all three levels of nesting use $store prefix
 	if !strings.Contains(markup, "x-if=\"$store.user.isLoggedIn\"") {
@@ -105,7 +105,7 @@ store data = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", nil)
 
 	// UPDATED EXPECTATION: Verify outer loop uses $store prefix and runtime x-for
 	// Format is "item in collection" when no index variable is specified
@@ -164,7 +164,7 @@ store theme = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
+	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", nil)
 
 	// Verify all three stores are referenced correctly
 	if !strings.Contains(markup, "x-text=\"$store.auth.user\"") {
@@ -219,7 +219,7 @@ store form = {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", nil)
 
 	// Note: Bracket notation {$form[fieldName]} is not yet implemented
 	// For now, we test dot notation which works

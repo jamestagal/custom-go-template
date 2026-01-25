@@ -824,7 +824,7 @@ func TestGetAggregatedStyles_Cache_MissOnFirstCall(t *testing.T) {
 	transformer.RegisterComponent("CacheTestComponent", template, []string{})
 
 	// First call should be a cache miss and perform full aggregation
-	result := GetAggregatedStyles(template, nil, "CacheTestComponent", "")
+	result := GetAggregatedStyles(template, nil, "CacheTestComponent", "", nil)
 
 	// Verify result contains expected style
 	if !strings.Contains(result, ".cache-test { color: blue; }") {
@@ -854,10 +854,10 @@ func TestGetAggregatedStyles_Cache_HitOnSecondCall(t *testing.T) {
 	transformer.RegisterComponent("CacheHitComponent", template, []string{})
 
 	// First call - cache miss
-	firstResult := GetAggregatedStyles(template, nil, "CacheHitComponent", "")
+	firstResult := GetAggregatedStyles(template, nil, "CacheHitComponent", "", nil)
 
 	// Second call - should be cache hit
-	secondResult := GetAggregatedStyles(template, nil, "CacheHitComponent", "")
+	secondResult := GetAggregatedStyles(template, nil, "CacheHitComponent", "", nil)
 
 	// Both results should be identical
 	if firstResult != secondResult {
@@ -897,8 +897,8 @@ func TestGetAggregatedStyles_Cache_DifferentComponents(t *testing.T) {
 	transformer.RegisterComponent("ComponentB", templateB, []string{})
 
 	// Call for both components
-	resultA := GetAggregatedStyles(templateA, nil, "ComponentA", "")
-	resultB := GetAggregatedStyles(templateB, nil, "ComponentB", "")
+	resultA := GetAggregatedStyles(templateA, nil, "ComponentA", "", nil)
+	resultB := GetAggregatedStyles(templateB, nil, "ComponentB", "", nil)
 
 	// Verify each component has its own cached result
 	if !strings.Contains(resultA, ".component-a { color: red; }") {
@@ -916,8 +916,8 @@ func TestGetAggregatedStyles_Cache_DifferentComponents(t *testing.T) {
 	}
 
 	// Call again to verify cache works for both
-	resultA2 := GetAggregatedStyles(templateA, nil, "ComponentA", "")
-	resultB2 := GetAggregatedStyles(templateB, nil, "ComponentB", "")
+	resultA2 := GetAggregatedStyles(templateA, nil, "ComponentA", "", nil)
+	resultB2 := GetAggregatedStyles(templateB, nil, "ComponentB", "", nil)
 
 	if resultA != resultA2 {
 		t.Errorf("ComponentA cache not working correctly")
@@ -944,10 +944,10 @@ func TestClearStyleCache(t *testing.T) {
 	transformer.RegisterComponent("ClearCacheComponent", template, []string{})
 
 	// First call - cache miss
-	firstResult := GetAggregatedStyles(template, nil, "ClearCacheComponent", "")
+	firstResult := GetAggregatedStyles(template, nil, "ClearCacheComponent", "", nil)
 
 	// Verify cache hit works
-	cachedResult := GetAggregatedStyles(template, nil, "ClearCacheComponent", "")
+	cachedResult := GetAggregatedStyles(template, nil, "ClearCacheComponent", "", nil)
 	if firstResult != cachedResult {
 		t.Errorf("Cache not working before clear")
 	}
@@ -956,7 +956,7 @@ func TestClearStyleCache(t *testing.T) {
 	ClearStyleCache()
 
 	// Next call should re-aggregate (cache miss again)
-	afterClearResult := GetAggregatedStyles(template, nil, "ClearCacheComponent", "")
+	afterClearResult := GetAggregatedStyles(template, nil, "ClearCacheComponent", "", nil)
 
 	// Result should be identical (same aggregation logic) but freshly computed
 	if firstResult != afterClearResult {
@@ -995,7 +995,7 @@ func TestGetAggregatedStyles_ConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			results[index] = GetAggregatedStyles(template, nil, "ConcurrentComponent", "")
+			results[index] = GetAggregatedStyles(template, nil, "ConcurrentComponent", "", nil)
 		}(i)
 	}
 
@@ -1022,7 +1022,7 @@ func TestGetAggregatedStyles_Cache_NilTemplate(t *testing.T) {
 	ClearStyleCache()
 
 	// Call with nil template
-	result := GetAggregatedStyles(nil, nil, "NilComponent", "")
+	result := GetAggregatedStyles(nil, nil, "NilComponent", "", nil)
 
 	// Should return empty string
 	if strings.TrimSpace(result) != "" {
@@ -1030,7 +1030,7 @@ func TestGetAggregatedStyles_Cache_NilTemplate(t *testing.T) {
 	}
 
 	// Second call should also return empty (should not panic)
-	result2 := GetAggregatedStyles(nil, nil, "NilComponent", "")
+	result2 := GetAggregatedStyles(nil, nil, "NilComponent", "", nil)
 	if strings.TrimSpace(result2) != "" {
 		t.Errorf("Expected empty result on second call for nil template")
 	}
@@ -1051,7 +1051,7 @@ func TestGetAggregatedStyles_Cache_EmptyComponentName(t *testing.T) {
 	}
 
 	// Call with empty component name
-	result := GetAggregatedStyles(template, nil, "", "")
+	result := GetAggregatedStyles(template, nil, "", "", nil)
 
 	// Should still work (empty string is valid map key)
 	if !strings.Contains(result, ".empty-name { color: purple; }") {
@@ -1059,7 +1059,7 @@ func TestGetAggregatedStyles_Cache_EmptyComponentName(t *testing.T) {
 	}
 
 	// Second call should be cached
-	result2 := GetAggregatedStyles(template, nil, "", "")
+	result2 := GetAggregatedStyles(template, nil, "", "", nil)
 	if result != result2 {
 		t.Errorf("Cache should work with empty component name")
 	}
@@ -1097,7 +1097,7 @@ func TestGetAggregatedStyles_Cache_NestedComponents(t *testing.T) {
 	transformer.RegisterComponent("CachedParent", parentTemplate, []string{})
 
 	// First call - cache miss, should aggregate both parent and child
-	firstResult := GetAggregatedStyles(parentTemplate, nil, "CachedParent", "")
+	firstResult := GetAggregatedStyles(parentTemplate, nil, "CachedParent", "", nil)
 
 	// Verify both styles are present
 	if !strings.Contains(firstResult, ".child-cached") {
@@ -1108,7 +1108,7 @@ func TestGetAggregatedStyles_Cache_NestedComponents(t *testing.T) {
 	}
 
 	// Second call - cache hit
-	secondResult := GetAggregatedStyles(parentTemplate, nil, "CachedParent", "")
+	secondResult := GetAggregatedStyles(parentTemplate, nil, "CachedParent", "", nil)
 
 	// Should be identical
 	if firstResult != secondResult {
@@ -1161,11 +1161,11 @@ func BenchmarkGetAggregatedStyles_CacheHit(b *testing.B) {
 	// Setup: Create component and prime cache
 	template := createBenchmarkTemplate()
 	transformer.RegisterComponent("BenchmarkComponent", template, []string{})
-	GetAggregatedStyles(template, nil, "BenchmarkComponent", "") // Prime cache
+	GetAggregatedStyles(template, nil, "BenchmarkComponent", "", nil) // Prime cache
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		GetAggregatedStyles(template, nil, "BenchmarkComponent", "")
+		GetAggregatedStyles(template, nil, "BenchmarkComponent", "", nil)
 	}
 }
 
@@ -1177,7 +1177,7 @@ func BenchmarkGetAggregatedStyles_CacheMiss(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ClearStyleCache() // Force miss
-		GetAggregatedStyles(template, nil, "BenchmarkMissComponent", "")
+		GetAggregatedStyles(template, nil, "BenchmarkMissComponent", "", nil)
 	}
 }
 
@@ -1220,10 +1220,10 @@ func BenchmarkGetAggregatedStyles_NestedComponents_CacheHit(b *testing.B) {
 	transformer.RegisterComponent("BenchParent", parentTemplate, []string{})
 
 	// Prime cache
-	GetAggregatedStyles(parentTemplate, nil, "BenchParent", "")
+	GetAggregatedStyles(parentTemplate, nil, "BenchParent", "", nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		GetAggregatedStyles(parentTemplate, nil, "BenchParent", "")
+		GetAggregatedStyles(parentTemplate, nil, "BenchParent", "", nil)
 	}
 }

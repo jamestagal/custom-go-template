@@ -1,8 +1,10 @@
 ---
-import Hero2436 from '../components/hero2436.html'
-import Services2437 from '../components/services2437.html'
-export let topper, title, description, buttonText, buttonLink
+<!-- Index Layout - Renders dynamic components from content JSON -->
+<!-- Receives content from html.html wrapper via export let -->
+<!-- Component styles are now auto-collected from JSON content (no imports needed) -->
+export let content, components
 ---
 
-<Hero2436 topper={topper} title={title} description={description} buttonText={buttonText} buttonLink={buttonLink} />
-<Services2437 />
+{for component in content.components}
+    <Component:dynamic name={component.name} {...component.fields} />
+{/for}

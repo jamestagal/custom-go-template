@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"sync"
 
@@ -125,17 +126,18 @@ func findComponentNodes(nodes []ast.Node) []string {
 // 1. Original AST - for FenceSection imports (Hero2436, Services2437 in _index.html)
 // 2. Transformed AST - for dynamically resolved components (Component:dynamic → _index)
 // 3. Dynamic layout - when Component:dynamic resolves to a layout, collect that layout's imports
+// 4. JSON components - component names specified in JSON content (e.g., content/pages/_index.json)
 //
-// Pattern: Style Aggregation Pattern [Load: 22]
-// Cognitive Load: 22 (traverse original: 5, traverse transformed: 5, dynamic layout: 4, merge: 3, dedupe: 4, format: 1)
+// Pattern: Style Aggregation Pattern [Load: 24]
+// Cognitive Load: 24 (traverse original: 5, traverse transformed: 5, dynamic layout: 4, json components: 3, merge: 3, dedupe: 4)
 //
 // Example:
 //   html.html (original) imports: Nav, Head, Footer
 //   html.html (transformed) has: Nav, Head, Footer, + resolved _index component
 //   dynamicLayoutName: "_index"
-//   _index (original) imports: Hero2436, Services2437
-//   Result: Styles from Nav, Head, Footer, Hero2436, Services2437, _index
-func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transformedAST *ast.Template, componentName string, dynamicLayoutName string) string {
+//   jsonComponentNames: ["hero2436", "services2437", "whyChoose2425"]
+//   Result: Styles from Nav, Head, Footer, Hero2436, Services2437, WhyChoose2425, _index
+func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transformedAST *ast.Template, componentName string, dynamicLayoutName string, jsonComponentNames []string) string {
 	// Handle nil template gracefully
 	if originalAST == nil && transformedAST == nil {
 		return ""
@@ -266,6 +268,29 @@ func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transfor
 			collectStyles(layoutTemplate.Template, dynamicLayoutName)
 		} else {
 			log.Printf("[AggregateComponentStyles] Warning: dynamic layout %s not found in component registry", dynamicLayoutName)
+		}
+	}
+
+	// Step 4: Collect styles from JSON-specified components
+	// This handles the case where components are specified in content JSON files (e.g., content/pages/_index.json)
+	// These components are NOT imported in the template but are rendered via {for component in content.components}
+	if len(jsonComponentNames) > 0 {
+		log.Printf("[AggregateComponentStyles] Phase 4: Collecting from %d JSON-specified components: %v", len(jsonComponentNames), jsonComponentNames)
+
+		for _, compName := range jsonComponentNames {
+			// Capitalize first letter to match component registration convention
+			// Components are registered with capitalized names (e.g., "hero2436" → "Hero2436")
+			capitalizedName := compName
+			if len(compName) > 0 {
+				capitalizedName = strings.ToUpper(compName[:1]) + compName[1:]
+			}
+
+			if compTemplate, exists := transformer.GetComponentTemplate(capitalizedName); exists {
+				log.Printf("[AggregateComponentStyles] Found JSON component template: %s", capitalizedName)
+				collectStyles(compTemplate.Template, capitalizedName)
+			} else {
+				log.Printf("[AggregateComponentStyles] Warning: JSON component %s (capitalized: %s) not found in component registry", compName, capitalizedName)
+			}
 		}
 	}
 
@@ -425,6 +450,7 @@ func AggregateComponentStyles(rootTemplate *ast.Template, componentName string) 
 //
 // UPDATED: Now accepts both original and transformed ASTs to handle dynamic components
 // UPDATED: Now accepts dynamicLayoutName to collect styles from dynamically resolved layouts
+// UPDATED: Now accepts jsonComponentNames to collect styles from JSON-specified components
 //
 // On first call for a component, performs full aggregation and caches result.
 // Subsequent calls return cached result for significant performance improvement.
@@ -432,19 +458,26 @@ func AggregateComponentStyles(rootTemplate *ast.Template, componentName string) 
 // Thread-safe for concurrent access.
 //
 // Example:
-//   styles := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index")
-//   // First call: cache miss, performs aggregation including _index layout imports
-//   styles2 := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index")
+//   styles := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index", []string{"hero2436", "services2437"})
+//   // First call: cache miss, performs aggregation including _index layout and JSON component imports
+//   styles2 := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index", []string{"hero2436", "services2437"})
 //   // Second call: cache hit, returns cached result instantly
-func GetAggregatedStyles(originalAST *ast.Template, transformedAST *ast.Template, componentName string, dynamicLayoutName string) string {
-	// Build cache key that includes dynamic layout name
+func GetAggregatedStyles(originalAST *ast.Template, transformedAST *ast.Template, componentName string, dynamicLayoutName string, jsonComponentNames []string) string {
+	// Build cache key that includes dynamic layout name and JSON component names
 	cacheKey := componentName
 	if dynamicLayoutName != "" {
 		cacheKey = fmt.Sprintf("%s:layout=%s", componentName, dynamicLayoutName)
 	}
+	// Include JSON component names in cache key for proper invalidation
+	if len(jsonComponentNames) > 0 {
+		sortedNames := make([]string, len(jsonComponentNames))
+		copy(sortedNames, jsonComponentNames)
+		sort.Strings(sortedNames)
+		cacheKey = fmt.Sprintf("%s:json=%s", cacheKey, strings.Join(sortedNames, ","))
+	}
 
 	if !cacheEnabled {
-		return AggregateComponentStylesWithTransformed(originalAST, transformedAST, componentName, dynamicLayoutName)
+		return AggregateComponentStylesWithTransformed(originalAST, transformedAST, componentName, dynamicLayoutName, jsonComponentNames)
 	}
 
 	// Try cache lookup (read lock for concurrent reads)
@@ -453,13 +486,13 @@ func GetAggregatedStyles(originalAST *ast.Template, transformedAST *ast.Template
 	styleCacheMutex.RUnlock()
 
 	if exists {
-		log.Printf("[Style Cache] HIT for component: %s (dynamic layout: %s)", componentName, dynamicLayoutName)
+		log.Printf("[Style Cache] HIT for component: %s (dynamic layout: %s, json components: %v)", componentName, dynamicLayoutName, jsonComponentNames)
 		return cached
 	}
 
 	// Cache miss - perform aggregation
-	log.Printf("[Style Cache] MISS for component: %s (dynamic layout: %s) - aggregating...", componentName, dynamicLayoutName)
-	aggregated := AggregateComponentStylesWithTransformed(originalAST, transformedAST, componentName, dynamicLayoutName)
+	log.Printf("[Style Cache] MISS for component: %s (dynamic layout: %s, json components: %v) - aggregating...", componentName, dynamicLayoutName, jsonComponentNames)
+	aggregated := AggregateComponentStylesWithTransformed(originalAST, transformedAST, componentName, dynamicLayoutName, jsonComponentNames)
 
 	// Store in cache (write lock for exclusive write)
 	styleCacheMutex.Lock()

@@ -91,7 +91,7 @@ export let components
 
 	// Fixed: Render signature changed - now takes (templatePath, props, contentData)
 	// For testing, we can use RenderWithStores with empty template path
-	html, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "")
+	html, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", nil)
 
 	// FIXED: Update expectations for x-data wrappers (components need isolation)
 	// Verify output contains both components (check for class attribute, x-data may be present)

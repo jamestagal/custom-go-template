@@ -7,7 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
-
+	"reflect"
 	"github.com/jimafisk/custom_go_template/ast" // Import AST package
 	"github.com/jimafisk/custom_go_template/parser"
 	"github.com/jimafisk/custom_go_template/transformer"
@@ -73,9 +73,10 @@ func Render(templatePath string, props map[string]any, contentData map[string]in
 	// - Original AST: has FenceSection imports (Hero2436, Services2437 in _index.html)
 	// - Transformed AST: has resolved dynamic components (Component:dynamic → _index)
 	// This ensures ALL component CSS is collected
+	// Note: Render() doesn't have JSON component names - those come from RenderWithStores
 	componentName := extractComponentName(templatePath)
 	log.Printf("[Render] Calling GetAggregatedStyles for: %s", componentName)
-	style := GetAggregatedStyles(templateAST, transformedAST, componentName, "")
+	style := GetAggregatedStyles(templateAST, transformedAST, componentName, "", nil)
 	log.Printf("[Render] GetAggregatedStyles returned %d bytes", len(style))
 
 	// Check if page styles are present
@@ -102,20 +103,21 @@ func Render(templatePath string, props map[string]any, contentData map[string]in
 //   - storeDefinitions: Map of store names to their JS object literal definitions
 //   - templatePath: Path to the template file (for component name extraction)
 //   - dynamicLayoutName: Name of the dynamically resolved layout (e.g., "_index") for CSS aggregation
+//   - jsonComponentNames: Component names from JSON content (e.g., from content/pages/_index.json)
 //
 // Output:
 //   - markup: The rendered HTML markup
 //   - script: The combined script content (store init + extracted scripts)
 //   - style: The aggregated CSS styles (page + all component styles)
 //
-// Cognitive Load: 14
+// Cognitive Load: 15
 // - Generate markup: 2
 // - Generate base script: 2
 // - Generate store script: 3
 // - Combine scripts: 2
-// - Aggregate styles with dynamic layout: 3
+// - Aggregate styles with dynamic layout + JSON components: 4
 // - Generate style: 2
-func RenderWithStores(originalAST *ast.Template, transformedAST *ast.Template, storeDefinitions map[string]string, templatePath string, dynamicLayoutName string) (string, string, string) {
+func RenderWithStores(originalAST *ast.Template, transformedAST *ast.Template, storeDefinitions map[string]string, templatePath string, dynamicLayoutName string, jsonComponentNames []string) (string, string, string) {
 	// Generate markup from transformed AST
 	markup := generateMarkup(transformedAST)
 
@@ -149,10 +151,11 @@ func RenderWithStores(originalAST *ast.Template, transformedAST *ast.Template, s
 	// - Original AST: has FenceSection imports (Nav, Head, Footer in html.html)
 	// - Transformed AST: has resolved dynamic components (Component:dynamic → _index)
 	// - Dynamic Layout: "_index" layout's imports (Hero2436, Services2437)
+	// - JSON Components: components specified in content JSON (hero2436, services2437, whyChoose2425)
 	// This fixes the "missing component CSS" bug
 	componentName := extractComponentName(templatePath)
-	log.Printf("[RenderWithStores] Aggregating styles for: %s (dynamic layout: %s)", componentName, dynamicLayoutName)
-	style := GetAggregatedStyles(originalAST, transformedAST, componentName, dynamicLayoutName)
+	log.Printf("[RenderWithStores] Aggregating styles for: %s (dynamic layout: %s, json components: %v)", componentName, dynamicLayoutName, jsonComponentNames)
+	style := GetAggregatedStyles(originalAST, transformedAST, componentName, dynamicLayoutName, jsonComponentNames)
 	log.Printf("[RenderWithStores] Aggregated %d bytes of styles", len(style))
 
 	return markup, combinedScript, style
@@ -569,11 +572,21 @@ func FormatJSValue(value any) string {
 		}
 		return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
 	default:
+		// CRITICAL FIX: Check if it's ANY slice type using reflection
+		// This handles []interface{}, []string, []int, etc. that don't match []any
+		if reflect.TypeOf(value).Kind() == reflect.Slice {
+			sliceVal := reflect.ValueOf(value)
+			var parts []string
+			for i := 0; i < sliceVal.Len(); i++ {
+				parts = append(parts, FormatJSValue(sliceVal.Index(i).Interface()))
+			}
+			return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
+		}
+		
 		// For other types, use the default string representation
-		return fmt.Sprintf("%v", v)
+		return fmt.Sprintf("%v", value)
 	}
 }
-
 func generateMarkup(template *ast.Template) string {
 	var sb strings.Builder
 

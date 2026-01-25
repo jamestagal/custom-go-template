@@ -35,7 +35,7 @@ func TestCartBadge_ActualFile(t *testing.T) {
 	storeDefinitions := transformer.GetReferencedStoreDefinitions(allDefinitions, referencedStores)
 
 	// Render
-	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "CartBadge.html", "")
+	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "CartBadge.html", "", nil)
 
 	// Print the rendered markup for manual inspection
 	t.Logf("Rendered CartBadge.html:\n%s", markup)

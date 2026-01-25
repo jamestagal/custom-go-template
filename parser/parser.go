@@ -330,6 +330,8 @@ func BlockConditionalParser() Parser {
 func BlockLoopParser() Parser {
 	return func(input string) Result {
 		log.Printf("[BlockLoopParser] Attempting to parse loop block")
+		log.Printf("[BlockLoopParser] ===== ENTRY POINT =====")
+		log.Printf("[BlockLoopParser] Input: %.100s...", input)
 		originalInput := input
 
 		// First, check if we start with a for directive
@@ -346,6 +348,11 @@ func BlockLoopParser() Parser {
 
 		remaining := forStartRes.Remaining
 		log.Printf("[BlockLoopParser] Parsed loop: %s in %s", loop.Value, loop.Collection)
+		log.Printf("[BlockLoopParser] ✓ Successfully parsed loop directive")
+		log.Printf("[BlockLoopParser]   Iterator: %s", loop.Iterator)
+		log.Printf("[BlockLoopParser]   Value: %s", loop.Value)
+		log.Printf("[BlockLoopParser]   Collection: %s", loop.Collection)
+		log.Printf("[BlockLoopParser]   IsOf: %v", loop.IsOf)
 
 		// Parse content until we hit /for or /each
 		iterationCount := 0
