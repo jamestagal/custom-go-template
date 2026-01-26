@@ -308,6 +308,12 @@ func generateRuntimeLoopTemplate(node *ast.Loop, itemVar, indexVar, cleanedColle
 
 	log.Printf("generateRuntimeLoopTemplate: generated x-for expression: %s", loopExpr)
 
+	// Track collection variable for x-data optimization
+	// Only runtime collections need to be in x-data
+	if runtimeTracker != nil {
+		runtimeTracker.TrackExpression(cleanedCollection)
+	}
+
 	// Create the template element with the loop expression
 	// Use loop body scope for transforming content
 	return createLoopTemplate(loopExpr, node.Content, loopBodyScope)

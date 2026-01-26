@@ -315,6 +315,12 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 	// Extract variables from the condition expression
 	extractVariablesFromExpr(transformedIfCondition, dataScope)
 
+	// Track condition variables for x-data optimization
+	// Only runtime conditions need variables in x-data
+	if runtimeTracker != nil {
+		runtimeTracker.TrackExpression(transformedIfCondition)
+	}
+
 	// Log the condition for debugging
 	log.Printf("Transformed conditional with condition: %s (RUNTIME)", node.IfCondition)
 

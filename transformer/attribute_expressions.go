@@ -698,6 +698,12 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 					// Extract variables from expression to data scope
 					extractVariablesFromExpr(expression, dataScope)
 
+					// Track variables for x-data optimization
+					// Only variables in runtime expressions need to be in x-data
+					if runtimeTracker != nil {
+						runtimeTracker.TrackExpression(expression)
+					}
+
 					// Determine whether this is an Alpine directive
 					isAlpine := strings.HasPrefix(attr.Name, "x-") || strings.HasPrefix(attr.Name, "@")
 
@@ -837,6 +843,12 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 
 				// Combine all parts with + operator
 				combinedExpression := strings.Join(expressionParts, " + ")
+
+				// Track variables for x-data optimization
+				// Only variables in runtime expressions need to be in x-data
+				if runtimeTracker != nil {
+					runtimeTracker.TrackExpression(combinedExpression)
+				}
 
 				// Debug logging for mixed content
 				logExpressionDebug("Attribute '%s' mixed content (static + expressions) → RUNTIME", attr.Name)

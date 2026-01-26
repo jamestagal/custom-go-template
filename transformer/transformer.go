@@ -7,6 +7,18 @@ import (
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
+// runtimeTracker tracks variables that need runtime evaluation by Alpine.js.
+// This is a package-level variable reset at the start of each transformation.
+// Variables only used at build-time (e.g., allContent for loop expansion)
+// will NOT be tracked and thus excluded from x-data.
+var runtimeTracker *RuntimeVarTracker
+
+// GetRuntimeTracker returns the current runtime variable tracker.
+// Used by the renderer to filter scope before x-data serialization.
+func GetRuntimeTracker() *RuntimeVarTracker {
+	return runtimeTracker
+}
+
 // TransformAST transforms the AST to Alpine.js compatible nodes
 func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 	log.Printf("[DIAGNOSTIC] ========== TransformAST START ==========")
@@ -20,6 +32,11 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 	} else {
 		log.Printf("[DIAGNOSTIC] TransformAST: ✗ 'components' prop MISSING from props!")
 	}
+
+	// Initialize runtime variable tracker for x-data optimization
+	// This tracks which variables are actually used by Alpine.js at runtime
+	runtimeTracker = NewRuntimeVarTracker()
+	log.Printf("TransformAST: Initialized runtime variable tracker")
 
 	// Reset component tracking for each transformation
 	resetComponentTracking()
@@ -180,6 +197,12 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 				// Add variables from the expression to the data scope
 				extractVariablesFromExpr(cleanedExpr, dataScope)
 
+				// Track variables for x-data optimization
+				// Only variables in runtime expressions need to be in x-data
+				if runtimeTracker != nil {
+					runtimeTracker.TrackExpression(cleanedExpr)
+				}
+
 				// Create an Alpine.js x-text element
 				xTextElement := &ast.Element{
 					TagName: "span",
@@ -254,9 +277,18 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 // applyAlpineDataWrapper wraps the nodes in an Alpine.js x-data wrapper
 // Uses alpineDataFormatter from alpine.go which properly formats JavaScript values
 func applyAlpineDataWrapper(nodes []ast.Node, dataScope map[string]any) []ast.Node {
-	// Build the x-data value from the data scope using proper JavaScript formatting
+	// OPTIMIZATION: Filter scope to only include runtime-tracked variables
+	// Variables only used at build-time (like allContent for loop expansion)
+	// are excluded from x-data to reduce page weight
+	filteredScope := dataScope
+	if runtimeTracker != nil {
+		filteredScope = runtimeTracker.FilterScope(dataScope)
+		log.Printf("[X-Data] Filtered scope from %d to %d variables", len(dataScope), len(filteredScope))
+	}
+
+	// Build the x-data value from the filtered scope using proper JavaScript formatting
 	// alpineDataFormatter uses FormatGoValueToJS which handles arrays, objects, etc.
-	xDataValue := alpineDataFormatter(dataScope)
+	xDataValue := alpineDataFormatter(filteredScope)
 
 	// Create a wrapper div with the x-data directive
 	wrapperDiv := &ast.Element{

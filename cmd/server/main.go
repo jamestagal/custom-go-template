@@ -595,7 +595,15 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 	markup, script, style := renderer.RenderWithStores(template, transformed, finalStores, entrypoint, layoutName, jsonComponentNames)
 
 	// Build x-data from props
-	xDataValue := buildXDataFromProps(props)
+	// OPTIMIZATION: Filter props to only include runtime-tracked variables
+	// Variables only used at build-time (like allContent for loop expansion)
+	// are excluded from x-data to reduce page weight
+	filteredProps := props
+	if runtimeTracker := transformer.GetRuntimeTracker(); runtimeTracker != nil {
+		filteredProps = runtimeTracker.FilterScope(props)
+		log.Printf("[X-Data] Filtered props from %d to %d variables", len(props), len(filteredProps))
+	}
+	xDataValue := buildXDataFromProps(filteredProps)
 
 	// Build final HTML with x-data injected
 	finalHTML := markup
@@ -903,7 +911,13 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	// CRITICAL: Generate x-data using transformer's alpineDataFormatter
 	// This function is not exported, so we need to call Transform to get the data scope
 	// and then format it ourselves
-	xDataValue := buildXDataFromProps(props)
+	// OPTIMIZATION: Filter props to only include runtime-tracked variables
+	filteredProps := props
+	if runtimeTracker := transformer.GetRuntimeTracker(); runtimeTracker != nil {
+		filteredProps = runtimeTracker.FilterScope(props)
+		log.Printf("[X-Data] Filtered props from %d to %d variables", len(props), len(filteredProps))
+	}
+	xDataValue := buildXDataFromProps(filteredProps)
 
 	// Build final HTML with x-data injected
 	finalHTML := markup

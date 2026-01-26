@@ -448,3 +448,165 @@ func deepEqual(a, b any) bool {
 	// Compare JSON representations
 	return string(aJSON) == string(bJSON)
 }
+
+// ============================================================================
+// PHASE 3: Runtime Variable Tracking for x-data Optimization
+// ============================================================================
+
+// RuntimeVarTracker tracks variables that need runtime evaluation by Alpine.js.
+// Variables that are only used at build-time (e.g., allContent for loop expansion)
+// should NOT be included in x-data to reduce page weight.
+//
+// Pattern: Runtime Variable Tracking [Cognitive Load: 8]
+//
+// Usage:
+//
+//	tracker := NewRuntimeVarTracker()
+//	// During transformation, track variables that remain in Alpine directives
+//	tracker.Track("photos")      // x-for="photo in photos"
+//	tracker.Track("published")   // x-if="published"
+//
+//	// When serializing x-data, filter to only tracked variables
+//	if tracker.IsTracked("allContent") {
+//	    // Include in x-data
+//	} else {
+//	    // Exclude - was only used at build-time
+//	}
+type RuntimeVarTracker struct {
+	vars map[string]bool
+}
+
+// NewRuntimeVarTracker creates a new tracker for runtime variables
+func NewRuntimeVarTracker() *RuntimeVarTracker {
+	return &RuntimeVarTracker{vars: make(map[string]bool)}
+}
+
+// Track records a variable as needing runtime evaluation.
+// Only the root variable name is tracked (e.g., "photos" from "photos.length").
+func (t *RuntimeVarTracker) Track(varName string) {
+	if varName == "" || t == nil {
+		return
+	}
+
+	// Only track the root variable (before any dots)
+	// e.g., "photos.length" → "photos"
+	root := strings.SplitN(varName, ".", 2)[0]
+
+	// Skip common loop iterator names that shouldn't be in x-data
+	// These are temporary variables from x-for directives
+	skipNames := map[string]bool{
+		"item": true, "index": true, "key": true, "value": true,
+		"i": true, "idx": true, "k": true, "v": true,
+		"component": true, "post": true, "photo": true,
+	}
+	if skipNames[root] {
+		return
+	}
+
+	t.vars[root] = true
+	log.Printf("[RuntimeVarTracker] Tracking variable: %s (from %s)", root, varName)
+}
+
+// TrackExpression extracts and tracks all variables from an expression.
+// Handles expressions like "photos && photos.length > 0" → tracks "photos"
+func (t *RuntimeVarTracker) TrackExpression(expr string) {
+	if expr == "" || t == nil {
+		return
+	}
+
+	// Extract variable-like tokens from the expression
+	// This is a simplified approach that handles most common cases
+	tokens := extractVariableTokens(expr)
+	for _, token := range tokens {
+		t.Track(token)
+	}
+}
+
+// IsTracked checks if a variable was tracked for runtime evaluation
+func (t *RuntimeVarTracker) IsTracked(varName string) bool {
+	if t == nil {
+		return true // If no tracker, include everything (safe default)
+	}
+	return t.vars[varName]
+}
+
+// GetTrackedVars returns all tracked variable names
+func (t *RuntimeVarTracker) GetTrackedVars() []string {
+	if t == nil {
+		return nil
+	}
+	result := make([]string, 0, len(t.vars))
+	for v := range t.vars {
+		result = append(result, v)
+	}
+	return result
+}
+
+// FilterScope filters a dataScope to only include tracked runtime variables.
+// This is called before serializing to x-data to reduce page weight.
+func (t *RuntimeVarTracker) FilterScope(dataScope map[string]any) map[string]any {
+	if t == nil || len(t.vars) == 0 {
+		// No tracking info, return original scope
+		return dataScope
+	}
+
+	filtered := make(map[string]any)
+	for key, value := range dataScope {
+		if t.IsTracked(key) {
+			filtered[key] = value
+		}
+	}
+
+	log.Printf("[RuntimeVarTracker] FilterScope: %d → %d variables (removed %d build-time-only)",
+		len(dataScope), len(filtered), len(dataScope)-len(filtered))
+
+	return filtered
+}
+
+// extractVariableTokens extracts variable-like tokens from an expression.
+// Returns tokens that look like variable names (start with letter/underscore).
+// Pattern: Token Extraction [Cognitive Load: 8]
+func extractVariableTokens(expr string) []string {
+	var tokens []string
+	var current strings.Builder
+
+	for i := 0; i < len(expr); i++ {
+		ch := expr[i]
+
+		// Start of a potential identifier
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_' || ch == '$' {
+			current.WriteByte(ch)
+
+			// Continue reading the identifier
+			for i+1 < len(expr) {
+				next := expr[i+1]
+				if (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') ||
+					(next >= '0' && next <= '9') || next == '_' || next == '.' {
+					i++
+					current.WriteByte(next)
+				} else {
+					break
+				}
+			}
+
+			token := current.String()
+			current.Reset()
+
+			// Skip JavaScript keywords and literals
+			skipKeywords := map[string]bool{
+				"true": true, "false": true, "null": true, "undefined": true,
+				"this": true, "new": true, "typeof": true, "instanceof": true,
+				"if": true, "else": true, "for": true, "while": true,
+				"return": true, "function": true, "const": true, "let": true, "var": true,
+				"$store": true, "$el": true, "$refs": true, "$data": true,
+			}
+
+			// Skip if it's a keyword or starts with $store (Alpine magic)
+			if !skipKeywords[token] && !strings.HasPrefix(token, "$store.") {
+				tokens = append(tokens, token)
+			}
+		}
+	}
+
+	return tokens
+}
