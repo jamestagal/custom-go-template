@@ -388,15 +388,15 @@ func formatComponentData(dataScope map[string]any) string {
 				continue
 			}
 
-			// CRITICAL: Check if this value has the variable reference marker
-			// Values marked with __VAR_REF__ prefix came from dynamic props that reference parent scope
-			// Values marked with __PROP__ prefix are component props that should remain reactive
+			// CRITICAL FIX: Skip values with __VAR_REF__ marker entirely
+			// These reference parent scope variables that may not exist at runtime
+			// (e.g., allContent was filtered out by x-data optimization)
+			// Including them would create "allContent: allContent" which references
+			// a non-existent JavaScript variable and breaks Alpine.js
 			if strings.HasPrefix(cleanValue, "__VAR_REF__") {
-				// Strip the marker and output as Alpine expression without quotes
 				varName := strings.TrimPrefix(cleanValue, "__VAR_REF__")
-				result.WriteString(key)
-				result.WriteString(": ")
-				result.WriteString(varName)
+				log.Printf("[formatComponentData] Skipping __VAR_REF__ key=%q (references %s which may not exist in scope)", key, varName)
+				first = true // Reset first flag since we're skipping this entry
 				continue
 			}
 			if strings.HasPrefix(cleanValue, "__PROP__") {

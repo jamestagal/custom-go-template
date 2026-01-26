@@ -1011,12 +1011,14 @@ func alpineDataFormatter(dataScope map[string]any) string {
 				formattedValue = fixed
 				log.Printf("alpineDataFormatter: Fixed Go slice format for key=%s: %q → %q", key, strVal, fixed)
 			} else if strings.HasPrefix(strVal, "__VAR_REF__") {
-				// CRITICAL: Check if this has the __VAR_REF__ marker
-				// This indicates a variable reference that should be output without quotes
-				// Strip the marker and output as unquoted variable reference
+				// CRITICAL FIX: Skip __VAR_REF__ marked values entirely
+				// These reference parent scope variables that may not exist at runtime
+				// (e.g., allContent was filtered out by x-data optimization)
+				// Including them would create "allContent: allContent" which references
+				// a non-existent JavaScript variable and breaks Alpine.js
 				varName := strings.TrimPrefix(strVal, "__VAR_REF__")
-				formattedValue = varName
-				log.Printf("alpineDataFormatter: Stripped __VAR_REF__ marker, outputting variable reference: %s", varName)
+				log.Printf("alpineDataFormatter: Skipping __VAR_REF__ key=%s (references %s which may not exist in scope)", key, varName)
+				continue // Skip this key entirely
 			} else {
 				// CRITICAL FIX: Check if string looks like JSON BEFORE checking isDynamicExpression
 				// This prevents arrays like ["dog", "cat", "bird"] from being treated as

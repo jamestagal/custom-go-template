@@ -423,15 +423,24 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 	}
 
 	// Handle the else branch if present
-	// Alpine.js 3.x compatibility: Use x-else directive
+	// Using negated x-if instead of x-else for broader compatibility
 	if len(node.ElseContent) > 0 {
 
-		// FIXED: Use x-else instead of negated x-if (Alpine.js 3.x supports x-else!)
+		// Build negated condition: !($store.auth.isLoggedIn)
+		// We negate ALL previous conditions (if + all else-ifs)
+		negatedPrevious := make([]string, len(previousConditions))
+		for j, prevCond := range previousConditions {
+			negatedPrevious[j] = fmt.Sprintf("!(%s)", prevCond)
+		}
+		elseCondition := strings.Join(negatedPrevious, " && ")
+
+		// Create template with negated x-if (more compatible than x-else)
 		elseTemplate := &ast.Element{
 			TagName: "template",
 			Attributes: []ast.Attribute{
 				{
-					Name:  "x-else",
+					Name:  "x-if",
+					Value: elseCondition,
 				},
 			},
 			Children: []ast.Node{},
