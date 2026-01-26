@@ -203,6 +203,12 @@ func IsSimpleVariable(expr string) bool {
 func TryResolveBuildTimeValue(expr string, dataScope map[string]any) (string, bool) {
 	expr = strings.TrimSpace(expr)
 
+	// Handle fallback operator (||) at build-time
+	// Example: "post.fields.title || 'Untitled'" → try main value, use fallback if falsy
+	if strings.Contains(expr, "||") {
+		return tryResolveFallbackExpression(expr, dataScope)
+	}
+
 	// Handle property access expressions like "card.icon.src"
 	if strings.Contains(expr, ".") {
 		return tryResolvePropertyAccess(expr, dataScope)
@@ -240,8 +246,13 @@ func TryResolveBuildTimeValue(expr string, dataScope map[string]any) (string, bo
 
 // tryResolvePropertyAccess resolves property access expressions like "card.icon.src"
 // by navigating through nested objects in the dataScope
+// Also handles optional chaining (?.) by converting to regular property access
 // Cognitive Load: 10 (property navigation + type assertions)
 func tryResolvePropertyAccess(expr string, dataScope map[string]any) (string, bool) {
+	// Handle optional chaining (?.) by converting to regular property access
+	// JavaScript's ?. returns undefined for missing properties, which we handle gracefully
+	expr = strings.ReplaceAll(expr, "?.", ".")
+
 	parts := strings.Split(expr, ".")
 	if len(parts) < 2 {
 		return "", false
@@ -285,6 +296,67 @@ func tryResolvePropertyAccess(expr string, dataScope map[string]any) (string, bo
 
 	// Convert final value to string
 	return convertValueToString(current, expr)
+}
+
+// tryResolveFallbackExpression handles expressions with || fallback operator
+// Example: "post.fields.title || 'Untitled'" → resolves to title value or 'Untitled'
+// Example: "post.fields.publish?.date || ''" → resolves to date value or ''
+// Cognitive Load: 12 (string parsing + recursive resolution)
+func tryResolveFallbackExpression(expr string, dataScope map[string]any) (string, bool) {
+	// Split on || operator
+	parts := strings.SplitN(expr, "||", 2)
+	if len(parts) != 2 {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Invalid fallback syntax", expr)
+		return "", false
+	}
+
+	mainExpr := strings.TrimSpace(parts[0])
+	fallbackExpr := strings.TrimSpace(parts[1])
+
+	// Handle optional chaining (?.) by converting to regular property access
+	// JavaScript's ?. returns undefined for missing properties, which we treat as falsy
+	mainExpr = strings.ReplaceAll(mainExpr, "?.", ".")
+
+	// Try to resolve the main expression
+	mainValue, resolvable := tryResolvePropertyAccess(mainExpr, dataScope)
+
+	if resolvable && mainValue != "" {
+		logExpressionDebug("Expression '{%s}' → BUILD-TIME: Main value resolved to %q", expr, mainValue)
+		return mainValue, true
+	}
+
+	// Main value is falsy/missing, use fallback
+	// Parse the fallback - it could be a string literal or another expression
+
+	// Check if fallback is a string literal (single or double quotes)
+	fallbackExpr = strings.TrimSpace(fallbackExpr)
+	if (strings.HasPrefix(fallbackExpr, "'") && strings.HasSuffix(fallbackExpr, "'")) ||
+		(strings.HasPrefix(fallbackExpr, "\"") && strings.HasSuffix(fallbackExpr, "\"")) {
+		// String literal - extract the value (remove quotes)
+		fallbackValue := fallbackExpr[1 : len(fallbackExpr)-1]
+		logExpressionDebug("Expression '{%s}' → BUILD-TIME: Using fallback literal %q", expr, fallbackValue)
+		return fallbackValue, true
+	}
+
+	// Fallback might be another property access or variable
+	if strings.Contains(fallbackExpr, ".") {
+		if fallbackValue, resolvable := tryResolvePropertyAccess(fallbackExpr, dataScope); resolvable {
+			logExpressionDebug("Expression '{%s}' → BUILD-TIME: Using fallback property %q", expr, fallbackValue)
+			return fallbackValue, true
+		}
+	}
+
+	// Check if it's a simple variable in scope
+	if value, exists := dataScope[fallbackExpr]; exists && value != nil {
+		if resolved, ok := convertValueToString(value, fallbackExpr); ok {
+			logExpressionDebug("Expression '{%s}' → BUILD-TIME: Using fallback variable %q", expr, resolved)
+			return resolved, true
+		}
+	}
+
+	// Cannot resolve fallback at build-time
+	logExpressionDebug("Expression '{%s}' → RUNTIME: Cannot resolve fallback %q", expr, fallbackExpr)
+	return "", false
 }
 
 // convertValueToString converts a value to its string representation for build-time interpolation

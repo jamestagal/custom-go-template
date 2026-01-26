@@ -10,7 +10,7 @@ import Nav from './nav.html'
 import Footer from './footer.html'
 
 <!-- Props received from Plenti build system / Go server -->
-export let content, layout, allContent, components
+export let content, layout, allContent, allLayouts, components
 
 <!-- Default values for optional props -->
 prop title = "Plentico"
@@ -54,13 +54,15 @@ prop description = "A Go template engine powered by Alpine.js"
 
 			<!-- Slot for dynamic content - replaced by server with specific layout -->
 			<!-- Pass content explicitly (Pages layout needs it for iteration) -->
-			<!-- allContent removed - components inherit from body x-data via Alpine scope -->
+			<!-- allContent passed for layouts that need to list other content (e.g., news sidebar) -->
 			<!-- Pass BOTH components array AND spread fields for compatibility -->
 			<!-- - components array: for collection-type layouts (jim-test.html) -->
 			<!-- - spread fields: for single-type layouts (_index.html) -->
 			<Component:dynamic name={layout}
 				content={content}
 				components={content.components}
+				allContent={allContent}
+				allLayouts={allLayouts}
 				buildTime={buildTime}
 				{...content.fields} />
 
@@ -78,11 +80,11 @@ prop description = "A Go template engine powered by Alpine.js"
 
 <style>
   /* Content wrapper - centers and constrains content */
-  .content-wrapper {
+/*   .content-wrapper {
     max-width: 80rem;
     margin: 0 auto;
     padding: 10rem 2rem 2rem 2rem;
-  }
+  } */
 
   /* Full-width sections break out of the container */
   .content-wrapper > div > section,

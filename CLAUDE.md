@@ -295,6 +295,33 @@ Template Source → Parser → AST → Transformer → Rendered HTML/CSS/JS
 - `{variable}` → `<span x-text="variable"></span>`
 - Use single curly braces (not double like Svelte)
 
+#### Fallback Operator Support (||)
+
+The transformer resolves JavaScript-style fallback expressions at build-time:
+
+```html
+{post.fields.title || 'Untitled'}     → Resolves to title or 'Untitled'
+{publish?.date || 'No date'}          → Handles optional chaining + fallback
+```
+
+#### Optional Chaining Support (?.)
+
+Property access expressions support optional chaining:
+
+```html
+{blogImage?.src}         → Resolved at build-time if blogImage exists
+{author?.image?.alt}     → Multi-level optional chaining supported
+```
+
+#### Build-Time Equality Comparisons
+
+Conditionals with equality operators are evaluated at build-time when values are available:
+
+```html
+{if post.type === "news"}   → Evaluated during loop expansion
+{if status !== "draft"}     → Supports !== operator
+```
+
 ### Conditionals
 ```
 {if condition}

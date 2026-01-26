@@ -12,7 +12,7 @@
     "date": "2025-03-10"
   },
   "blogImage": {
-    "src": "https://picsum.photos/1200/600?random=6",
+    "src": "/images/blogImage1.png",
     "alt": "Team photo",
     "width": 1200,
     "height": 600

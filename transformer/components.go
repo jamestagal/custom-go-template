@@ -48,6 +48,7 @@ func UnregisterComponent(name string) {
 // GetComponentTemplate retrieves a component template by name
 // Supports case-insensitive lookup to match JSON component names like "hero2436" with registered "Hero2436"
 // Also handles PascalCase template names like "Head" → "head" component
+// Also handles PascalCase → snake_case conversion: "FeaturedPostsSidebar" → "featured_posts_sidebar"
 func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
 	// Try exact match first (most common case)
 	template, exists := componentTemplateRegistry[name]
@@ -75,10 +76,38 @@ func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
 				return template, exists
 			}
 		}
+
+		// Try PascalCase → snake_case conversion
+		// This handles: "FeaturedPostsSidebar" → "featured_posts_sidebar"
+		snakeName := pascalToSnake(name)
+		if snakeName != name && snakeName != lowercasedName {
+			template, exists = componentTemplateRegistry[snakeName]
+			if exists {
+				log.Printf("[GetComponentTemplate] Found component via snake_case match: %q → %q", name, snakeName)
+				return template, exists
+			}
+		}
 	}
 
 	// Not found with any strategy
 	return nil, false
+}
+
+// pascalToSnake converts PascalCase to snake_case
+// Examples: "FeaturedPostsSidebar" → "featured_posts_sidebar", "MyComponent" → "my_component"
+func pascalToSnake(s string) string {
+	var result []byte
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				result = append(result, '_')
+			}
+			result = append(result, byte(r+32)) // Convert to lowercase
+		} else {
+			result = append(result, byte(r))
+		}
+	}
+	return string(result)
 }
 
 // GetAllRegisteredKeys returns all registered component template keys for debugging
@@ -782,7 +811,8 @@ func TransformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 //   }
 //   TransformComponentWithResolvedProps("pages", resolvedProps, parentScope)
 func TransformComponentWithResolvedProps(componentName string, resolvedProps map[string]any, parentDataScope map[string]any) []ast.Node {
-	log.Printf("TransformComponentWithResolvedProps: component=%s, props=%d", componentName, len(resolvedProps))
+	log.Printf("[TRANSFORM-COMP] ===== TransformComponentWithResolvedProps START =====")
+	log.Printf("[TRANSFORM-COMP] component=%s, resolvedProps keys=%v", componentName, getMapKeys(resolvedProps))
 
 	// Look up component template from registry
 	componentTemplate, exists := GetComponentTemplate(componentName)
@@ -810,7 +840,12 @@ func TransformComponentWithResolvedProps(componentName string, resolvedProps map
 		log.Printf("TransformComponentWithResolvedProps: Injected prop '%s' (type: %T)", propName, propValue)
 	}
 
-	log.Printf("TransformComponentWithResolvedProps: Final scope for '%s': %d entries", componentName, len(componentDataScope))
+	log.Printf("[TRANSFORM-COMP] Final scope for '%s': %d entries, keys=%v", componentName, len(componentDataScope), getMapKeys(componentDataScope))
+
+	// Check if 'published' is in scope (for debugging news component)
+	if pubVal, hasPub := componentDataScope["published"]; hasPub {
+		log.Printf("[TRANSFORM-COMP] ✓ 'published' is in scope: %v (type=%T)", pubVal, pubVal)
+	}
 
 	// Filter out fence section and style section from component body
 	componentBodyNodes := []ast.Node{}

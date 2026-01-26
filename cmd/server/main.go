@@ -36,8 +36,9 @@ var (
 )
 
 // TASK 5.3: Cache for getAllContent to avoid repeated directory walks
+// Changed to []interface{} to match Plenti's array format
 var (
-	allContentCache   map[string]interface{}
+	allContentCache   []interface{}
 	allContentCacheMu sync.RWMutex
 	allContentCached  bool
 )
@@ -192,11 +193,12 @@ func invalidateContentCache() {
 }
 
 // TASK 5.3: getAllContent loads all content JSON files from content/ directory
-// Returns map indexed by relative path: "pages/_index", "blog/post-1", etc.
+// Returns ARRAY in Plenti format: [{type, path, fields}, ...]
+// This matches Plenti's allContent structure for filtering in templates.
 //
 // Pattern: File Discovery Pattern with Caching [Load: 15]
 // Cognitive Load: 15 (directory walk: 5, file reading: 3, JSON parsing: 3, path formatting: 2, caching: 2)
-func getAllContent() map[string]interface{} {
+func getAllContent() []interface{} {
 	// Check cache first
 	allContentCacheMu.RLock()
 	if allContentCached {
@@ -206,14 +208,14 @@ func getAllContent() map[string]interface{} {
 	}
 	allContentCacheMu.RUnlock()
 
-	// Build fresh cache
-	result := make(map[string]interface{})
+	// Build fresh cache as array (Plenti format)
+	result := make([]interface{}, 0)
 	contentDir := "content"
 
 	// Walk content directory recursively (COGNITIVE LOAD RULE: wrapped error)
 	err := filepath.Walk(contentDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			// If content directory doesn't exist, just return empty map
+			// If content directory doesn't exist, just return empty array
 			return nil
 		}
 
@@ -235,13 +237,25 @@ func getAllContent() map[string]interface{} {
 			return nil // Continue walking
 		}
 
-		// Calculate relative key: "content/pages/about.json" -> "pages/about"
+		// Calculate relative path: "content/news/team-expansion.json" -> "news/team-expansion"
 		relPath := strings.TrimPrefix(path, contentDir+string(filepath.Separator))
 		relPath = strings.TrimSuffix(relPath, ".json")
 		// Normalize path separators for cross-platform compatibility
 		relPath = filepath.ToSlash(relPath)
 
-		result[relPath] = content
+		// Extract type from path: "news/team-expansion" -> "news"
+		contentType := relPath
+		if idx := strings.Index(relPath, "/"); idx > 0 {
+			contentType = relPath[:idx]
+		}
+
+		// Build Plenti-format entry: {type, path, fields}
+		entry := map[string]interface{}{
+			"type":   contentType,
+			"path":   "/" + relPath,
+			"fields": content,
+		}
+		result = append(result, entry)
 		return nil
 	})
 
@@ -1803,6 +1817,18 @@ func renderContentTypePage(layoutName, contentType, slug string, w http.Response
 		}
 	}
 	props["content"] = contentWithFields
+
+	// Step 4a: Add magic variables (same pattern as renderWithWrapper)
+	// allContent is needed for sidebars that list other content (e.g., Featured Posts)
+	props["allContent"] = getAllContent()
+	log.Printf("[TRACE-SERVER] renderContentTypePage: Added allContent magic variable (%d items)", len(getAllContent()))
+
+	// allLayouts for dynamic component lookups
+	layoutNames := make([]string, 0)
+	for name := range transformer.GetAllComponentNames() {
+		layoutNames = append(layoutNames, name)
+	}
+	props["allLayouts"] = layoutNames
 
 	log.Printf("[TRACE-SERVER] renderContentTypePage: Built props with %d keys", len(props))
 	log.Printf("[TRACE-SERVER] renderContentTypePage: Props keys: %v", getKeys(props))
