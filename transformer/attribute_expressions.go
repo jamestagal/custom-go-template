@@ -240,6 +240,22 @@ func TryResolveBuildTimeValue(expr string, dataScope map[string]any) (string, bo
 		return "", false
 	}
 
+	// FIX: Check if value is a getter/setter definition - these need runtime 'this' context
+	// Getter/setter definitions look like: "get name() { ... }" or "set name(value) { ... }"
+	if strVal, ok := value.(string); ok {
+		trimmed := strings.TrimSpace(strVal)
+		if (strings.HasPrefix(trimmed, "get ") || strings.HasPrefix(trimmed, "set ")) &&
+			strings.Contains(trimmed, "(") && strings.Contains(trimmed, "{") {
+			logExpressionDebug("Expression '{%s}' → RUNTIME: Value is getter/setter definition", expr)
+			return "", false
+		}
+		// Also check for function definitions that reference 'this'
+		if strings.HasPrefix(trimmed, "function") && strings.Contains(trimmed, "this.") {
+			logExpressionDebug("Expression '{%s}' → RUNTIME: Value is function with 'this' reference", expr)
+			return "", false
+		}
+	}
+
 	// Resolve to string value
 	return convertValueToString(value, expr)
 }

@@ -544,6 +544,7 @@ func (t *RuntimeVarTracker) GetTrackedVars() []string {
 
 // FilterScope filters a dataScope to only include tracked runtime variables.
 // This is called before serializing to x-data to reduce page weight.
+// IMPORTANT: Also includes dependencies of getters/setters (things they reference via this.*)
 func (t *RuntimeVarTracker) FilterScope(dataScope map[string]any) map[string]any {
 	if t == nil || len(t.vars) == 0 {
 		// No tracking info, return original scope
@@ -551,16 +552,77 @@ func (t *RuntimeVarTracker) FilterScope(dataScope map[string]any) map[string]any
 	}
 
 	filtered := make(map[string]any)
+
+	// First pass: include directly tracked variables
 	for key, value := range dataScope {
 		if t.IsTracked(key) {
 			filtered[key] = value
 		}
 	}
 
-	log.Printf("[RuntimeVarTracker] FilterScope: %d → %d variables (removed %d build-time-only)",
-		len(dataScope), len(filtered), len(dataScope)-len(filtered))
+	// Second pass: for any getters/setters in filtered, also include their 'this.*' dependencies
+	// This ensures getters like formattedJoinDate get their dependencies (user, formatDate, etc.)
+	additionalDeps := make(map[string]bool)
+	for key, value := range filtered {
+		if strVal, ok := value.(string); ok {
+			trimmed := strings.TrimSpace(strVal)
+			// Check if this is a getter or setter definition
+			if (strings.HasPrefix(trimmed, "get ") || strings.HasPrefix(trimmed, "set ")) &&
+				strings.Contains(trimmed, "(") && strings.Contains(trimmed, "{") {
+				// Extract 'this.*' references from the getter/setter body
+				deps := extractThisReferences(strVal)
+				for _, dep := range deps {
+					if _, exists := dataScope[dep]; exists && !t.IsTracked(dep) {
+						additionalDeps[dep] = true
+						log.Printf("[RuntimeVarTracker] Getter/setter '%s' depends on '%s' - adding to filtered scope", key, dep)
+					}
+				}
+			}
+		}
+	}
+
+	// Add the additional dependencies
+	for dep := range additionalDeps {
+		filtered[dep] = dataScope[dep]
+	}
+
+	log.Printf("[RuntimeVarTracker] FilterScope: %d → %d variables (removed %d build-time-only, added %d getter deps)",
+		len(dataScope), len(filtered), len(dataScope)-len(filtered)+len(additionalDeps), len(additionalDeps))
 
 	return filtered
+}
+
+// extractThisReferences extracts variable names referenced via 'this.*' in a string
+// For example, "this.formatDate(this.user.joinDate)" returns ["formatDate", "user"]
+func extractThisReferences(s string) []string {
+	var refs []string
+	seen := make(map[string]bool)
+
+	// Simple pattern matching for this.varName
+	for i := 0; i < len(s)-5; i++ {
+		if s[i:i+5] == "this." {
+			// Extract the variable name after "this."
+			start := i + 5
+			end := start
+			for end < len(s) && (isAlphaNumeric(s[end]) || s[end] == '_') {
+				end++
+			}
+			if end > start {
+				varName := s[start:end]
+				if !seen[varName] {
+					seen[varName] = true
+					refs = append(refs, varName)
+				}
+			}
+		}
+	}
+
+	return refs
+}
+
+// isAlphaNumeric checks if a byte is a letter or digit
+func isAlphaNumeric(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
 }
 
 // extractVariableTokens extracts variable-like tokens from an expression.
