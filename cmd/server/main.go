@@ -92,11 +92,15 @@ func main() {
 	// Register routes from content/pages/*.json files (Plenti-style)
 	registerContentPageRoutes()
 
+	// Register routes from content type directories (news, blog, etc.)
+	registerContentTypeRoutes()
+
 	// Register routes from layouts/content/*.html files (custom layouts)
 	registerContentRoutes()
 
 	// Note: All routes (including "/") are now handled by:
 	// - registerContentPageRoutes() for content/pages/*.json files
+	// - registerContentTypeRoutes() for content/<type>/*.json files (news, blog, etc.)
 	// - registerContentRoutes() for layouts/content/*.html files
 	// Static files are served via serveStaticFile() when routes call it
 
@@ -1634,4 +1638,186 @@ func registerContentPageRoutes() {
 	}
 
 	log.Printf("Registered %d content page routes from content/pages/", routeCount)
+}
+
+// registerContentTypeRoutes registers HTTP routes for content type directories (news, blog, etc.)
+// This handles the Plenti pattern where content types like "news" have:
+// - Content files: content/news/*.json
+// - Layout file: layouts/content/news.html
+// - Routes: /news/*, /news/<slug>
+//
+// Pattern: Dynamic Content Type Route Registration [Load: 15]
+// Cognitive Load: 15 (directory scan: 4, layout check: 3, route creation: 5, logging: 3)
+func registerContentTypeRoutes() {
+	contentDir := "content"
+	layoutDir := "layouts/content"
+
+	// Read all entries in content/ directory
+	entries, err := os.ReadDir(contentDir)
+	if err != nil {
+		log.Printf("Warning: Failed to read content directory %s: %v", contentDir, err)
+		return
+	}
+
+	totalRoutes := 0
+
+	for _, entry := range entries {
+		// Only process directories (content types)
+		if !entry.IsDir() {
+			continue
+		}
+
+		contentTypeName := entry.Name()
+
+		// Skip "pages" - handled by registerContentPageRoutes
+		if contentTypeName == "pages" {
+			continue
+		}
+
+		// Check if matching layout exists
+		layoutPath := filepath.Join(layoutDir, contentTypeName+".html")
+		if _, err := os.Stat(layoutPath); os.IsNotExist(err) {
+			log.Printf("Skipping content type %s - no matching layout at %s", contentTypeName, layoutPath)
+			continue
+		}
+
+		// Register routes for this content type
+		typeDir := filepath.Join(contentDir, contentTypeName)
+		routeCount := registerContentTypeFiles(contentTypeName, typeDir)
+		totalRoutes += routeCount
+
+		log.Printf("Registered %d routes for content type: %s", routeCount, contentTypeName)
+	}
+
+	log.Printf("Registered %d total content type routes", totalRoutes)
+}
+
+// registerContentTypeFiles registers routes for all JSON files in a content type directory
+// Pattern: Content Type File Registration [Load: 12]
+func registerContentTypeFiles(contentTypeName, typeDir string) int {
+	files, err := os.ReadDir(typeDir)
+	if err != nil {
+		log.Printf("Warning: Failed to read content type directory %s: %v", typeDir, err)
+		return 0
+	}
+
+	routeCount := 0
+
+	for _, file := range files {
+		// Skip directories and non-JSON files
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+
+		// Skip special files
+		fileName := file.Name()
+		if fileName == "_defaults.json" || fileName == "_schema.json" {
+			continue
+		}
+
+		// Extract slug from filename: "new-product-launch.json" → "new-product-launch"
+		slug := strings.TrimSuffix(fileName, ".json")
+
+		// Create route: /news/new-product-launch
+		route := "/" + contentTypeName + "/" + slug
+
+		// Capture variables for closure
+		currentRoute := route
+		currentLayoutName := contentTypeName
+		currentContentType := contentTypeName
+		currentSlug := slug
+
+		http.HandleFunc(currentRoute, func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("[ContentType Handler] %s called for URL: %s", currentRoute, r.URL.Path)
+			if err := renderContentTypePage(currentLayoutName, currentContentType, currentSlug, w, r); err != nil {
+				log.Printf("Error rendering %s: %v", currentRoute, err)
+				http.Error(w, "Failed to render page", http.StatusInternalServerError)
+			}
+		})
+
+		routeCount++
+		log.Printf("Registered content type route: %s → %s/%s (layout: %s)", route, typeDir, fileName, contentTypeName)
+	}
+
+	return routeCount
+}
+
+// renderContentTypePage renders a content type page (news, blog, etc.) with the global wrapper
+// Uses the same pattern as renderWithWrapper but loads content from content/<type>/<slug>.json
+//
+// Pattern: Content Type Page Rendering with Wrapper [Load: 18]
+func renderContentTypePage(layoutName, contentType, slug string, w http.ResponseWriter, r *http.Request) error {
+	log.Printf("[TRACE-SERVER] ========== renderContentTypePage START ==========")
+	log.Printf("[TRACE-SERVER] renderContentTypePage: layout=%s, contentType=%s, slug=%s", layoutName, contentType, slug)
+
+	// Step 1: Load content from content/<contentType>/<slug>.json
+	contentPath := filepath.Join("content", contentType, slug+".json")
+	contentData, err := loader.LoadContentJSON(contentPath)
+	if err != nil {
+		return fmt.Errorf("renderContentTypePage: failed to load content %s: %w", contentPath, err)
+	}
+
+	log.Printf("[TRACE-SERVER] renderContentTypePage: Loaded content from %s: %d keys", contentPath, len(contentData))
+	log.Printf("[TRACE-SERVER] renderContentTypePage: content keys: %v", getKeys(contentData))
+
+	// Step 2: Extract fields - content types use flat structure OR nested "fields"
+	// Check if data has nested "fields" structure (legacy format) or flat (Plenti standard)
+	var contentFields map[string]interface{}
+
+	if fieldsRaw, hasFields := contentData["fields"]; hasFields {
+		// Legacy format: data nested in "fields"
+		if fields, ok := fieldsRaw.(map[string]interface{}); ok {
+			log.Printf("[TRACE-SERVER] renderContentTypePage: Using nested 'fields' structure with %d fields", len(fields))
+			contentFields = fields
+		} else {
+			contentFields = contentData
+		}
+	} else {
+		// Plenti standard: flat structure at root (all keys are fields)
+		log.Printf("[TRACE-SERVER] renderContentTypePage: Using flat structure")
+		contentFields = contentData
+	}
+
+	// If no fields extracted, use empty map
+	if contentFields == nil {
+		contentFields = make(map[string]interface{})
+	}
+
+	// Step 3: Build props map for wrapper (same pattern as renderWithWrapper)
+	props := map[string]interface{}{
+		"layout":        layoutName,                   // Name of the layout to render (e.g., "news")
+		"env":           make(map[string]interface{}), // Environment vars
+		"user":          make(map[string]interface{}), // User data
+		"shadowContent": make(map[string]interface{}), // Shadow content
+	}
+
+	// Step 4: Build content object with fields
+	// The wrapper passes content.fields to the dynamic component via {...content.fields}
+	contentWithFields := map[string]interface{}{
+		"fields": contentFields,
+	}
+	// Preserve any top-level content keys that aren't "fields"
+	for key, val := range contentData {
+		if key != "fields" {
+			contentWithFields[key] = val
+		}
+	}
+	props["content"] = contentWithFields
+
+	log.Printf("[TRACE-SERVER] renderContentTypePage: Built props with %d keys", len(props))
+	log.Printf("[TRACE-SERVER] renderContentTypePage: Props keys: %v", getKeys(props))
+	log.Printf("[TRACE-SERVER] renderContentTypePage: content.fields has %d keys: %v", len(contentFields), getKeys(contentFields))
+
+	// Step 5: Render with html.html wrapper (same as renderWithWrapper)
+	wrapperPath := "layouts/global/html.html"
+	log.Printf("[TRACE-SERVER] renderContentTypePage: Rendering with wrapper: %s, layout: %s", wrapperPath, layoutName)
+
+	err = renderTemplateWithProps(wrapperPath, props, w, r)
+	if err != nil {
+		return fmt.Errorf("renderContentTypePage: failed to render wrapper: %w", err)
+	}
+
+	log.Printf("[TRACE-SERVER] renderContentTypePage: Successfully rendered %s/%s with layout %s", contentType, slug, layoutName)
+	log.Printf("[TRACE-SERVER] ========== renderContentTypePage END ==========")
+	return nil
 }
