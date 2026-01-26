@@ -570,6 +570,67 @@ Use **Stores** when:
 - Need global application state (auth, theme, cart)
 - Example: `{if $auth.isLoggedIn}` used by LoginButton, UserMenu, ProtectedRoute
 
+### x-data Optimization (RuntimeVarTracker)
+
+The template engine optimizes x-data attributes to **only include variables needed at runtime**, filtering out build-time-only variables. This dramatically reduces page weight.
+
+**Problem Solved:**
+Without optimization, x-data would contain ALL variables passed to a component, including large arrays like `allContent` (~50KB) that are only used for build-time loop expansion.
+
+**How RuntimeVarTracker Works:**
+
+1. **Tracking Phase** - During transformation, the tracker records variables that appear in Alpine.js runtime directives:
+   - `x-for="photo in photos"` → tracks `photos`
+   - `x-if="published"` → tracks `published`
+   - `x-text="title"` → tracks `title`
+   - `:src="image.src"` → tracks `image`
+
+2. **Filtering Phase** - Before serializing x-data, `FilterScope()` removes untracked variables:
+   - Variables used only at build-time (loop expansion, conditionals evaluated at build-time) are excluded
+   - Only runtime-needed variables remain in x-data
+
+**Example Transformation:**
+
+```html
+<!-- Template uses allContent for build-time loop, photos for runtime -->
+{for post in allContent}
+  <div>{post.title}</div>
+{/for}
+{if photos && photos.length > 0}
+  <div x-for="photo in photos">...</div>
+{/if}
+```
+
+**Before optimization:**
+```html
+<div x-data="{ allContent: [...50KB...], allLayouts: [...], content: {...}, photos: [] }">
+```
+
+**After optimization:**
+```html
+<div x-data="{ photos: [] }">
+```
+
+**Key Files:**
+- `transformer/scope.go` - `RuntimeVarTracker` type and `FilterScope()` method
+- `transformer/transformer.go` - Global tracker initialization (`runtimeTracker`)
+- `transformer/components.go` - Filtering applied in `transformComponent()` and `TransformComponentWithResolvedProps()`
+- `transformer/config.go` - `OptimizeXData` flag (enabled by default)
+
+**Variables That Are NOT Tracked:**
+- Loop iterators (`item`, `index`, `component`, `post`, `photo`, etc.)
+- JavaScript keywords (`true`, `false`, `null`, etc.)
+- Alpine.js magic properties (`$store`, `$el`, `$refs`, etc.)
+
+**When Variables ARE Tracked:**
+- Runtime x-for collections: `x-for="item in items"` → tracks `items`
+- Runtime x-if conditions: `x-if="visible"` → tracks `visible`
+- Runtime x-text/x-html: `x-text="message"` → tracks `message`
+- Dynamic attribute bindings: `:src="image.src"` → tracks `image`
+
+**Toggle:**
+Set `OptimizeXData = false` in `transformer/config.go` to disable (for debugging).
+
 ### Transformation Order
 1. Parse template to AST (using unified parser path)
 2. Extract fence data (props, variables, functions)
