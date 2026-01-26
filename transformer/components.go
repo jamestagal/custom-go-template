@@ -865,7 +865,28 @@ func TransformComponentWithResolvedProps(componentName string, resolvedProps map
 		return transformedNodes
 	}
 
-	log.Printf("[X-Data] TransformComponentWithResolvedProps: wrapping '%s' with scope", componentName)
+	// Apply x-data optimization: filter to only runtime-tracked variables
+	if OptimizeXData {
+		runtimeTracker := GetRuntimeTracker()
+		filteredScope := componentDataScope
+		if runtimeTracker != nil {
+			filteredScope = runtimeTracker.FilterScope(componentDataScope)
+			log.Printf("[X-Data] TransformComponentWithResolvedProps '%s' filtered scope from %d to %d variables",
+				componentName, len(componentDataScope), len(filteredScope))
+		}
+
+		// Only wrap if there are runtime variables left
+		if len(filteredScope) == 0 {
+			log.Printf("[X-Data] TransformComponentWithResolvedProps '%s' has no runtime variables, skipping x-data wrapper", componentName)
+			return transformedNodes
+		}
+
+		log.Printf("[X-Data] TransformComponentWithResolvedProps '%s' needs wrapper with %d runtime vars", componentName, len(filteredScope))
+		return wrapWithXData(transformedNodes, filteredScope)
+	}
+
+	// Legacy behavior - always wrap with full scope
+	log.Printf("[X-Data] TransformComponentWithResolvedProps: wrapping '%s' with full scope (legacy)", componentName)
 	return wrapWithXData(transformedNodes, componentDataScope)
 }
 
@@ -1090,9 +1111,24 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 	//
 	// Without wrappers, both would share parent scope and show same values!
 	if OptimizeXData {
-		// Always wrap components with full scope (not diff)
+		// OPTIMIZATION: Filter component scope to only include runtime-tracked variables
+		// Variables only used at build-time (like allContent for loop expansion)
+		// are excluded from x-data to reduce page weight
+		filteredScope := componentDataScope
+		if runtimeTracker != nil {
+			filteredScope = runtimeTracker.FilterScope(componentDataScope)
+			log.Printf("[X-Data] Component '%s' filtered scope from %d to %d variables",
+				componentName, len(componentDataScope), len(filteredScope))
+		}
+
+		// Only wrap if there are runtime variables left
+		if len(filteredScope) == 0 {
+			log.Printf("[X-Data] Component '%s' has no runtime variables, skipping x-data wrapper", componentName)
+			return transformedNodes
+		}
+
 		log.Printf("[X-Data] Component '%s' needs wrapper (component isolation required)", componentName)
-		return wrapWithXData(transformedNodes, componentDataScope)
+		return wrapWithXData(transformedNodes, filteredScope)
 	}
 
 	// Legacy behavior - always wrap with full scope
