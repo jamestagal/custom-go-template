@@ -1,6 +1,6 @@
 # Spec Tasks
 
-These are the tasks to be completed for the spec detailed in @.agent-os/specs/2025-01-27-plenti-architecture-refactor/spec.md
+These are the tasks to be completed for the spec detailed in @.agent-os/specs/2026-01-27-plenti-architecture-refactor/spec.md
 
 > Created: 2025-10-27
 > Status: Ready for Implementation
