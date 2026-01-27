@@ -716,8 +716,8 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 
 					// Track variables for x-data optimization
 					// Only variables in runtime expressions need to be in x-data
-					if runtimeTracker != nil {
-						runtimeTracker.TrackExpression(expression)
+					if tracker := getRuntimeTracker(); tracker != nil {
+						tracker.TrackExpression(expression)
 					}
 
 					// Determine whether this is an Alpine directive
@@ -862,8 +862,8 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 
 				// Track variables for x-data optimization
 				// Only variables in runtime expressions need to be in x-data
-				if runtimeTracker != nil {
-					runtimeTracker.TrackExpression(combinedExpression)
+				if tracker := getRuntimeTracker(); tracker != nil {
+					tracker.TrackExpression(combinedExpression)
 				}
 
 				// Debug logging for mixed content

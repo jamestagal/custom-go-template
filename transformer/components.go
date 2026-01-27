@@ -860,9 +860,9 @@ func TransformComponentWithResolvedProps(componentName string, resolvedProps map
 	// CRITICAL: Use a FRESH tracker for this component's transformation
 	// This ensures each component instance tracks only ITS OWN runtime variables,
 	// even when multiple components use the same variable names (like 'user')
-	savedTracker := runtimeTracker
+	savedTracker := getRuntimeTracker()
 	componentTracker := NewRuntimeVarTracker()
-	runtimeTracker = componentTracker
+	setRuntimeTracker(componentTracker)
 	log.Printf("[X-Data] TransformComponentWithResolvedProps '%s': created fresh tracker", componentName)
 
 	// Recursively transform component body with its isolated scope
@@ -870,10 +870,10 @@ func TransformComponentWithResolvedProps(componentName string, resolvedProps map
 
 	// Restore global tracker and merge component's tracked vars into it
 	trackedVars := componentTracker.GetTrackedVars()
-	runtimeTracker = savedTracker
-	if runtimeTracker != nil {
+	setRuntimeTracker(savedTracker)
+	if savedTracker != nil {
 		for _, v := range trackedVars {
-			runtimeTracker.Track(v)
+			savedTracker.Track(v)
 		}
 	}
 	log.Printf("[X-Data] TransformComponentWithResolvedProps '%s': restored global tracker, merged %d vars", componentName, len(trackedVars))
@@ -1104,19 +1104,25 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 	// CRITICAL: Use a FRESH tracker for this component's transformation
 	// This ensures each component instance tracks only ITS OWN runtime variables,
 	// even when multiple components use the same variable names (like 'user')
-	savedTracker := runtimeTracker
+	savedTracker := getRuntimeTracker()
 	componentTracker := NewRuntimeVarTracker()
-	runtimeTracker = componentTracker
-	log.Printf("[X-Data] Component '%s': created fresh tracker (saved global with %d vars)", componentName, len(savedTracker.GetTrackedVars()))
+	setRuntimeTracker(componentTracker)
+	savedVarCount := 0
+	if savedTracker != nil {
+		savedVarCount = len(savedTracker.GetTrackedVars())
+	}
+	log.Printf("[X-Data] Component '%s': created fresh tracker (saved global with %d vars)", componentName, savedVarCount)
 
 	// Recursively transform component body with its isolated scope
 	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
 
 	// Restore global tracker and merge component's tracked vars into it
 	trackedVars := componentTracker.GetTrackedVars()
-	runtimeTracker = savedTracker
-	for _, v := range trackedVars {
-		runtimeTracker.Track(v)
+	setRuntimeTracker(savedTracker)
+	if savedTracker != nil {
+		for _, v := range trackedVars {
+			savedTracker.Track(v)
+		}
 	}
 	log.Printf("[X-Data] Component '%s': restored global tracker, merged %d vars", componentName, len(trackedVars))
 

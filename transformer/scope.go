@@ -5,9 +5,71 @@ import (
 	"log"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
+
+// ============================================================================
+// TransformContext: Per-request state for concurrent safety
+// ============================================================================
+
+// TransformContext holds per-request transformation state.
+// This replaces global variables to enable safe concurrent HTTP request handling.
+//
+// Pattern: Context Passing for Concurrency Safety [Cognitive Load: 5]
+//
+// Usage:
+//
+//	ctx := NewTransformContext(props)
+//	transformedAST := TransformASTWithContext(template, ctx)
+//	filteredScope := ctx.RuntimeTracker.FilterScope(dataScope)
+type TransformContext struct {
+	// RuntimeTracker tracks variables that need runtime evaluation by Alpine.js
+	RuntimeTracker *RuntimeVarTracker
+
+	// DataScope holds the current variable scope for transformation
+	DataScope map[string]any
+
+	// mu protects concurrent access to context fields (if needed for sub-goroutines)
+	mu sync.RWMutex
+}
+
+// NewTransformContext creates a new transformation context with initialized state
+func NewTransformContext(props map[string]any) *TransformContext {
+	return &TransformContext{
+		RuntimeTracker: NewRuntimeVarTracker(),
+		DataScope:      InitDataScope(props),
+	}
+}
+
+// GetRuntimeTracker returns the runtime tracker from this context.
+// Thread-safe for concurrent read access.
+func (ctx *TransformContext) GetRuntimeTracker() *RuntimeVarTracker {
+	if ctx == nil {
+		return nil
+	}
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+	return ctx.RuntimeTracker
+}
+
+// GetDataScope returns a copy of the current data scope.
+// Thread-safe for concurrent read access.
+func (ctx *TransformContext) GetDataScope() map[string]any {
+	if ctx == nil {
+		return nil
+	}
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+
+	// Return a copy to prevent concurrent modification
+	copy := make(map[string]any, len(ctx.DataScope))
+	for k, v := range ctx.DataScope {
+		copy[k] = v
+	}
+	return copy
+}
 
 // InitDataScope initializes the data scope with provided props
 func InitDataScope(props map[string]any) map[string]any {

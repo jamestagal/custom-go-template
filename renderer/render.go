@@ -23,6 +23,7 @@ import (
 //   - markup: Rendered HTML
 //   - script: Extracted JavaScript
 //   - style: Extracted CSS
+//   - error: Any error that occurred during rendering
 //
 // Cognitive Load: 18
 // - Read file: 2
@@ -31,17 +32,17 @@ import (
 // - Transform: 3
 // - Aggregate styles: 2
 // - Generate outputs: 6
-func Render(templatePath string, props map[string]any, contentData map[string]interface{}) (string, string, string) {
+func Render(templatePath string, props map[string]any, contentData map[string]interface{}) (string, string, string, error) {
 	// Read template file (COGNITIVE LOAD RULE: wrapped error)
 	content, err := os.ReadFile(templatePath)
 	if err != nil {
-		log.Fatalf("Render: failed to read template %s: %v", templatePath, err)
+		return "", "", "", fmt.Errorf("Render: failed to read template %s: %w", templatePath, err)
 	}
 
 	// Parse the template to AST (COGNITIVE LOAD RULE: wrapped error)
 	templateAST, err := parser.ParseTemplate(string(content))
 	if err != nil {
-		log.Fatalf("Render: failed to parse template %s: %v", templatePath, err)
+		return "", "", "", fmt.Errorf("Render: failed to parse template %s: %w", templatePath, err)
 	}
 
 	// TASK 4.1: Inject content into exported props if contentData provided
@@ -90,7 +91,7 @@ func Render(templatePath string, props map[string]any, contentData map[string]in
 	markup := generateMarkup(transformedAST)
 	script := generateScript(transformedAST)
 
-	return markup, script, style
+	return markup, script, style, nil
 }
 
 // RenderWithStores renders a transformed template AST with store initialization

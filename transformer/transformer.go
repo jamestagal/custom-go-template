@@ -3,20 +3,46 @@ package transformer
 import (
 	"log"
 	"strings"
+	"sync"
 
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
+// ============================================================================
+// Thread-safe runtime tracker for concurrent request handling
+// ============================================================================
+
 // runtimeTracker tracks variables that need runtime evaluation by Alpine.js.
-// This is a package-level variable reset at the start of each transformation.
-// Variables only used at build-time (e.g., allContent for loop expansion)
-// will NOT be tracked and thus excluded from x-data.
-var runtimeTracker *RuntimeVarTracker
+// Protected by trackerMu for thread-safe access during concurrent HTTP requests.
+//
+// Pattern: Mutex-Protected Global State [Cognitive Load: 6]
+// This is a transitional pattern - future refactoring should pass context
+// through the transformation pipeline for true per-request isolation.
+var (
+	runtimeTracker *RuntimeVarTracker
+	trackerMu      sync.RWMutex
+)
+
+// setRuntimeTracker sets the runtime tracker (thread-safe).
+// Called at the start of each transformation.
+func setRuntimeTracker(tracker *RuntimeVarTracker) {
+	trackerMu.Lock()
+	defer trackerMu.Unlock()
+	runtimeTracker = tracker
+}
+
+// getRuntimeTracker returns the current runtime tracker (thread-safe).
+func getRuntimeTracker() *RuntimeVarTracker {
+	trackerMu.RLock()
+	defer trackerMu.RUnlock()
+	return runtimeTracker
+}
 
 // GetRuntimeTracker returns the current runtime variable tracker.
 // Used by the renderer to filter scope before x-data serialization.
+// Thread-safe: accesses tracker through mutex.
 func GetRuntimeTracker() *RuntimeVarTracker {
-	return runtimeTracker
+	return getRuntimeTracker()
 }
 
 // TransformAST transforms the AST to Alpine.js compatible nodes
@@ -35,7 +61,8 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 
 	// Initialize runtime variable tracker for x-data optimization
 	// This tracks which variables are actually used by Alpine.js at runtime
-	runtimeTracker = NewRuntimeVarTracker()
+	// Uses thread-safe setter to protect concurrent access
+	setRuntimeTracker(NewRuntimeVarTracker())
 	log.Printf("TransformAST: Initialized runtime variable tracker")
 
 	// Reset component tracking for each transformation
@@ -128,7 +155,7 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 			if inLiteralContext {
 				// Pass through as-is without any transformation
 				transformedNodes = append(transformedNodes, n)
-			} else if strings.Contains(n.Content, "{") || strings.Contains(n.Content, "{") {
+			} else if strings.Contains(n.Content, "{") {
 				// Transform text nodes with expressions
 				textNodes := transformTextWithExpressions(n.Content, dataScope)
 				transformedNodes = append(transformedNodes, textNodes...)
@@ -199,8 +226,8 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 
 				// Track variables for x-data optimization
 				// Only variables in runtime expressions need to be in x-data
-				if runtimeTracker != nil {
-					runtimeTracker.TrackExpression(cleanedExpr)
+				if tracker := getRuntimeTracker(); tracker != nil {
+					tracker.TrackExpression(cleanedExpr)
 				}
 
 				// Create an Alpine.js x-text element
@@ -281,8 +308,8 @@ func applyAlpineDataWrapper(nodes []ast.Node, dataScope map[string]any) []ast.No
 	// Variables only used at build-time (like allContent for loop expansion)
 	// are excluded from x-data to reduce page weight
 	filteredScope := dataScope
-	if runtimeTracker != nil {
-		filteredScope = runtimeTracker.FilterScope(dataScope)
+	if tracker := getRuntimeTracker(); tracker != nil {
+		filteredScope = tracker.FilterScope(dataScope)
 		log.Printf("[X-Data] Filtered scope from %d to %d variables", len(dataScope), len(filteredScope))
 	}
 

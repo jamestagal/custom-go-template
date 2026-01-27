@@ -310,8 +310,8 @@ func generateRuntimeLoopTemplate(node *ast.Loop, itemVar, indexVar, cleanedColle
 
 	// Track collection variable for x-data optimization
 	// Only runtime collections need to be in x-data
-	if runtimeTracker != nil {
-		runtimeTracker.TrackExpression(cleanedCollection)
+	if tracker := getRuntimeTracker(); tracker != nil {
+		tracker.TrackExpression(cleanedCollection)
 	}
 
 	// Create the template element with the loop expression

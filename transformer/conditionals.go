@@ -404,8 +404,8 @@ func transformConditional(node *ast.Conditional, dataScope map[string]any) []ast
 
 	// Track condition variables for x-data optimization
 	// Only runtime conditions need variables in x-data
-	if runtimeTracker != nil {
-		runtimeTracker.TrackExpression(transformedIfCondition)
+	if tracker := getRuntimeTracker(); tracker != nil {
+		tracker.TrackExpression(transformedIfCondition)
 	}
 
 	// Log the condition for debugging

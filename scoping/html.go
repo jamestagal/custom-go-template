@@ -1,6 +1,7 @@
 package scoping
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -21,13 +22,13 @@ type ScopedElement struct {
 
 // ScopeHTML adds scoped classes to a full HTML document string and returns the modified markup
 // and a list of elements that were scoped. It also handles adding x-data and x-text attributes.
-func ScopeHTML(markup string, props map[string]any) (string, []ScopedElement) {
+func ScopeHTML(markup string, props map[string]any) (string, []ScopedElement, error) {
 	scopedElements := []ScopedElement{}
 	node, err := html.Parse(strings.NewReader(markup))
 	if err != nil {
 		// Handle parsing error more gracefully?
 		log.Printf("Warning: Failed to parse HTML for scoping: %v", err)
-		return markup, scopedElements // Return original markup on error
+		return markup, scopedElements, nil // Return original markup on error (graceful degradation)
 	}
 
 	node, scopedElements = traverse(node, scopedElements, props)
@@ -36,18 +37,18 @@ func ScopeHTML(markup string, props map[string]any) (string, []ScopedElement) {
 	buf := &strings.Builder{}
 	err = html.Render(buf, node)
 	if err != nil {
-		log.Fatal(err) // Consider returning error instead of fatal
+		return "", nil, fmt.Errorf("ScopeHTML: failed to render HTML: %w", err)
 	}
 	// The default html.Render escapes entities like quotes in attributes.
 	// We might need selective unescaping or different rendering if it causes issues.
 	markup = buf.String() // html.UnescapeString might be too broad
 
-	return markup, scopedElements
+	return markup, scopedElements, nil
 }
 
 // ScopeHTMLComp adds scoped classes to an HTML fragment (component) string.
 // It uses html.ParseFragment to avoid adding <html><body> tags.
-func ScopeHTMLComp(comp_markup string, comp_props map[string]any, comp_data map[string]any) (string, []ScopedElement) {
+func ScopeHTMLComp(comp_markup string, comp_props map[string]any, comp_data map[string]any) (string, []ScopedElement, error) {
 	scopedElements := []ScopedElement{}
 	fragments := []string{}
 	// Use a dummy context node (like body) for ParseFragment
@@ -59,7 +60,7 @@ func ScopeHTMLComp(comp_markup string, comp_props map[string]any, comp_data map[
 	nodes, err := html.ParseFragment(strings.NewReader(comp_markup), contextNode)
 	if err != nil {
 		log.Printf("Warning: Failed to parse HTML fragment for scoping: %v", err)
-		return comp_markup, scopedElements // Return original on error
+		return comp_markup, scopedElements, nil // Return original on error (graceful degradation)
 	}
 
 	for _, node := range nodes {
@@ -87,13 +88,13 @@ func ScopeHTMLComp(comp_markup string, comp_props map[string]any, comp_data map[
 		buf := &strings.Builder{}
 		err := html.Render(buf, node)
 		if err != nil {
-			log.Fatal(err) // Consider returning error
+			return "", nil, fmt.Errorf("ScopeHTMLComp: failed to render fragment: %w", err)
 		}
 		fragments = append(fragments, buf.String()) // Don't unescape fragment render
 	}
 	comp_markup = strings.Join(fragments, "")
 
-	return comp_markup, scopedElements
+	return comp_markup, scopedElements, nil
 }
 
 // traverse walks the HTML node tree, applying scoping and transformations.
@@ -156,7 +157,9 @@ func traverse(node *html.Node, scopedElements []ScopedElement, props map[string]
 			if !hasScopeClass {
 				randomStr, err := utils.GenerateRandom() // Use utils.GenerateRandom
 				if err != nil {
-					log.Fatal(err) // Consider returning error
+					// Fallback to a deterministic scope class if random generation fails
+					log.Printf("Warning: failed to generate random scope class: %v, using fallback", err)
+					randomStr = fmt.Sprintf("fallback-%d", len(scopedElements))
 				}
 				scopedClass = "plenti-" + randomStr
 			}

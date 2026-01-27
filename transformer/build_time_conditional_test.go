@@ -424,7 +424,7 @@ func TestTransformConditionalNegationBuildTime(t *testing.T) {
 	}
 
 	// Initialize runtime tracker to prevent nil pointer
-	runtimeTracker = NewRuntimeVarTracker()
+	setRuntimeTracker(NewRuntimeVarTracker())
 
 	// showRole: false means !showRole is true → render if-branch (Role hidden)
 	dataScope := map[string]any{
@@ -468,7 +468,7 @@ func TestRuntimeVarNotTrackedForEliminatedBranch(t *testing.T) {
 	}
 
 	// Initialize fresh tracker
-	runtimeTracker = NewRuntimeVarTracker()
+	setRuntimeTracker(NewRuntimeVarTracker())
 
 	// showRole: false → the if-branch with roleBadge is eliminated
 	dataScope := map[string]any{
@@ -479,7 +479,7 @@ func TestRuntimeVarNotTrackedForEliminatedBranch(t *testing.T) {
 	transformConditional(conditionalNode, dataScope)
 
 	// roleBadge should NOT be tracked since its branch was eliminated
-	if runtimeTracker.IsTracked("roleBadge") {
+	if tracker := getRuntimeTracker(); tracker != nil && tracker.IsTracked("roleBadge") {
 		t.Errorf("Variable 'roleBadge' should NOT be tracked when its branch is eliminated at build-time")
 	}
 }
