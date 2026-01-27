@@ -211,9 +211,10 @@ func TestTransformLoopWithStoreCollection(t *testing.T) {
 				},
 			},
 			contains: []string{
-				// BUILD-TIME EXPANSION: Should produce 2 expanded divs, NOT x-for template
-				`<div><span x-text="item.name"></span> (<span x-text="$store.theme.mode"></span>)</div>`,
-				`<div><span x-text="item.name"></span> (<span x-text="$store.theme.mode"></span>)</div>`,
+				// BUILD-TIME EXPANSION: item.name resolves to actual values (a, b)
+				// Store expressions remain as runtime ($store.theme.mode)
+				`<div>a (<span x-text="$store.theme.mode"></span>)</div>`,
+				`<div>b (<span x-text="$store.theme.mode"></span>)</div>`,
 			},
 		},
 	}

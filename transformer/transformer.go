@@ -7,8 +7,37 @@ import (
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
+// runtimeTracker tracks variables that need runtime evaluation by Alpine.js.
+// This is a package-level variable reset at the start of each transformation.
+// Variables only used at build-time (e.g., allContent for loop expansion)
+// will NOT be tracked and thus excluded from x-data.
+var runtimeTracker *RuntimeVarTracker
+
+// GetRuntimeTracker returns the current runtime variable tracker.
+// Used by the renderer to filter scope before x-data serialization.
+func GetRuntimeTracker() *RuntimeVarTracker {
+	return runtimeTracker
+}
+
 // TransformAST transforms the AST to Alpine.js compatible nodes
 func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
+	log.Printf("[DIAGNOSTIC] ========== TransformAST START ==========")
+	log.Printf("[DIAGNOSTIC] TransformAST: props keys=%v", getMapKeys(props))
+
+	// DIAGNOSTIC: Check if components is in props
+	if componentsRaw, ok := props["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[DIAGNOSTIC] TransformAST: ✓ 'components' prop is in props (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[DIAGNOSTIC] TransformAST: ✗ 'components' prop MISSING from props!")
+	}
+
+	// Initialize runtime variable tracker for x-data optimization
+	// This tracks which variables are actually used by Alpine.js at runtime
+	runtimeTracker = NewRuntimeVarTracker()
+	log.Printf("TransformAST: Initialized runtime variable tracker")
+
 	// Reset component tracking for each transformation
 	resetComponentTracking()
 
@@ -17,6 +46,17 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 
 	// Initialize the data scope with the provided props
 	dataScope := InitDataScope(props)
+
+	log.Printf("[DIAGNOSTIC] TransformAST: dataScope initialized with keys=%v", getMapKeys(dataScope))
+
+	// DIAGNOSTIC: Check if components is in dataScope after initialization
+	if componentsRaw, ok := dataScope["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[DIAGNOSTIC] TransformAST: ✓ 'components' in dataScope after InitDataScope (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[DIAGNOSTIC] TransformAST: ✗ 'components' MISSING from dataScope after InitDataScope!")
+	}
 
 	// Find fence section if it exists
 	fence := FindFenceSection(template.RootNodes)
@@ -32,6 +72,8 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 		// No fence section, initialize empty store tracking
 		InitStoreTracking(map[string]string{})
 	}
+
+	log.Printf("[DIAGNOSTIC] TransformAST: dataScope after CollectFenceData keys=%v", getMapKeys(dataScope))
 
 	// Start the transformation process
 	log.Printf("TransformAST: Starting node transformation")
@@ -49,6 +91,7 @@ func TransformAST(template *ast.Template, props map[string]any) *ast.Template {
 	log.Printf("TransformAST: Applied whitespace preservation")
 
 	log.Printf("TransformAST: Transformation complete, generated %d nodes", len(transformedNodes))
+	log.Printf("[DIAGNOSTIC] ========== TransformAST END ==========")
 
 	return transformedTemplate
 }
@@ -137,30 +180,44 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 
 		case *ast.ExpressionNode:
 			// Transform expression nodes
-			log.Printf("transformNodes: Transforming Expression node")
 			// Clean the expression by removing any extra curly braces
 			cleanedExpr := n.Expression
 			cleanedExpr = strings.TrimPrefix(cleanedExpr, "{")
 			cleanedExpr = strings.TrimSuffix(cleanedExpr, "}")
 			cleanedExpr = strings.TrimSpace(cleanedExpr)
 
-			// Add variables from the expression to the data scope
-			extractVariablesFromExpr(cleanedExpr, dataScope)
+			// CRITICAL FIX: Try build-time resolution first for property access expressions
+			// This handles cases like {card.title}, {cta.button.text}, {text} in loops
+			// where the loop variable is resolved at build-time during loop expansion
+			if resolvedValue, resolvable := TryResolveBuildTimeValue(cleanedExpr, dataScope); resolvable {
+				// Build-time interpolation: replace with the actual text value
+				transformedNodes = append(transformedNodes, &ast.TextNode{Content: resolvedValue})
+			} else {
+				// Runtime expression: create Alpine.js x-text binding
+				// Add variables from the expression to the data scope
+				extractVariablesFromExpr(cleanedExpr, dataScope)
 
-			// Create an Alpine.js x-text element
-			xTextElement := &ast.Element{
-				TagName: "span",
-				Attributes: []ast.Attribute{
-					{
-						Name:       "x-text",
-						Value:      cleanedExpr,
-						Dynamic:    true,
-						IsAlpine:   true,
-						AlpineType: "text",
+				// Track variables for x-data optimization
+				// Only variables in runtime expressions need to be in x-data
+				if runtimeTracker != nil {
+					runtimeTracker.TrackExpression(cleanedExpr)
+				}
+
+				// Create an Alpine.js x-text element
+				xTextElement := &ast.Element{
+					TagName: "span",
+					Attributes: []ast.Attribute{
+						{
+							Name:       "x-text",
+							Value:      cleanedExpr,
+							Dynamic:    true,
+							IsAlpine:   true,
+							AlpineType: "text",
+						},
 					},
-				},
+				}
+				transformedNodes = append(transformedNodes, xTextElement)
 			}
-			transformedNodes = append(transformedNodes, xTextElement)
 
 		case *ast.ComponentNode:
 			// Transform component nodes
@@ -220,9 +277,18 @@ func transformNodes(nodes []ast.Node, dataScope map[string]any, applyAlpineWrapp
 // applyAlpineDataWrapper wraps the nodes in an Alpine.js x-data wrapper
 // Uses alpineDataFormatter from alpine.go which properly formats JavaScript values
 func applyAlpineDataWrapper(nodes []ast.Node, dataScope map[string]any) []ast.Node {
-	// Build the x-data value from the data scope using proper JavaScript formatting
+	// OPTIMIZATION: Filter scope to only include runtime-tracked variables
+	// Variables only used at build-time (like allContent for loop expansion)
+	// are excluded from x-data to reduce page weight
+	filteredScope := dataScope
+	if runtimeTracker != nil {
+		filteredScope = runtimeTracker.FilterScope(dataScope)
+		log.Printf("[X-Data] Filtered scope from %d to %d variables", len(dataScope), len(filteredScope))
+	}
+
+	// Build the x-data value from the filtered scope using proper JavaScript formatting
 	// alpineDataFormatter uses FormatGoValueToJS which handles arrays, objects, etc.
-	xDataValue := alpineDataFormatter(dataScope)
+	xDataValue := alpineDataFormatter(filteredScope)
 
 	// Create a wrapper div with the x-data directive
 	wrapperDiv := &ast.Element{

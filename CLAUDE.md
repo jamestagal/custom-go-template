@@ -17,6 +17,193 @@ This is a custom Go template engine that transforms Svelte-inspired template syn
 
 **Core Purpose**: Parse templates with syntax like `{if condition}`, `{for item in items}`, and `{variable}`, then transform them into Alpine.js directives (`x-if`, `x-for`, `x-text`, etc.).
 
+## Plenti Architecture Pattern
+
+The template engine supports **two rendering modes**:
+
+### 1. Standalone Rendering (Legacy)
+- Complete HTML pages with `<!DOCTYPE>`, `<html>`, `<body>` tags
+- All content hardcoded in template
+- Uses `renderTemplate()` function
+- Example: `/store-demo` (self-contained page)
+
+### 2. Wrapper Rendering (Plenti Pattern)
+- Content-only templates (no HTML wrapper)
+- Content loaded from JSON files in `content/pages/`
+- Global HTML wrapper at `layouts/global/html.html`
+- Uses `renderWithWrapper()` function
+- Example: `/` (home), content pages
+
+**Plenti Pattern Flow:**
+```
+Request → renderWithWrapper() → Load JSON → Parse Wrapper → Inject Content → Render
+```
+
+---
+
+## Plenti Content Patterns (CRITICAL)
+
+There are **TWO DISTINCT PATTERNS** for organizing content in Plenti:
+
+### Pattern 1: Component-Based Pages (Component Loop)
+
+**Used for:** Pages built from multiple reusable components
+
+**Content Type:** `pages` (uses `layouts/content/pages.html`)
+
+**JSON Structure - MINIMAL, components array ONLY:**
+```json
+{
+  "components": [
+    {"name": "hero2436", "fields": {"title": "...", "description": "..."}},
+    {"name": "services2437", "fields": {}},
+    {"name": "whyChoose2425", "fields": {...}}
+  ]
+}
+```
+
+**❌ DO NOT include these fields in component-based JSON:**
+- `"path"` - Automatically generated from filename
+- `"title"` - Should be in component fields if needed
+- `"description"` - Should be in component fields if needed
+- `"type"` - Determined by folder location
+
+**Template:** `layouts/content/pages.html`
+```html
+---
+export let components, allContent, content
+---
+
+{for component in components}
+  <Component:dynamic name={component.name} {...component.fields} />
+{/for}
+```
+
+**Key Points:**
+- ✅ Component names reference REAL components in `layouts/components/`
+- ✅ Each component file exists (e.g., `layouts/components/hero2436.html`)
+- ✅ The `pages.html` template is generic - it just loops through components
+- ✅ NO custom template per page - the type determines the template
+
+**Real-World Example:** `/Users/benjaminwaller/Projects/PlentifyWebsites/plentify/content/pages/about.json`
+
+---
+
+### Pattern 2: Custom Template Pages (Flat Structure)
+
+**Used for:** Pages with unique, custom layouts that aren't component-based
+
+**Content Type:** Custom (e.g., `portfolio` uses `layouts/content/portfolio.html`)
+
+**JSON Structure - FLAT, all fields at root level:**
+```json
+{
+  "title": "Capital Tigers",
+  "subtitle": "A new website for the Canberra Capital Tigers",
+  "description": [{"paragraph": "..."}],
+  "featureTitle": "Website features:",
+  "listFeatures": [{"item": "..."}],
+  "card": {...},
+  "button": {...},
+  "background": {...}
+}
+```
+
+**✅ This pattern DOES include top-level fields** - they're the page content!
+
+**Template:** `layouts/content/portfolio.html`
+```html
+---
+export let title, subtitle, description, featureTitle, listFeatures, card, button, background
+---
+
+<section id="content-page">
+  <div class="cs-container">
+    <h1>{title}</h1>
+    <h3>{subtitle}</h3>
+    {for d in description}
+      <p>{@html d.paragraph}</p>
+    {/for}
+    <!-- Custom layout HTML -->
+  </div>
+</section>
+
+<style>
+  /* Custom CSS for this template */
+</style>
+```
+
+**Key Points:**
+- ✅ Each field has an `export let` in the template
+- ✅ Template has custom HTML structure and styling
+- ✅ ONE template per content type (all portfolio/*.json use portfolio.html)
+- ✅ Can still import dynamic components if needed
+
+**Real-World Example:** `/Users/benjaminwaller/Projects/PlentifyWebsites/plentify/content/portfolio/capital-tigers.json`
+
+---
+
+## How Plenti Determines Which Pattern to Use
+
+**By Content Type (Folder/Filename):**
+
+```
+content/pages/about.json      → Uses layouts/content/pages.html (Pattern 1: Component loop)
+content/pages/contact.json    → Uses layouts/content/pages.html (Pattern 1: Component loop)
+content/portfolio/item1.json  → Uses layouts/content/portfolio.html (Pattern 2: Custom template)
+content/index.json            → Uses layouts/content/index.html (Could be either pattern)
+```
+
+**The Rule:**
+- Content type (folder or filename) determines which template in `layouts/content/` is used
+- The template structure determines whether JSON needs components array or flat fields
+
+---
+
+## Common Mistake: Mixing Patterns ❌
+
+**WRONG - Component-based JSON with extra fields:**
+```json
+{
+  "path": "/about",           ← REMOVE - not needed!
+  "title": "About Page",      ← REMOVE - should be in component fields!
+  "type": "page",             ← REMOVE - determined by location!
+  "components": [
+    {"name": "hero", "fields": {...}}
+  ]
+}
+```
+
+**RIGHT - Component-based JSON, minimal:**
+```json
+{
+  "components": [
+    {"name": "hero", "fields": {"title": "About Page", ...}}
+  ]
+}
+```
+
+**WRONG - Custom template JSON with components array:**
+```json
+{
+  "components": [...]  ← Portfolio template doesn't expect this!
+}
+```
+
+**RIGHT - Custom template JSON, flat fields:**
+```json
+{
+  "title": "...",
+  "subtitle": "...",
+  "description": [...]
+}
+```
+
+---
+
+**See:** `MIGRATION_GUIDE.md` for complete migration documentation.
+
+
 ## Architecture
 
 The codebase follows a pipeline architecture:
@@ -107,6 +294,33 @@ Template Source → Parser → AST → Transformer → Rendered HTML/CSS/JS
 ### Expressions
 - `{variable}` → `<span x-text="variable"></span>`
 - Use single curly braces (not double like Svelte)
+
+#### Fallback Operator Support (||)
+
+The transformer resolves JavaScript-style fallback expressions at build-time:
+
+```html
+{post.fields.title || 'Untitled'}     → Resolves to title or 'Untitled'
+{publish?.date || 'No date'}          → Handles optional chaining + fallback
+```
+
+#### Optional Chaining Support (?.)
+
+Property access expressions support optional chaining:
+
+```html
+{blogImage?.src}         → Resolved at build-time if blogImage exists
+{author?.image?.alt}     → Multi-level optional chaining supported
+```
+
+#### Build-Time Equality Comparisons
+
+Conditionals with equality operators are evaluated at build-time when values are available:
+
+```html
+{if post.type === "news"}   → Evaluated during loop expansion
+{if status !== "draft"}     → Supports !== operator
+```
 
 ### Conditionals
 ```
@@ -355,6 +569,67 @@ Use **Stores** when:
 - State persists across component instances
 - Need global application state (auth, theme, cart)
 - Example: `{if $auth.isLoggedIn}` used by LoginButton, UserMenu, ProtectedRoute
+
+### x-data Optimization (RuntimeVarTracker)
+
+The template engine optimizes x-data attributes to **only include variables needed at runtime**, filtering out build-time-only variables. This dramatically reduces page weight.
+
+**Problem Solved:**
+Without optimization, x-data would contain ALL variables passed to a component, including large arrays like `allContent` (~50KB) that are only used for build-time loop expansion.
+
+**How RuntimeVarTracker Works:**
+
+1. **Tracking Phase** - During transformation, the tracker records variables that appear in Alpine.js runtime directives:
+   - `x-for="photo in photos"` → tracks `photos`
+   - `x-if="published"` → tracks `published`
+   - `x-text="title"` → tracks `title`
+   - `:src="image.src"` → tracks `image`
+
+2. **Filtering Phase** - Before serializing x-data, `FilterScope()` removes untracked variables:
+   - Variables used only at build-time (loop expansion, conditionals evaluated at build-time) are excluded
+   - Only runtime-needed variables remain in x-data
+
+**Example Transformation:**
+
+```html
+<!-- Template uses allContent for build-time loop, photos for runtime -->
+{for post in allContent}
+  <div>{post.title}</div>
+{/for}
+{if photos && photos.length > 0}
+  <div x-for="photo in photos">...</div>
+{/if}
+```
+
+**Before optimization:**
+```html
+<div x-data="{ allContent: [...50KB...], allLayouts: [...], content: {...}, photos: [] }">
+```
+
+**After optimization:**
+```html
+<div x-data="{ photos: [] }">
+```
+
+**Key Files:**
+- `transformer/scope.go` - `RuntimeVarTracker` type and `FilterScope()` method
+- `transformer/transformer.go` - Global tracker initialization (`runtimeTracker`)
+- `transformer/components.go` - Filtering applied in `transformComponent()` and `TransformComponentWithResolvedProps()`
+- `transformer/config.go` - `OptimizeXData` flag (enabled by default)
+
+**Variables That Are NOT Tracked:**
+- Loop iterators (`item`, `index`, `component`, `post`, `photo`, etc.)
+- JavaScript keywords (`true`, `false`, `null`, etc.)
+- Alpine.js magic properties (`$store`, `$el`, `$refs`, etc.)
+
+**When Variables ARE Tracked:**
+- Runtime x-for collections: `x-for="item in items"` → tracks `items`
+- Runtime x-if conditions: `x-if="visible"` → tracks `visible`
+- Runtime x-text/x-html: `x-text="message"` → tracks `message`
+- Dynamic attribute bindings: `:src="image.src"` → tracks `image`
+
+**Toggle:**
+Set `OptimizeXData = false` in `transformer/config.go` to disable (for debugging).
 
 ### Transformation Order
 1. Parse template to AST (using unified parser path)

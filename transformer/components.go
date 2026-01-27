@@ -47,6 +47,8 @@ func UnregisterComponent(name string) {
 
 // GetComponentTemplate retrieves a component template by name
 // Supports case-insensitive lookup to match JSON component names like "hero2436" with registered "Hero2436"
+// Also handles PascalCase template names like "Head" → "head" component
+// Also handles PascalCase → snake_case conversion: "FeaturedPostsSidebar" → "featured_posts_sidebar"
 func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
 	// Try exact match first (most common case)
 	template, exists := componentTemplateRegistry[name]
@@ -63,10 +65,49 @@ func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
 			log.Printf("[GetComponentTemplate] Found component via case-insensitive match: %q → %q", name, capitalizedName)
 			return template, exists
 		}
+
+		// Try lowercase first letter for PascalCase → lowercase mapping
+		// This handles: "Head" → "head", "Nav" → "nav", "Footer" → "footer"
+		lowercasedName := strings.ToLower(name[:1]) + name[1:]
+		if lowercasedName != name { // Only try if different from input
+			template, exists = componentTemplateRegistry[lowercasedName]
+			if exists {
+				log.Printf("[GetComponentTemplate] Found component via lowercase match: %q → %q", name, lowercasedName)
+				return template, exists
+			}
+		}
+
+		// Try PascalCase → snake_case conversion
+		// This handles: "FeaturedPostsSidebar" → "featured_posts_sidebar"
+		snakeName := pascalToSnake(name)
+		if snakeName != name && snakeName != lowercasedName {
+			template, exists = componentTemplateRegistry[snakeName]
+			if exists {
+				log.Printf("[GetComponentTemplate] Found component via snake_case match: %q → %q", name, snakeName)
+				return template, exists
+			}
+		}
 	}
 
 	// Not found with any strategy
 	return nil, false
+}
+
+// pascalToSnake converts PascalCase to snake_case
+// Examples: "FeaturedPostsSidebar" → "featured_posts_sidebar", "MyComponent" → "my_component"
+func pascalToSnake(s string) string {
+	var result []byte
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				result = append(result, '_')
+			}
+			result = append(result, byte(r+32)) // Convert to lowercase
+		} else {
+			result = append(result, byte(r))
+		}
+	}
+	return string(result)
 }
 
 // GetAllRegisteredKeys returns all registered component template keys for debugging
@@ -105,6 +146,7 @@ func GetAllComponentNames() map[string]bool {
 //   - head: Document metadata section
 //   - body: Document content section (x-data added by server if needed)
 //   - !doctype: Document type declaration
+//   - template: Alpine.js template element (x-for, x-if containers - should not have x-data)
 //
 // Example:
 //   isStructuralTag("head")    // Returns: true
@@ -116,6 +158,7 @@ func isStructuralTag(tagName string) bool {
 		"head":     true,
 		"body":     true,
 		"!doctype": true,
+		"template": true, // Alpine.js template elements should not get x-data
 	}
 	return structural[strings.ToLower(tagName)]
 }
@@ -345,15 +388,15 @@ func formatComponentData(dataScope map[string]any) string {
 				continue
 			}
 
-			// CRITICAL: Check if this value has the variable reference marker
-			// Values marked with __VAR_REF__ prefix came from dynamic props that reference parent scope
-			// Values marked with __PROP__ prefix are component props that should remain reactive
+			// CRITICAL FIX: Skip values with __VAR_REF__ marker entirely
+			// These reference parent scope variables that may not exist at runtime
+			// (e.g., allContent was filtered out by x-data optimization)
+			// Including them would create "allContent: allContent" which references
+			// a non-existent JavaScript variable and breaks Alpine.js
 			if strings.HasPrefix(cleanValue, "__VAR_REF__") {
-				// Strip the marker and output as Alpine expression without quotes
 				varName := strings.TrimPrefix(cleanValue, "__VAR_REF__")
-				result.WriteString(key)
-				result.WriteString(": ")
-				result.WriteString(varName)
+				log.Printf("[formatComponentData] Skipping __VAR_REF__ key=%q (references %s which may not exist in scope)", key, varName)
+				first = true // Reset first flag since we're skipping this entry
 				continue
 			}
 			if strings.HasPrefix(cleanValue, "__PROP__") {
@@ -571,11 +614,32 @@ func replaceVarRefsWithThis(expr string, dataScope map[string]any) string {
 			startIdx := match[0]
 			endIdx := match[1]
 
+			// CRITICAL FIX: Check if already preceded by 'this.' or '.'
+			// to prevent double-prefixing: content.components → this.content.this.components
+			alreadyPrefixed := false
+			if startIdx >= 5 {
+				beforeMatch := result[startIdx-5 : startIdx]
+				if strings.HasSuffix(beforeMatch, "this.") {
+					alreadyPrefixed = true
+					log.Printf("[replaceVarRefsWithThis] Skipping '%s' at index %d (already has 'this.' prefix)", varName, startIdx)
+				}
+			}
+			if !alreadyPrefixed && startIdx >= 1 {
+				if result[startIdx-1] == '.' {
+					alreadyPrefixed = true
+					log.Printf("[replaceVarRefsWithThis] Skipping '%s' at index %d (already preceded by '.')", varName, startIdx)
+				}
+			}
+
+			if alreadyPrefixed {
+				continue
+			}
+
 			// Check if it's followed by a colon (property key pattern)
 			afterMatch := result[endIdx:]
 			trimmedAfter := strings.TrimSpace(afterMatch)
 			if !strings.HasPrefix(trimmedAfter, ":") {
-				// Not a property key, replace it
+				// Not a property key and not already prefixed, replace it
 				result = result[:startIdx] + "this." + result[startIdx:endIdx] + result[endIdx:]
 			}
 		}
@@ -649,56 +713,64 @@ func isDynamicExpression(value string, dataScope map[string]any) bool {
 
 // extractPropValue extracts the value from a component prop, handling dynamic vs static values
 //
-// CRITICAL FIX (2025-10-06): Return variable references as strings, not resolved values
+// BUILD-TIME RESOLUTION (2025-01-25): Resolve actual values for build-time expansion
 //
-// For component props that reference parent variables (e.g., user={user1}), we need to
-// pass the variable NAME as a string so Alpine.js can resolve it at runtime, NOT the
-// actual value from the parent scope.
+// For component props that reference parent variables (e.g., content={content}), we resolve
+// the ACTUAL VALUE from parent scope to enable build-time loop expansion. This allows
+// loops like {for component in content.components} to expand at build time because the
+// actual array is available in the component's dataScope.
 //
 // Example:
-//   Parent has: user1 = {name: "Alice"}
-//   Template: <UserProfile user={user1} />
+//   Parent has: content = {components: [{name: "Hero"}, {name: "Footer"}]}
+//   Template: <Component:dynamic ... content={content} />
 //
-//   BEFORE (wrong): componentDataScope["user"] = {name: "Alice"}
-//                   Output: user: { name: 'Alice' } (static object)
+//   componentDataScope["content"] = the actual map with components array
+//   → Loop can resolve content.components → build-time expansion works!
 //
-//   AFTER (correct): componentDataScope["user"] = "user1"
-//                    Output: user: user1 (Alpine expression)
+// Note: For Alpine.js reactivity, the body x-data already contains the data.
+// Components inherit from parent Alpine scope, so reactivity is preserved.
 func extractPropValue(prop ast.ComponentProp, parentDataScope map[string]any) any {
 	if prop.IsDynamic {
 		// For dynamic props ({var}), extract the variable name or expression
 		// Remove curly braces and whitespace
 		varName := strings.TrimSpace(strings.Trim(prop.Value, "{}"))
 
-
 		// CRITICAL: Check if this is a quoted string literal like {"Bo"}
 		// These should be output with quotes in the x-data
 		if (strings.HasPrefix(varName, "\"") && strings.HasSuffix(varName, "\"")) ||
 			(strings.HasPrefix(varName, "'") && strings.HasSuffix(varName, "'")) {
 			// This is a string literal expression - return as-is with quotes
-			// The quotes are part of the JavaScript expression, not fence-section quotes
 			log.Printf("extractPropValue: String literal expression '%s'", varName)
 			return varName
 		}
 
-		// CRITICAL FIX: Check if this is a simple variable reference
-		// If so, return the variable NAME (as string) for Alpine to resolve
-		// Use a special prefix to mark it as a variable reference (not a string literal)
+		// BUILD-TIME FIX: Resolve actual values from parent scope for build-time expansion
+		// This enables loops like {for component in content.components} to work at build time
+
+		// Case 1: Simple variable reference (e.g., "content", "user")
 		if isSimpleVariableReference(varName) {
-			// Check if the variable exists in parent scope
-			// FIX 6: Always return __VAR_REF__ for simple variable references to preserve reactivity
-			// This ensures Alpine.js can resolve the variable at runtime, not baked-in values
-			if _, exists := parentDataScope[varName]; exists {
-				log.Printf("extractPropValue: Keeping variable reference '%s' as __VAR_REF__", varName)
-				return "__VAR_REF__" + varName
-			} else {
-				log.Printf("extractPropValue: Variable '%s' NOT FOUND in parent scope!", varName)
-				return "__VAR_REF__" + varName // Still return as ref in case it's available at runtime
+			if value, exists := parentDataScope[varName]; exists && value != nil {
+				log.Printf("extractPropValue: Resolved variable '%s' to actual value (type: %T)", varName, value)
+				return value // Return actual value for build-time expansion
 			}
+			// Variable not found - return as string for Alpine to resolve at runtime
+			log.Printf("extractPropValue: Variable '%s' not in parent scope, keeping as reference", varName)
+			return "__VAR_REF__" + varName
 		}
 
-		// For expressions (age + 10, user.name), return as-is for Alpine.js to evaluate
-		log.Printf("extractPropValue: Passing expression '%s'", varName)
+		// Case 2: Nested property access (e.g., "content.components", "user.profile.name")
+		if strings.Contains(varName, ".") && !strings.Contains(varName, " ") {
+			// Try to resolve nested property
+			resolved := resolveNestedPropertyAccess(varName, parentDataScope)
+			if resolved != nil {
+				log.Printf("extractPropValue: Resolved nested property '%s' to actual value (type: %T)", varName, resolved)
+				return resolved // Return actual value for build-time expansion
+			}
+			log.Printf("extractPropValue: Could not resolve nested property '%s', keeping as expression", varName)
+		}
+
+		// For other expressions (age + 10, function calls), return as-is for Alpine.js
+		log.Printf("extractPropValue: Passing expression '%s' as-is", varName)
 		return varName
 	}
 
@@ -723,6 +795,144 @@ func transformComponentProps(props []ast.ComponentProp, parentDataScope map[stri
 // It's called by the main transformer for ComponentNode AST nodes
 func TransformComponent(node *ast.ComponentNode, parentDataScope map[string]any) []ast.Node {
 	return transformComponent(node, parentDataScope)
+}
+
+// TransformComponentWithResolvedProps transforms a component with already-resolved prop values
+// This bypasses the extractPropValue flow and directly uses the provided props map.
+// Used by TransformDynamicComponentByName to pass pre-resolved props from mergeProps.
+//
+// Pattern: Service Implementation Pattern [Load: 20]
+// Cognitive Load: 20 (component lookup: 5, scope creation: 5, transformation: 10)
+//
+// Example:
+//   resolvedProps := map[string]any{
+//     "content": map[string]any{"components": [...]},  // Actual map, not JSON string
+//     "name": "Benjamin",
+//   }
+//   TransformComponentWithResolvedProps("pages", resolvedProps, parentScope)
+func TransformComponentWithResolvedProps(componentName string, resolvedProps map[string]any, parentDataScope map[string]any) []ast.Node {
+	log.Printf("[TRANSFORM-COMP] ===== TransformComponentWithResolvedProps START =====")
+	log.Printf("[TRANSFORM-COMP] component=%s, resolvedProps keys=%v", componentName, getMapKeys(resolvedProps))
+
+	// Look up component template from registry
+	componentTemplate, exists := GetComponentTemplate(componentName)
+	if !exists {
+		log.Printf("Warning: Component template '%s' not registered.", componentName)
+		return createComponentPlaceholder(componentName, resolvedProps)
+	}
+
+	// Create isolated data scope for this component instance
+	componentDataScope := make(map[string]any)
+	log.Printf("TransformComponentWithResolvedProps: Created isolated scope for '%s'", componentName)
+
+	// Extract component's fence data (props, variables, functions)
+	for _, rootNode := range componentTemplate.Template.RootNodes {
+		if fence, ok := rootNode.(*ast.FenceSection); ok {
+			collectComponentFenceData(fence, componentDataScope)
+			log.Printf("TransformComponentWithResolvedProps: Collected fence data, scope now has %d entries", len(componentDataScope))
+		}
+	}
+
+	// CRITICAL: Directly inject resolved props into component data scope
+	// These are ACTUAL values (maps, slices), not JSON strings
+	for propName, propValue := range resolvedProps {
+		componentDataScope[propName] = propValue
+		log.Printf("TransformComponentWithResolvedProps: Injected prop '%s' (type: %T)", propName, propValue)
+	}
+
+	log.Printf("[TRANSFORM-COMP] Final scope for '%s': %d entries, keys=%v", componentName, len(componentDataScope), getMapKeys(componentDataScope))
+
+	// Check if 'published' is in scope (for debugging news component)
+	if pubVal, hasPub := componentDataScope["published"]; hasPub {
+		log.Printf("[TRANSFORM-COMP] ✓ 'published' is in scope: %v (type=%T)", pubVal, pubVal)
+	}
+
+	// Filter out fence section and style section from component body
+	componentBodyNodes := []ast.Node{}
+	for _, node := range componentTemplate.Template.RootNodes {
+		_, isFence := node.(*ast.FenceSection)
+		_, isStyle := node.(*ast.StyleSection)
+		if !isFence && !isStyle {
+			componentBodyNodes = append(componentBodyNodes, node)
+		}
+	}
+
+	// CRITICAL: Use a FRESH tracker for this component's transformation
+	// This ensures each component instance tracks only ITS OWN runtime variables,
+	// even when multiple components use the same variable names (like 'user')
+	savedTracker := runtimeTracker
+	componentTracker := NewRuntimeVarTracker()
+	runtimeTracker = componentTracker
+	log.Printf("[X-Data] TransformComponentWithResolvedProps '%s': created fresh tracker", componentName)
+
+	// Recursively transform component body with its isolated scope
+	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
+
+	// Restore global tracker and merge component's tracked vars into it
+	trackedVars := componentTracker.GetTrackedVars()
+	runtimeTracker = savedTracker
+	if runtimeTracker != nil {
+		for _, v := range trackedVars {
+			runtimeTracker.Track(v)
+		}
+	}
+	log.Printf("[X-Data] TransformComponentWithResolvedProps '%s': restored global tracker, merged %d vars", componentName, len(trackedVars))
+
+	// Wrap with x-data if component has data
+	if len(componentDataScope) == 0 {
+		return transformedNodes
+	}
+
+	// Apply x-data optimization: filter to only runtime-tracked variables
+	if OptimizeXData {
+		// Use the component's own tracker for filtering (not global)
+		filteredScope := componentTracker.FilterScope(componentDataScope)
+		log.Printf("[X-Data] TransformComponentWithResolvedProps '%s' filtered scope from %d to %d variables (per-component tracking)",
+			componentName, len(componentDataScope), len(filteredScope))
+
+		// Only wrap if there are runtime variables left
+		if len(filteredScope) == 0 {
+			log.Printf("[X-Data] TransformComponentWithResolvedProps '%s' has no runtime variables, skipping x-data wrapper", componentName)
+			return transformedNodes
+		}
+
+		log.Printf("[X-Data] TransformComponentWithResolvedProps '%s' needs wrapper with %d runtime vars", componentName, len(filteredScope))
+		return wrapWithXData(transformedNodes, filteredScope)
+	}
+
+	// Legacy behavior - always wrap with full scope
+	log.Printf("[X-Data] TransformComponentWithResolvedProps: wrapping '%s' with full scope (legacy)", componentName)
+	return wrapWithXData(transformedNodes, componentDataScope)
+}
+
+// createComponentPlaceholder creates a placeholder for unregistered components
+func createComponentPlaceholder(componentName string, props map[string]any) []ast.Node {
+	placeholderAttrs := []ast.Attribute{
+		{
+			Name:  "x-component",
+			Value: componentName,
+		},
+	}
+
+	// Add props as data-prop-* attributes
+	for propName, propValue := range props {
+		valueStr := fmt.Sprintf("%v", propValue)
+		if str, ok := propValue.(string); ok {
+			valueStr = str
+		}
+		placeholderAttrs = append(placeholderAttrs, ast.Attribute{
+			Name:  "data-prop-" + propName,
+			Value: valueStr,
+		})
+	}
+
+	return []ast.Node{
+		&ast.Element{
+			TagName:    "div",
+			Attributes: placeholderAttrs,
+			Children:   []ast.Node{},
+		},
+	}
 }
 
 // transformComponent handles both regular and dynamic component transformation
@@ -890,8 +1100,25 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 			componentBodyNodes = append(componentBodyNodes, node)
 		}
 	}
+
+	// CRITICAL: Use a FRESH tracker for this component's transformation
+	// This ensures each component instance tracks only ITS OWN runtime variables,
+	// even when multiple components use the same variable names (like 'user')
+	savedTracker := runtimeTracker
+	componentTracker := NewRuntimeVarTracker()
+	runtimeTracker = componentTracker
+	log.Printf("[X-Data] Component '%s': created fresh tracker (saved global with %d vars)", componentName, len(savedTracker.GetTrackedVars()))
+
 	// Recursively transform component body with its isolated scope
 	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
+
+	// Restore global tracker and merge component's tracked vars into it
+	trackedVars := componentTracker.GetTrackedVars()
+	runtimeTracker = savedTracker
+	for _, v := range trackedVars {
+		runtimeTracker.Track(v)
+	}
+	log.Printf("[X-Data] Component '%s': restored global tracker, merged %d vars", componentName, len(trackedVars))
 
 	// PHASE 4: Wrap with x-data (Task 2.4 + PHASE 2 OPTIMIZATION) ✓
 
@@ -916,9 +1143,20 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 	//
 	// Without wrappers, both would share parent scope and show same values!
 	if OptimizeXData {
-		// Always wrap components with full scope (not diff)
+		// OPTIMIZATION: Filter component scope using ONLY variables tracked during
+		// THIS component's transformation (using the fresh componentTracker)
+		filteredScope := componentTracker.FilterScope(componentDataScope)
+		log.Printf("[X-Data] Component '%s' filtered scope from %d to %d variables (per-component tracking)",
+			componentName, len(componentDataScope), len(filteredScope))
+
+		// Only wrap if there are runtime variables left
+		if len(filteredScope) == 0 {
+			log.Printf("[X-Data] Component '%s' has no runtime variables, skipping x-data wrapper", componentName)
+			return transformedNodes
+		}
+
 		log.Printf("[X-Data] Component '%s' needs wrapper (component isolation required)", componentName)
-		return wrapWithXData(transformedNodes, componentDataScope)
+		return wrapWithXData(transformedNodes, filteredScope)
 	}
 
 	// Legacy behavior - always wrap with full scope

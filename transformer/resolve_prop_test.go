@@ -56,7 +56,7 @@ func TestResolvePropValue(t *testing.T) {
 		description string
 	}{
 		// ========== Dynamic Props (prop={expression}) ==========
-		// UPDATED: Simple variable references now return __VAR_REF__ markers
+		// UPDATED 2025-01-25: Simple variable references now return ACTUAL values for build-time expansion
 		{
 			name: "dynamic prop - simple variable lookup success",
 			prop: ast.ComponentProp{
@@ -65,8 +65,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__currentUser",
-			description: "Should return __VAR_REF__ marker for reactivity",
+			expected:    parentScope["currentUser"], // Actual map value
+			description: "Should return actual value for build-time expansion",
 		},
 		{
 			name: "dynamic prop - boolean variable",
@@ -76,8 +76,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__isLoggedIn",
-			description: "Should return __VAR_REF__ marker for boolean variable",
+			expected:    true, // Actual bool value
+			description: "Should return actual bool value for build-time expansion",
 		},
 		{
 			name: "dynamic prop - integer variable",
@@ -87,8 +87,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__count",
-			description: "Should return __VAR_REF__ marker for integer variable",
+			expected:    42, // Actual int value
+			description: "Should return actual int value for build-time expansion",
 		},
 		{
 			name: "dynamic prop - float variable",
@@ -98,8 +98,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__discount",
-			description: "Should return __VAR_REF__ marker for float variable",
+			expected:    15.5, // Actual float value
+			description: "Should return actual float value for build-time expansion",
 		},
 		{
 			name: "dynamic prop - array variable",
@@ -109,8 +109,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__products",
-			description: "Should return __VAR_REF__ marker for array variable",
+			expected:    parentScope["products"], // Actual array value
+			description: "Should return actual array value for build-time expansion",
 		},
 		{
 			name: "dynamic prop - function reference",
@@ -120,8 +120,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__formatPrice",
-			description: "Should return __VAR_REF__ marker for function variable",
+			expected:    "function(p) { return '$' + p; }", // Actual string value
+			description: "Should return actual function string for build-time expansion",
 		},
 		{
 			name: "dynamic prop - property access expression",
@@ -131,8 +131,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "currentUser.name",
-			description: "Should return expression string for Alpine to evaluate",
+			expected:    "John Doe", // Resolved nested property value
+			description: "Should resolve nested property and return actual value",
 		},
 		{
 			name: "dynamic prop - array index access",
@@ -153,8 +153,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "config.debug",
-			description: "Should return expression for nested property access",
+			expected:    true, // Resolved nested property value
+			description: "Should resolve nested property and return actual value",
 		},
 		{
 			name: "dynamic prop - method call expression",
@@ -241,8 +241,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__count",
-			description: "Should handle whitespace and return __VAR_REF__ marker",
+			expected:    42, // Actual int value (whitespace is trimmed)
+			description: "Should handle whitespace and return actual value",
 		},
 		{
 			name: "dynamic prop - special case for validationErrors",
@@ -252,13 +252,12 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__validationErrors",
-			description: "Should return __VAR_REF__ marker for validationErrors",
+			expected:    parentScope["validationErrors"], // Actual array value
+			description: "Should return actual array value for validationErrors",
 		},
 
 		// ========== Shorthand Props ({prop}) ==========
-		// Parser creates shorthand props with IsDynamic=true AND Value=propName
-		// So they return __VAR_REF__ markers just like dynamic props
+		// UPDATED 2025-01-25: Shorthand props now return actual values for build-time expansion
 		{
 			name: "shorthand prop - variable found",
 			prop: ast.ComponentProp{
@@ -268,8 +267,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic:   true, // Parser ALSO sets IsDynamic
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__user",
-			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
+			expected:    "Alice", // Actual string value
+			description: "Should return actual value for build-time expansion",
 		},
 		{
 			name: "shorthand prop - boolean found",
@@ -280,8 +279,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__isLoggedIn",
-			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
+			expected:    true, // Actual bool value
+			description: "Should return actual bool value for build-time expansion",
 		},
 		{
 			name: "shorthand prop - integer found",
@@ -292,8 +291,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__count",
-			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
+			expected:    42, // Actual int value
+			description: "Should return actual int value for build-time expansion",
 		},
 		{
 			name: "shorthand prop - object found",
@@ -304,8 +303,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__currentUser",
-			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
+			expected:    parentScope["currentUser"], // Actual map value
+			description: "Should return actual map value for build-time expansion",
 		},
 		{
 			name: "shorthand prop - array found",
@@ -316,8 +315,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__items",
-			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
+			expected:    parentScope["items"], // Actual array value
+			description: "Should return actual array value for build-time expansion",
 		},
 		{
 			name: "shorthand prop - variable not found",
@@ -328,8 +327,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__missingProp",
-			description: "Should return __VAR_REF__ marker even when not found",
+			expected:    "__VAR_REF__missingProp", // Still returns marker when not found
+			description: "Should return __VAR_REF__ marker when variable not in scope",
 		},
 		{
 			name: "shorthand prop - title found",
@@ -340,8 +339,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic:   true,
 			},
 			parentScope: parentScope,
-			expected:    "__VAR_REF__title",
-			description: "Should return __VAR_REF__ marker (shorthand treated as dynamic)",
+			expected:    "Welcome", // Actual string value
+			description: "Should return actual string value for build-time expansion",
 		},
 
 		// ========== Static Props (prop="value") ==========
@@ -604,8 +603,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{"count": 10},
-			expected:    "__VAR_REF__count",
-			description: "Should return __VAR_REF__ marker even without braces",
+			expected:    10, // Actual value for build-time expansion
+			description: "Should return actual value for build-time expansion",
 		},
 		{
 			name: "dynamic prop - empty braces",
@@ -648,8 +647,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic:   true,
 			},
 			parentScope: map[string]any{"user_name": "Bob"},
-			expected:    "__VAR_REF__user_name",
-			description: "Should return __VAR_REF__ marker for prop names with underscores",
+			expected:    "Bob", // Actual value for build-time expansion
+			description: "Should return actual value for build-time expansion",
 		},
 		{
 			name: "shorthand prop - prop name with dollar sign",
@@ -660,8 +659,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic:   true,
 			},
 			parentScope: map[string]any{"$store": map[string]any{"data": "value"}},
-			expected:    "__VAR_REF__$store",
-			description: "Should return __VAR_REF__ marker for prop names with dollar signs",
+			expected:    map[string]any{"data": "value"}, // Actual value for build-time expansion
+			description: "Should return actual value for build-time expansion",
 		},
 		{
 			name: "static prop - whitespace value",
@@ -692,8 +691,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{"zero": 0},
-			expected:    "__VAR_REF__zero",
-			description: "Should return __VAR_REF__ marker for zero value",
+			expected:    0, // Actual value for build-time expansion
+			description: "Should return actual zero value for build-time expansion",
 		},
 		{
 			name: "parent scope with false value",
@@ -703,8 +702,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{"disabled": false},
-			expected:    "__VAR_REF__disabled",
-			description: "Should return __VAR_REF__ marker for false value",
+			expected:    false, // Actual value for build-time expansion
+			description: "Should return actual false value for build-time expansion",
 		},
 		{
 			name: "parent scope with empty string",
@@ -714,8 +713,8 @@ func TestResolvePropValueEdgeCases(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: map[string]any{"emptyStr": ""},
-			expected:    "__VAR_REF__emptyStr",
-			description: "Should return __VAR_REF__ marker for empty string",
+			expected:    "", // Actual value for build-time expansion
+			description: "Should return actual empty string for build-time expansion",
 		},
 	}
 
@@ -759,7 +758,7 @@ func TestResolvePropValueLogging(t *testing.T) {
 			},
 			parentScope:  map[string]any{"otherVar": "value"},
 			shouldLog:    true,
-			expectedLogSubstring: "NOT FOUND",
+			expectedLogSubstring: "not in parent scope",
 			description:  "Should log when shorthand prop variable not found",
 		},
 		{
@@ -771,11 +770,11 @@ func TestResolvePropValueLogging(t *testing.T) {
 			},
 			parentScope:  map[string]any{"other": "value"},
 			shouldLog:    true,
-			expectedLogSubstring: "NOT FOUND",
+			expectedLogSubstring: "not in parent scope",
 			description:  "Should log about variable not found",
 		},
 		{
-			name: "shorthand prop found - should log kept as var ref",
+			name: "shorthand prop found - should log resolved",
 			prop: ast.ComponentProp{
 				Name:        "user",
 				Value:       "user",
@@ -784,8 +783,8 @@ func TestResolvePropValueLogging(t *testing.T) {
 			},
 			parentScope:  map[string]any{"user": "Alice"},
 			shouldLog:    true,
-			expectedLogSubstring: "Keeping variable reference",
-			description:  "Should log that variable is kept as __VAR_REF__",
+			expectedLogSubstring: "Resolved variable",
+			description:  "Should log that variable was resolved to actual value",
 		},
 		{
 			name: "static prop - no logging",
@@ -826,7 +825,8 @@ func TestResolvePropValueLogging(t *testing.T) {
 	}
 }
 
-// TestResolvePropValueTypePreservation tests that the marker system preserves type information
+// TestResolvePropValueTypePreservation tests that actual values are returned for build-time expansion
+// (Updated 2025-01-25: Changed from __VAR_REF__ markers to actual values for build-time loop expansion)
 func TestResolvePropValueTypePreservation(t *testing.T) {
 	parentScope := map[string]any{
 		"strVal":   "text",
@@ -842,7 +842,7 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 		name         string
 		prop         ast.ComponentProp
 		expectedType string
-		expectedPrefix string
+		expectedValue any
 		description  string
 	}{
 		{
@@ -853,8 +853,8 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				IsDynamic: true,
 			},
 			expectedType: "string",
-			expectedPrefix: "__VAR_REF__",
-			description:  "Simple variable should return __VAR_REF__ marker",
+			expectedValue: "text",
+			description:  "Simple variable should return actual string value",
 		},
 		{
 			name: "preserve int type",
@@ -863,9 +863,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{intVal}",
 				IsDynamic: true,
 			},
-			expectedType: "string",
-			expectedPrefix: "__VAR_REF__",
-			description:  "Simple variable should return __VAR_REF__ marker",
+			expectedType: "int",
+			expectedValue: 42,
+			description:  "Simple variable should return actual int value",
 		},
 		{
 			name: "preserve float type",
@@ -874,9 +874,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{floatVal}",
 				IsDynamic: true,
 			},
-			expectedType: "string",
-			expectedPrefix: "__VAR_REF__",
-			description:  "Simple variable should return __VAR_REF__ marker",
+			expectedType: "float64",
+			expectedValue: 3.14,
+			description:  "Simple variable should return actual float value",
 		},
 		{
 			name: "preserve bool type",
@@ -885,9 +885,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{boolVal}",
 				IsDynamic: true,
 			},
-			expectedType: "string",
-			expectedPrefix: "__VAR_REF__",
-			description:  "Simple variable should return __VAR_REF__ marker",
+			expectedType: "bool",
+			expectedValue: true,
+			description:  "Simple variable should return actual bool value",
 		},
 		{
 			name: "preserve nil type",
@@ -897,8 +897,8 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				IsDynamic: true,
 			},
 			expectedType: "string",
-			expectedPrefix: "__VAR_REF__",
-			description:  "Simple variable should return __VAR_REF__ marker",
+			expectedValue: "__VAR_REF__nilVal", // nil values return reference marker
+			description:  "Nil variable should return __VAR_REF__ marker (not in scope effectively)",
 		},
 		{
 			name: "preserve array type",
@@ -907,9 +907,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{arrayVal}",
 				IsDynamic: true,
 			},
-			expectedType: "string",
-			expectedPrefix: "__VAR_REF__",
-			description:  "Simple variable should return __VAR_REF__ marker",
+			expectedType: "[]interface {}",
+			expectedValue: []any{1, 2, 3},
+			description:  "Simple variable should return actual array value",
 		},
 		{
 			name: "preserve object type",
@@ -918,9 +918,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{objVal}",
 				IsDynamic: true,
 			},
-			expectedType: "string",
-			expectedPrefix: "__VAR_REF__",
-			description:  "Simple variable should return __VAR_REF__ marker",
+			expectedType: "map[string]interface {}",
+			expectedValue: map[string]any{"key": "value"},
+			description:  "Simple variable should return actual object value",
 		},
 	}
 
@@ -935,11 +935,13 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 					tt.description, actualType, tt.expectedType, result)
 			}
 
-			// Check for __VAR_REF__ prefix
+			// For string results, check exact match or prefix for __VAR_REF__
 			if strResult, ok := result.(string); ok {
-				if !strings.HasPrefix(strResult, tt.expectedPrefix) {
-					t.Errorf("%s\nExpected prefix: %s\nGot: %s",
-						tt.description, tt.expectedPrefix, strResult)
+				if strExpected, ok := tt.expectedValue.(string); ok {
+					if strResult != strExpected {
+						t.Errorf("%s\nGot: %s, want: %s",
+							tt.description, strResult, strExpected)
+					}
 				}
 			}
 		})

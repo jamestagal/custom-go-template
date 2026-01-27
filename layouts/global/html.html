@@ -3,12 +3,14 @@
 <!-- This is equivalent to Plenti's html.svelte -->
 
 <!-- Import global components (like Plenti's html.svelte) -->
+<!-- CRITICAL: Use PascalCase for components that conflict with HTML tag names (Head, Nav, Footer) -->
+<!-- The case-insensitive lookup will map Head → head, Nav → nav, Footer → footer -->
 import Head from './head.html'
 import Nav from './nav.html'
 import Footer from './footer.html'
 
 <!-- Props received from Plenti build system / Go server -->
-export let content, layout, allContent
+export let content, layout, allContent, allLayouts, components
 
 <!-- Default values for optional props -->
 prop title = "Plentico"
@@ -31,38 +33,66 @@ prop description = "A Go template engine powered by Alpine.js"
 	<!-- <LoginModal /> -->
 
 	<main>
-		<!-- Global Navigation -->
+		<!-- Global Navigation (position: fixed) -->
 		<Nav />
 
-		<!-- Global Header -->
-		<!-- <Header /> -->
+		<!-- Content wrapper - sections handle their own nav clearance and spacing -->
+		<!-- Full-width sections (hero, services) use their own padding-top for nav clearance -->
+		<!-- Text-heavy pages can add their own container padding as needed -->
+		<div class="content-wrapper">
+			<!-- ============================================ -->
+			<!-- DYNAMIC CONTENT LAYOUT INJECTION             -->
+			<!-- This is where page-specific layouts render  -->
+			<!-- For pages → renders layouts/content/pages.html -->
+			<!-- For courses → renders layouts/content/courses.html -->
+			<!-- ============================================ -->
 
-		<!-- ============================================ -->
-		<!-- DYNAMIC CONTENT LAYOUT INJECTION             -->
-		<!-- This is where page-specific layouts render  -->
-		<!-- For pages → renders layouts/content/pages.html -->
-		<!-- For courses → renders layouts/content/courses.html -->
-		<!-- ============================================ -->
+			<!-- Dynamic layout component injection -->
+			<!-- In Svelte this is: <svelte:component this={layout} {...content.fields} /> -->
+			<!-- In our Go template engine, this is handled by the server -->
+			<!-- The server will inject the appropriate layout based on the route -->
 
-		<!-- Dynamic layout component injection -->
-		<!-- In Svelte this is: <svelte:component this={layout} {...content.fields} /> -->
-		<!-- In our Go template engine, this is handled by the server -->
-		<!-- The server will inject the appropriate layout based on the route -->
+			<!-- Slot for dynamic content - replaced by server with specific layout -->
+			<!-- Pass content explicitly (Pages layout needs it for iteration) -->
+			<!-- allContent passed for layouts that need to list other content (e.g., news sidebar) -->
+			<!-- Pass BOTH components array AND spread fields for compatibility -->
+			<!-- - components array: for collection-type layouts (jim-test.html) -->
+			<!-- - spread fields: for single-type layouts (_index.html) -->
+			<Component:dynamic name={layout}
+				content={content}
+				components={content.components}
+				allContent={allContent}
+				allLayouts={allLayouts}
+				buildTime={buildTime}
+				{...content.fields} />
 
-		<!-- Slot for dynamic content - replaced by server with specific layout -->
-		<!-- Pass content explicitly (Pages layout needs it for iteration) -->
-		<!-- allContent removed - components inherit from body x-data via Alpine scope -->
-		<Component:dynamic name={layout}
-			content={content}
-			{...content.fields} />
+			<!-- Newsletter Subscription (optional global component) -->
+			<!-- <Newsletter /> -->
+		</div>
 
-		<!-- Newsletter Subscription (optional global component) -->
-		<!-- <Newsletter /> -->
-
-		<!-- Global Footer -->
+		<!-- Global Footer (full-width, outside content wrapper) -->
 		<Footer />
 	</main>
 
 </body>
 
 </html>
+
+<style>
+  /* Content wrapper - centers and constrains content */
+/*   .content-wrapper {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 10rem 2rem 2rem 2rem;
+  } */
+
+  /* Full-width sections break out of the container */
+  .content-wrapper > div > section,
+  .content-wrapper section[id^="hero"],
+  .content-wrapper section[id^="services"],
+  .content-wrapper section[id^="why"] {
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    max-width: none;
+  }
+</style>

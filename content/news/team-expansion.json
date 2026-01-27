@@ -1,47 +1,40 @@
 {
-  "type": "news",
-  "layout": "news",
-  "path": "/news/team-expansion",
   "title": "Growing Our Team",
   "published": true,
-  "fields": {
-    "title": "Growing Our Team",
-    "published": true,
-    "author": {
-      "name": "Sarah Johnson",
-      "image": {
-        "src": "https://picsum.photos/32/32?random=author3",
-        "alt": "Sarah Johnson profile"
-      }
+  "author": {
+    "name": "Sarah Johnson",
+    "image": {
+      "src": "https://picsum.photos/32/32?random=author3",
+      "alt": "Sarah Johnson profile"
+    }
+  },
+  "publish": {
+    "date": "2025-03-10"
+  },
+  "blogImage": {
+    "src": "/images/blogImage1.png",
+    "alt": "Team photo",
+    "width": 1200,
+    "height": 600
+  },
+  "figcaption": {
+    "caption": "Welcome to our newest team members joining this quarter",
+    "attribution": {
+      "text": "HR Department",
+      "link": "#"
+    }
+  },
+  "textItems": [
+    {
+      "order": 1,
+      "title": "Expanding Our Capabilities",
+      "paragraph": "We're excited to announce that we're growing our team with 15 new positions across engineering, design, and customer success. This expansion will help us better serve our customers and accelerate product development."
     },
-    "publish": {
-      "date": "2025-03-10"
-    },
-    "blogImage": {
-      "src": "https://picsum.photos/1200/600?random=6",
-      "alt": "Team photo",
-      "width": 1200,
-      "height": 600
-    },
-    "figcaption": {
-      "caption": "Welcome to our newest team members joining this quarter",
-      "attribution": {
-        "text": "HR Department",
-        "link": "#"
-      }
-    },
-    "textItems": [
-      {
-        "order": 1,
-        "title": "Expanding Our Capabilities",
-        "paragraph": "We're excited to announce that we're growing our team with 15 new positions across engineering, design, and customer success. This expansion will help us better serve our customers and accelerate product development."
-      },
-      {
-        "order": 2,
-        "title": "Open Positions",
-        "paragraph": "We're currently hiring for senior engineers, UX designers, and customer success managers. If you're passionate about building great products and helping customers succeed, we'd love to hear from you."
-      }
-    ],
-    "photos": []
-  }
+    {
+      "order": 2,
+      "title": "Open Positions",
+      "paragraph": "We're currently hiring for senior engineers, UX designers, and customer success managers. If you're passionate about building great products and helping customers succeed, we'd love to hear from you."
+    }
+  ],
+  "photos": []
 }

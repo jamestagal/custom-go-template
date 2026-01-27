@@ -214,7 +214,7 @@ import store from './stores/auth.js'
 			}
 
 			// Step 6: Render with stores (pass original AST, transformed AST, stores, and template path)
-			markup, script, _ := renderer.RenderWithStores(originalAST, transformed, finalStores, "test.html", "")
+			markup, script, _ := renderer.RenderWithStores(originalAST, transformed, finalStores, "test.html", "", nil)
 
 			// Assertions
 			if len(finalStores) != tt.wantStoreCount {
@@ -351,7 +351,7 @@ import store from './stores/config.js'
 			}
 
 			// Render (pass original AST, transformed AST, stores, and template path)
-			_, script, _ := renderer.RenderWithStores(originalAST, transformed, finalStores, "test.html", "")
+			_, script, _ := renderer.RenderWithStores(originalAST, transformed, finalStores, "test.html", "", nil)
 
 			// Check that script contains expected values
 			if !contains(script, tt.expectedSource) {

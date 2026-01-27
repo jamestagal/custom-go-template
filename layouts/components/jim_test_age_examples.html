@@ -1,0 +1,22 @@
+---
+import Age from "./age.html";
+
+export let name, age
+---
+
+<div style="margin: 2rem 0;">
+  <h2>Age Component Examples</h2>
+  <div style="margin-bottom: 0.5rem; font-size: 0.875rem; color: #666;">Passing dynamic props to components:</div>
+  <Age name={name} age={age} />
+  <Age name={"Bo"} age={age + 50} />
+  <Age name={"Baggins"} age={201} />
+</div>
+
+<style>
+  h2 {
+    color: #1f2937;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+</style>

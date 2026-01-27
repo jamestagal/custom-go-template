@@ -798,3 +798,29 @@ body {
     margin-bottom: 0.5rem;
     font-weight: 500;
   }
+
+  /* Content wrapper - centers and constrains text-heavy pages */
+/* .content-wrapper {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 10rem 2rem 2rem 2rem;
+} */
+
+/* Full-width sections break out of the container */
+/* .content-wrapper section[id^="hero"],
+.content-wrapper section[id^="services"],
+.content-wrapper section[id^="why"] {
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  max-width: none;
+} */
+
+/* .text-content-container {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0 2rem 2rem 2rem;
+} */
+ /* Nav clearance for first component only */
+/* .text-content-container:first-child {
+  padding-top: 10rem; 
+} */

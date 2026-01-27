@@ -1,0 +1,86 @@
+{
+  "components": [
+    {
+      "name": "jim_test_greeting",
+      "fields": {
+        "salutation": "Hello",
+        "name": "Benjamin",
+        "age": 55
+      }
+    },
+    {
+      "name": "jim_test_age_examples",
+      "fields": {
+        "name": "Benjamin",
+        "age": 55
+      }
+    },
+    {
+      "name": "jim_test_user_profiles",
+      "fields": {
+        "user1": {
+          "name": "Benjamin",
+          "email": "benjamin@example.com",
+          "role": "admin",
+          "avatar": null,
+          "joinDate": "2024-10-06"
+        },
+        "user2": {
+          "name": "Dynamic User",
+          "email": "dynamic@example.com",
+          "role": "user",
+          "avatar": null,
+          "joinDate": "2024-05-15"
+        },
+        "user3": {
+          "name": "Variable Path User",
+          "email": "variable@example.com",
+          "role": "editor",
+          "avatar": null,
+          "joinDate": "2024-03-20"
+        }
+      }
+    },
+    {
+      "name": "jim_test_animals_loop",
+      "fields": {
+        "name": "Benjamin",
+        "animals": ["dog", "cat", "bird"]
+      }
+    },
+    {
+      "name": "jim_test_advanced_loops",
+      "fields": {
+        "name": "Benjamin",
+        "animals": ["dog", "cat", "bird"]
+      }
+    },
+    {
+      "name": "jim_test_todos",
+      "fields": {}
+    },
+    {
+      "name": "jim_test_notifications",
+      "fields": {
+        "notifications": [
+          {
+            "type": "success",
+            "message": "Your changes have been saved successfully!"
+          },
+          {
+            "type": "info",
+            "message": "Please review the documentation for more details."
+          },
+          {
+            "type": "warning",
+            "message": "Your session will expire in 5 minutes."
+          },
+          {
+            "type": "error",
+            "message": "Failed to connect to the server."
+          }
+        ]
+      }
+    }
+  ]
+}

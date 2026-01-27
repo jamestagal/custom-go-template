@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -570,22 +571,71 @@ func FormatGoValueToJS(value any) string {
 		return "{" + strings.Join(pairs, ",") + "}"
 
 	default:
-		// CRITICAL FIX: Use JSON encoding for unknown types instead of fmt.Sprintf("%v")
-		// This prevents Go map syntax (map[key:value]) from appearing in output
+		// CRITICAL FIX: Use reflection to handle ANY slice/map types
+		// This catches types that don't match explicit cases (e.g., []map[string]interface{})
+		if value != nil {
+			valueType := reflect.TypeOf(value)
+
+			// Handle ANY slice type via reflection
+			if valueType.Kind() == reflect.Slice {
+				sliceVal := reflect.ValueOf(value)
+				elements := make([]string, 0, sliceVal.Len())
+				for i := 0; i < sliceVal.Len(); i++ {
+					elements = append(elements, FormatGoValueToJS(sliceVal.Index(i).Interface()))
+				}
+				log.Printf("FormatGoValueToJS: Handled slice type %T via reflection", value)
+				return "[" + strings.Join(elements, ",") + "]"
+			}
+
+			// Handle ANY map type via reflection
+			if valueType.Kind() == reflect.Map {
+				mapVal := reflect.ValueOf(value)
+				keys := make([]string, 0, mapVal.Len())
+				for _, key := range mapVal.MapKeys() {
+					keyStr := fmt.Sprintf("%v", key.Interface())
+					keys = append(keys, keyStr)
+				}
+				sort.Strings(keys)
+
+				pairs := make([]string, 0, len(keys))
+				for _, keyStr := range keys {
+					// Find the original key that matches this string representation
+					var val reflect.Value
+					for _, key := range mapVal.MapKeys() {
+						if fmt.Sprintf("%v", key.Interface()) == keyStr {
+							val = mapVal.MapIndex(key)
+							break
+						}
+					}
+
+					if val.IsValid() {
+						formattedValue := FormatGoValueToJS(val.Interface())
+						formattedKey := keyStr
+						if !isValidJSIdentifier(keyStr) {
+							escaped := strings.ReplaceAll(keyStr, `\`, `\\`)
+							escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+							escaped = strings.ReplaceAll(escaped, "\n", `\n`)
+							escaped = strings.ReplaceAll(escaped, "\r", `\r`)
+							escaped = strings.ReplaceAll(escaped, "\t", `\t`)
+							formattedKey = fmt.Sprintf(`'%s'`, escaped)
+						}
+						pairs = append(pairs, fmt.Sprintf(`%s:%s`, formattedKey, formattedValue))
+					}
+				}
+				log.Printf("FormatGoValueToJS: Handled map type %T via reflection", value)
+				return "{" + strings.Join(pairs, ",") + "}"
+			}
+		}
+
+		// Fall back to JSON encoding for other types
 		log.Printf("FormatGoValueToJS: WARNING - Unhandled type %T, using JSON encoding", value)
 		jsonBytes, err := json.Marshal(value)
 		if err != nil {
-			log.Printf("FormatGoValueToJS: ERROR - Failed to marshal %T: %v", value, err)
-			// Fallback to string conversion as last resort
-			str := fmt.Sprintf("%v", value)
-			escaped := strings.ReplaceAll(str, `\`, `\\`)
-			escaped = strings.ReplaceAll(escaped, `'`, `\'`)
-			return fmt.Sprintf(`'%s'`, escaped)
+			log.Printf("FormatGoValueToJS: failed to marshal %T: %v", value, err)
+			// Final fallback: convert to string
+			return fmt.Sprintf("%v", value)
 		}
-		// Convert double quotes to single quotes for HTML attribute safety
-		result := strings.ReplaceAll(string(jsonBytes), `"`, `'`)
-		log.Printf("FormatGoValueToJS: JSON-encoded %T to: %s", value, truncateString(result, 100))
-		return result
+		return string(jsonBytes)
 	}
 }
 
@@ -961,12 +1011,14 @@ func alpineDataFormatter(dataScope map[string]any) string {
 				formattedValue = fixed
 				log.Printf("alpineDataFormatter: Fixed Go slice format for key=%s: %q → %q", key, strVal, fixed)
 			} else if strings.HasPrefix(strVal, "__VAR_REF__") {
-				// CRITICAL: Check if this has the __VAR_REF__ marker
-				// This indicates a variable reference that should be output without quotes
-				// Strip the marker and output as unquoted variable reference
+				// CRITICAL FIX: Skip __VAR_REF__ marked values entirely
+				// These reference parent scope variables that may not exist at runtime
+				// (e.g., allContent was filtered out by x-data optimization)
+				// Including them would create "allContent: allContent" which references
+				// a non-existent JavaScript variable and breaks Alpine.js
 				varName := strings.TrimPrefix(strVal, "__VAR_REF__")
-				formattedValue = varName
-				log.Printf("alpineDataFormatter: Stripped __VAR_REF__ marker, outputting variable reference: %s", varName)
+				log.Printf("alpineDataFormatter: Skipping __VAR_REF__ key=%s (references %s which may not exist in scope)", key, varName)
+				continue // Skip this key entirely
 			} else {
 				// CRITICAL FIX: Check if string looks like JSON BEFORE checking isDynamicExpression
 				// This prevents arrays like ["dog", "cat", "bird"] from being treated as

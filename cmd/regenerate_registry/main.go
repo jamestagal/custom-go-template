@@ -28,7 +28,11 @@ func main() {
 	components = append(components, loadComponentsFromDir("examples/components", "../components/", storeRegistry)...)
 
 	// Register from global/ directory
-	components = append(components, loadComponentsFromDir("global", "../global/", storeRegistry)...)
+	components = append(components, loadComponentsFromDir("layouts/global", "../global/", storeRegistry)...)
+
+	// Register from layouts/components/ directory - NEW!
+	// This is the primary directory for components in the Plenti-style architecture
+	components = append(components, loadComponentsFromDir("layouts/components", "../components/", storeRegistry)...)
 
 	// Register from layouts/content/ directory
 	components = append(components, loadComponentsFromDir("layouts/content", "../content/", storeRegistry)...)
@@ -94,15 +98,23 @@ func loadComponentsFromDir(dir string, pathPrefix string, storeRegistry map[stri
 			componentProps := extractComponentProps(componentAST)
 			transformedAST := transformer.TransformAST(componentAST, componentProps)
 
-			// Use pathPrefix for name to match how components are registered
-			compName := fmt.Sprintf("%s%s", pathPrefix, file.Name())
-
+			// CRITICAL FIX: Register component TWICE to match server behavior
+			// 1. With full path prefix (for import resolution)
+			compNameWithPath := fmt.Sprintf("%s%s", pathPrefix, file.Name())
 			components = append(components, builder.ComponentTemplate{
-				Name: compName,
+				Name: compNameWithPath,
 				AST:  transformedAST,
 			})
+			log.Printf("Loaded component: %s from %s", compNameWithPath, componentPath)
 
-			log.Printf("Loaded component: %s from %s", compName, componentPath)
+			// 2. With just the base name (without .html) for JSON lookups
+			// This matches what the runtime loader expects when component.name = "jim_test_greeting"
+			baseName := strings.TrimSuffix(file.Name(), ".html")
+			components = append(components, builder.ComponentTemplate{
+				Name: baseName,
+				AST:  transformedAST,
+			})
+			log.Printf("Also registered as: %s (for JSON component.name lookups)", baseName)
 		}
 	}
 

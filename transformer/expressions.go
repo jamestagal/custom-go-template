@@ -106,26 +106,34 @@ func transformTextWithExpressions(text string, dataScope map[string]any) []ast.N
 			// Just treat it as plain text with the braces
 			result = append(result, &ast.TextNode{Content: text[match[0]:match[1]]})
 		} else {
-			// Add variables from the expression to the data scope
-			extractVariablesFromExpr(expr, dataScope)
+			// CRITICAL FIX: Try build-time resolution first for property access expressions
+			// This handles cases like {card.title}, {cta.button.text}, {text} in loops
+			if resolvedValue, resolvable := TryResolveBuildTimeValue(expr, dataScope); resolvable {
+				// Build-time interpolation: replace with the actual text value
+				result = append(result, &ast.TextNode{Content: resolvedValue})
+			} else {
+				// Runtime expression: create Alpine.js x-text binding
+				// Add variables from the expression to the data scope
+				extractVariablesFromExpr(expr, dataScope)
 
-			// Create a span with x-text for the expression
-			exprNode := &ast.Element{
-				TagName: "span",
-				Attributes: []ast.Attribute{
-					{
-						Name:       "x-text",
-						Value:      expr,
-						Dynamic:    true,
-						IsAlpine:   true,
-						AlpineType: "text",
+				// Create a span with x-text for the expression
+				exprNode := &ast.Element{
+					TagName: "span",
+					Attributes: []ast.Attribute{
+						{
+							Name:       "x-text",
+							Value:      expr,
+							Dynamic:    true,
+							IsAlpine:   true,
+							AlpineType: "text",
+						},
 					},
-				},
-				Children:    []ast.Node{},
-				SelfClosing: false,
-			}
+					Children:    []ast.Node{},
+					SelfClosing: false,
+				}
 
-			result = append(result, exprNode)
+				result = append(result, exprNode)
+			}
 		}
 
 		lastIndex = match[1]

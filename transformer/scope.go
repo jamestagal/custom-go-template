@@ -11,6 +11,9 @@ import (
 
 // InitDataScope initializes the data scope with provided props
 func InitDataScope(props map[string]any) map[string]any {
+	log.Printf("[DIAGNOSTIC] ========== InitDataScope START ==========")
+	log.Printf("[DIAGNOSTIC] InitDataScope: received %d props", len(props))
+
 	// Create a new map to avoid modifying the original props
 	dataScope := make(map[string]any)
 
@@ -18,8 +21,18 @@ func InitDataScope(props map[string]any) map[string]any {
 	// Props need to be actual values for build-time loop expansion to work
 	for key, value := range props {
 		dataScope[key] = value
+		log.Printf("[DIAGNOSTIC] InitDataScope: copied prop '%s' (type=%T)", key, value)
+
+		// DIAGNOSTIC: Log arrays in detail
+		if key == "components" {
+			if arr, ok := value.([]interface{}); ok {
+				log.Printf("[DIAGNOSTIC] InitDataScope: ✓ 'components' is array with %d items", len(arr))
+			}
+		}
 	}
 
+	log.Printf("[DIAGNOSTIC] InitDataScope: returning dataScope with %d keys", len(dataScope))
+	log.Printf("[DIAGNOSTIC] ========== InitDataScope END ==========")
 	return dataScope
 }
 
@@ -37,6 +50,18 @@ func FindFenceSection(nodes []ast.Node) *ast.FenceSection {
 // CRITICAL FIX: Now uses parseValue() for consistent handling of JavaScript literals.
 // This ensures quoted arrays/objects like let animals = "[...]" are unwrapped properly.
 func CollectFenceData(fence *ast.FenceSection, dataScope map[string]any) {
+	log.Printf("[DIAGNOSTIC] ========== CollectFenceData START ==========")
+	log.Printf("[DIAGNOSTIC] CollectFenceData: dataScope has %d keys BEFORE processing fence", len(dataScope))
+
+	// DIAGNOSTIC: Check if components exists before fence processing
+	if componentsRaw, ok := dataScope["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[DIAGNOSTIC] CollectFenceData: ✓ 'components' exists BEFORE fence processing (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[DIAGNOSTIC] CollectFenceData: ✗ 'components' does NOT exist before fence processing")
+	}
+
 	// Process variables directly from the FenceSection struct
 	for _, variable := range fence.Variables {
 		varName := variable.Name
@@ -71,11 +96,25 @@ func CollectFenceData(fence *ast.FenceSection, dataScope map[string]any) {
 			} else {
 				dataScope[prop.Name] = nil
 			}
+		} else {
+			log.Printf("[CollectFenceData] Skipping prop '%s' - already in dataScope (from props)", prop.Name)
 		}
 	}
 
 	// Extract variables from raw content in the fence
 	extractVariablesFromExpr(fence.RawContent, dataScope)
+
+	// DIAGNOSTIC: Check if components still exists after fence processing
+	if componentsRaw, ok := dataScope["components"]; ok {
+		if components, ok := componentsRaw.([]interface{}); ok {
+			log.Printf("[DIAGNOSTIC] CollectFenceData: ✓ 'components' STILL exists after fence processing (%d items)", len(components))
+		}
+	} else {
+		log.Printf("[DIAGNOSTIC] CollectFenceData: ✗ 'components' LOST during fence processing!")
+	}
+
+	log.Printf("[DIAGNOSTIC] CollectFenceData: dataScope has %d keys AFTER processing fence", len(dataScope))
+	log.Printf("[DIAGNOSTIC] ========== CollectFenceData END ==========")
 }
 
 // CreateChildScope creates a new scope that inherits from the parent scope
@@ -227,6 +266,15 @@ func resolveNestedProperty(propertyPath string, dataScope map[string]any) any {
 // - Collection is nil → returns (nil, false)
 // - dataScope is nil → returns (nil, false)
 func resolveCollectionFromScope(collectionName string, dataScope map[string]any) ([]interface{}, bool) {
+	log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope START ==========")
+	log.Printf("[DIAGNOSTIC] resolveCollectionFromScope: looking for collection '%s'", collectionName)
+	log.Printf("[DIAGNOSTIC] resolveCollectionFromScope: dataScope has %d keys", len(dataScope))
+
+	// DIAGNOSTIC: Log all keys
+	for key := range dataScope {
+		log.Printf("[DIAGNOSTIC] resolveCollectionFromScope: - dataScope key: '%s'", key)
+	}
+
 	// Handle nil dataScope gracefully (COGNITIVE LOAD RULE: check nil)
 	if dataScope == nil {
 		log.Printf("resolveCollectionFromScope: dataScope is nil, cannot resolve '%s'", collectionName)
@@ -238,6 +286,7 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 
 	// Check if this is a nested property access (e.g., "category.items")
 	if strings.Contains(collectionName, ".") {
+		log.Printf("[DIAGNOSTIC] resolveCollectionFromScope: detected nested property path '%s'", collectionName)
 		value = resolveNestedProperty(collectionName, dataScope)
 		exists = (value != nil)
 		if !exists {
@@ -255,6 +304,7 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 			}
 			log.Printf("resolveCollectionFromScope: collection '%s' not found in dataScope, available keys: %v",
 				collectionName, availableKeys)
+			log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope END (NOT FOUND) ==========")
 			return nil, false
 		}
 	}
@@ -269,6 +319,7 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 	if array, ok := value.([]interface{}); ok {
 		log.Printf("resolveCollectionFromScope: successfully resolved collection '%s' with %d items ([]interface{})",
 			collectionName, len(array))
+		log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope END (SUCCESS) ==========")
 		return array, true
 	}
 
@@ -290,12 +341,14 @@ func resolveCollectionFromScope(collectionName string, dataScope map[string]any)
 
 		log.Printf("resolveCollectionFromScope: successfully resolved collection '%s' with %d items (%s)",
 			collectionName, length, valueType.String())
+		log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope END (SUCCESS via reflection) ==========")
 		return result, true
 	}
 
 	// Not a slice/array type
 	log.Printf("resolveCollectionFromScope: collection '%s' is not an array, got type %T",
 		collectionName, value)
+	log.Printf("[DIAGNOSTIC] ========== resolveCollectionFromScope END (NOT AN ARRAY) ==========")
 	return nil, false
 }
 
@@ -394,4 +447,318 @@ func deepEqual(a, b any) bool {
 
 	// Compare JSON representations
 	return string(aJSON) == string(bJSON)
+}
+
+// ============================================================================
+// PHASE 3: Runtime Variable Tracking for x-data Optimization
+// ============================================================================
+
+// RuntimeVarTracker tracks variables that need runtime evaluation by Alpine.js.
+// Variables that are only used at build-time (e.g., allContent for loop expansion)
+// should NOT be included in x-data to reduce page weight.
+//
+// Pattern: Runtime Variable Tracking [Cognitive Load: 8]
+//
+// Usage:
+//
+//	tracker := NewRuntimeVarTracker()
+//	// During transformation, track variables that remain in Alpine directives
+//	tracker.Track("photos")      // x-for="photo in photos"
+//	tracker.Track("published")   // x-if="published"
+//
+//	// When serializing x-data, filter to only tracked variables
+//	if tracker.IsTracked("allContent") {
+//	    // Include in x-data
+//	} else {
+//	    // Exclude - was only used at build-time
+//	}
+type RuntimeVarTracker struct {
+	vars map[string]bool
+}
+
+// NewRuntimeVarTracker creates a new tracker for runtime variables
+func NewRuntimeVarTracker() *RuntimeVarTracker {
+	return &RuntimeVarTracker{vars: make(map[string]bool)}
+}
+
+// Track records a variable as needing runtime evaluation.
+// Only the root variable name is tracked (e.g., "photos" from "photos.length").
+func (t *RuntimeVarTracker) Track(varName string) {
+	if varName == "" || t == nil {
+		return
+	}
+
+	// Only track the root variable (before any dots)
+	// e.g., "photos.length" → "photos"
+	root := strings.SplitN(varName, ".", 2)[0]
+
+	// Skip common loop iterator names that shouldn't be in x-data
+	// These are temporary variables from x-for directives
+	skipNames := map[string]bool{
+		"item": true, "index": true, "key": true, "value": true,
+		"i": true, "idx": true, "k": true, "v": true,
+		"component": true, "post": true, "photo": true,
+	}
+	if skipNames[root] {
+		return
+	}
+
+	t.vars[root] = true
+	log.Printf("[RuntimeVarTracker] Tracking variable: %s (from %s)", root, varName)
+}
+
+// TrackExpression extracts and tracks all variables from an expression.
+// Handles expressions like "photos && photos.length > 0" → tracks "photos"
+func (t *RuntimeVarTracker) TrackExpression(expr string) {
+	if expr == "" || t == nil {
+		return
+	}
+
+	// Extract variable-like tokens from the expression
+	// This is a simplified approach that handles most common cases
+	tokens := extractVariableTokens(expr)
+	for _, token := range tokens {
+		t.Track(token)
+	}
+}
+
+// IsTracked checks if a variable was tracked for runtime evaluation
+func (t *RuntimeVarTracker) IsTracked(varName string) bool {
+	if t == nil {
+		return true // If no tracker, include everything (safe default)
+	}
+	return t.vars[varName]
+}
+
+// GetTrackedVars returns all tracked variable names
+func (t *RuntimeVarTracker) GetTrackedVars() []string {
+	if t == nil {
+		return nil
+	}
+	result := make([]string, 0, len(t.vars))
+	for v := range t.vars {
+		result = append(result, v)
+	}
+	return result
+}
+
+// Snapshot returns a copy of the current tracker state.
+// Used to save state before component transformation.
+func (t *RuntimeVarTracker) Snapshot() map[string]bool {
+	if t == nil {
+		return make(map[string]bool)
+	}
+	snapshot := make(map[string]bool, len(t.vars))
+	for k, v := range t.vars {
+		snapshot[k] = v
+	}
+	return snapshot
+}
+
+// NewVarsSince returns variables tracked since a snapshot was taken.
+// This allows per-component tracking by comparing before/after states.
+func (t *RuntimeVarTracker) NewVarsSince(snapshot map[string]bool) []string {
+	if t == nil {
+		return nil
+	}
+	var newVars []string
+	for v := range t.vars {
+		if !snapshot[v] {
+			newVars = append(newVars, v)
+		}
+	}
+	return newVars
+}
+
+// FilterScopeWithSnapshot filters a dataScope using only variables tracked since snapshot.
+// This enables per-component x-data optimization.
+func (t *RuntimeVarTracker) FilterScopeWithSnapshot(dataScope map[string]any, snapshot map[string]bool) map[string]any {
+	if t == nil {
+		return dataScope
+	}
+
+	// Find variables tracked since snapshot
+	localVars := make(map[string]bool)
+	for v := range t.vars {
+		if !snapshot[v] {
+			localVars[v] = true
+		}
+	}
+
+	if len(localVars) == 0 {
+		// No new variables tracked during this component's transformation
+		// This means all expressions were resolved at build-time!
+		log.Printf("[RuntimeVarTracker] FilterScopeWithSnapshot: no new variables since snapshot (all build-time resolved)")
+		return make(map[string]any) // Return empty scope
+	}
+
+	filtered := make(map[string]any)
+
+	// First pass: include directly tracked variables (since snapshot)
+	for key, value := range dataScope {
+		if localVars[key] {
+			filtered[key] = value
+		}
+	}
+
+	// Second pass: for any getters/setters in filtered, also include their 'this.*' dependencies
+	additionalDeps := make(map[string]bool)
+	for key, value := range filtered {
+		if strVal, ok := value.(string); ok {
+			trimmed := strings.TrimSpace(strVal)
+			// Check if this is a getter or setter definition
+			if (strings.HasPrefix(trimmed, "get ") || strings.HasPrefix(trimmed, "set ")) &&
+				strings.Contains(trimmed, "(") && strings.Contains(trimmed, "{") {
+				// Extract 'this.*' references from the getter/setter body
+				deps := extractThisReferences(strVal)
+				for _, dep := range deps {
+					if _, exists := dataScope[dep]; exists && !localVars[dep] {
+						additionalDeps[dep] = true
+						log.Printf("[RuntimeVarTracker] Getter/setter '%s' depends on '%s' - adding to filtered scope", key, dep)
+					}
+				}
+			}
+		}
+	}
+
+	// Add the additional dependencies
+	for dep := range additionalDeps {
+		filtered[dep] = dataScope[dep]
+	}
+
+	log.Printf("[RuntimeVarTracker] FilterScopeWithSnapshot: %d → %d variables (local: %d, getter deps: %d)",
+		len(dataScope), len(filtered), len(localVars), len(additionalDeps))
+
+	return filtered
+}
+
+// FilterScope filters a dataScope to only include tracked runtime variables.
+// This is called before serializing to x-data to reduce page weight.
+// IMPORTANT: Also includes dependencies of getters/setters (things they reference via this.*)
+func (t *RuntimeVarTracker) FilterScope(dataScope map[string]any) map[string]any {
+	if t == nil || len(t.vars) == 0 {
+		// No tracking info, return original scope
+		return dataScope
+	}
+
+	filtered := make(map[string]any)
+
+	// First pass: include directly tracked variables
+	for key, value := range dataScope {
+		if t.IsTracked(key) {
+			filtered[key] = value
+		}
+	}
+
+	// Second pass: for any getters/setters in filtered, also include their 'this.*' dependencies
+	// This ensures getters like formattedJoinDate get their dependencies (user, formatDate, etc.)
+	additionalDeps := make(map[string]bool)
+	for key, value := range filtered {
+		if strVal, ok := value.(string); ok {
+			trimmed := strings.TrimSpace(strVal)
+			// Check if this is a getter or setter definition
+			if (strings.HasPrefix(trimmed, "get ") || strings.HasPrefix(trimmed, "set ")) &&
+				strings.Contains(trimmed, "(") && strings.Contains(trimmed, "{") {
+				// Extract 'this.*' references from the getter/setter body
+				deps := extractThisReferences(strVal)
+				for _, dep := range deps {
+					if _, exists := dataScope[dep]; exists && !t.IsTracked(dep) {
+						additionalDeps[dep] = true
+						log.Printf("[RuntimeVarTracker] Getter/setter '%s' depends on '%s' - adding to filtered scope", key, dep)
+					}
+				}
+			}
+		}
+	}
+
+	// Add the additional dependencies
+	for dep := range additionalDeps {
+		filtered[dep] = dataScope[dep]
+	}
+
+	log.Printf("[RuntimeVarTracker] FilterScope: %d → %d variables (removed %d build-time-only, added %d getter deps)",
+		len(dataScope), len(filtered), len(dataScope)-len(filtered)+len(additionalDeps), len(additionalDeps))
+
+	return filtered
+}
+
+// extractThisReferences extracts variable names referenced via 'this.*' in a string
+// For example, "this.formatDate(this.user.joinDate)" returns ["formatDate", "user"]
+func extractThisReferences(s string) []string {
+	var refs []string
+	seen := make(map[string]bool)
+
+	// Simple pattern matching for this.varName
+	for i := 0; i < len(s)-5; i++ {
+		if s[i:i+5] == "this." {
+			// Extract the variable name after "this."
+			start := i + 5
+			end := start
+			for end < len(s) && (isAlphaNumeric(s[end]) || s[end] == '_') {
+				end++
+			}
+			if end > start {
+				varName := s[start:end]
+				if !seen[varName] {
+					seen[varName] = true
+					refs = append(refs, varName)
+				}
+			}
+		}
+	}
+
+	return refs
+}
+
+// isAlphaNumeric checks if a byte is a letter or digit
+func isAlphaNumeric(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}
+
+// extractVariableTokens extracts variable-like tokens from an expression.
+// Returns tokens that look like variable names (start with letter/underscore).
+// Pattern: Token Extraction [Cognitive Load: 8]
+func extractVariableTokens(expr string) []string {
+	var tokens []string
+	var current strings.Builder
+
+	for i := 0; i < len(expr); i++ {
+		ch := expr[i]
+
+		// Start of a potential identifier
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_' || ch == '$' {
+			current.WriteByte(ch)
+
+			// Continue reading the identifier
+			for i+1 < len(expr) {
+				next := expr[i+1]
+				if (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') ||
+					(next >= '0' && next <= '9') || next == '_' || next == '.' {
+					i++
+					current.WriteByte(next)
+				} else {
+					break
+				}
+			}
+
+			token := current.String()
+			current.Reset()
+
+			// Skip JavaScript keywords and literals
+			skipKeywords := map[string]bool{
+				"true": true, "false": true, "null": true, "undefined": true,
+				"this": true, "new": true, "typeof": true, "instanceof": true,
+				"if": true, "else": true, "for": true, "while": true,
+				"return": true, "function": true, "const": true, "let": true, "var": true,
+				"$store": true, "$el": true, "$refs": true, "$data": true,
+			}
+
+			// Skip if it's a keyword or starts with $store (Alpine magic)
+			if !skipKeywords[token] && !strings.HasPrefix(token, "$store.") {
+				tokens = append(tokens, token)
+			}
+		}
+	}
+
+	return tokens
 }

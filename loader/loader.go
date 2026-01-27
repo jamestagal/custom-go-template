@@ -207,6 +207,67 @@ func LoadComponentContent(routePath, componentName string) (map[string]interface
 	return fields, nil
 }
 
+// ExtractAllComponentNames extracts all component names from JSON content data.
+// If the JSON has a "components" array, it returns all component names.
+// Returns empty slice if no components found or if not a collection type.
+//
+// Example:
+//
+//	data := map[string]interface{}{
+//	  "components": []interface{}{
+//	    map[string]interface{}{"name": "hero2436", "fields": {...}},
+//	    map[string]interface{}{"name": "services2437", "fields": {...}},
+//	  },
+//	}
+//	names := ExtractAllComponentNames(data)
+//	// returns: []string{"hero2436", "services2437"}
+//
+// Cognitive Load: 8
+func ExtractAllComponentNames(data map[string]interface{}) []string {
+	if data == nil {
+		return []string{}
+	}
+
+	// Check if this is a collection type
+	componentsRaw, ok := data["components"]
+	if !ok {
+		return []string{}
+	}
+
+	// Type assert to array
+	components, ok := componentsRaw.([]interface{})
+	if !ok {
+		log.Printf("ExtractAllComponentNames: 'components' is not an array, got %T", componentsRaw)
+		return []string{}
+	}
+
+	// Collect all component names
+	names := make([]string, 0, len(components))
+	for _, compRaw := range components {
+		comp, ok := compRaw.(map[string]interface{})
+		if !ok {
+			log.Printf("ExtractAllComponentNames: component item is not a map, got %T", compRaw)
+			continue
+		}
+
+		// Get name
+		nameRaw, ok := comp["name"]
+		if !ok {
+			continue
+		}
+
+		name, ok := nameRaw.(string)
+		if !ok {
+			log.Printf("ExtractAllComponentNames: component name is not a string, got %T", nameRaw)
+			continue
+		}
+
+		names = append(names, name)
+	}
+
+	return names
+}
+
 // GetAbsoluteContentPath converts a relative content path to absolute path.
 // Useful for resolving paths from the project root.
 //

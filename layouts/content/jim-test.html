@@ -10,6 +10,7 @@ prop name = "Benjamin"
 prop age = 55
 prop animals = ["dog", "cat", "bird"]
 prop newAnimal = ""
+prop buildTime = ""
 
 let salutation = "Hello"
 let path = "../components/userprofile.html"
@@ -61,12 +62,13 @@ let currentNotification = null
 
   <Header />
 
-  <main style="padding: 2rem;">
-     <div style="background-color: #f0f0f0; padding: 0.5rem 1rem; border-radius: 0.25rem; margin-bottom: 1rem; font-size: 0.875rem; color: #666;">
-      ⚡ Build time: <strong>{buildTime}</strong>
-    </div>
+  <main>
+    <div class="text-content-container">
+      <div style="background-color: #f0f0f0; padding: 0.5rem 1rem; border-radius: 0.25rem; margin-bottom: 1rem; font-size: 0.875rem; color: #666;">
+        ⚡ Build time: <strong>{buildTime}</strong>
+      </div>
 
-    <h1>{salutation} {name}!</h1>
+      <h1>{salutation} {name}!</h1>
 
     <!-- Basic conditionals -->
     {if name.length > 3}
@@ -173,6 +175,7 @@ let currentNotification = null
         {/if}
       </div>
     {/if}
+    </div>
   </main>
 
   <Footer-old />
@@ -180,6 +183,13 @@ let currentNotification = null
 </html>
 
 <style>
+  /* Content container for text-heavy pages */
+  .text-content-container {
+    max-width: 80rem;
+    margin: 0 auto;
+    /* padding: 10rem 2rem 2rem 2rem; */
+  }
+
   /* Header styles */
   .header {
     background-color: #f8f9fa;

@@ -1,0 +1,38 @@
+---
+export let salutation, name, age
+---
+
+<div class="text-content-container">
+  <div style="background-color: #f0f0f0; padding: 0.5rem 1rem; border-radius: 0.25rem; margin-bottom: 1rem; font-size: 0.875rem; color: #666;">
+    ⚡ Build time: <strong>{buildTime}</strong>
+  </div>
+
+  <h1>{salutation} {name}!</h1>
+
+  <!-- Basic conditionals -->
+  {if name.length > 3}
+    <div id="praise">{name} is a long name</div>
+    {if age > 1}
+      <div>Has been born</div>
+    {/if}
+  {else if name.length == 2}
+    <div id="praise">{name} is medium</div>
+  {else}
+    <div id="praise">{name} is a short name</div>
+  {/if}
+</div>
+
+<style>
+  .text-content-container {
+    max-width: 80rem;
+    margin: 0 auto;
+    /* padding: 10rem 2rem 2rem 2rem; */
+  }
+  h1 {
+    color: orange;
+  }
+  #praise {
+    font-size: 2rem;
+    color: green;
+  }
+</style>

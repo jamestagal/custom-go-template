@@ -84,7 +84,8 @@ func TestTransformConditionalWithStoreExpression(t *testing.T) {
 			contains: []string{
 				`<template x-if="$store.auth.isLoggedIn"`,
 				`Logged in`,
-				`<template x-else`,
+				// Alpine.js 3.x: else uses negated x-if
+				`<template x-if="!($store.auth.isLoggedIn)"`,
 				`Please log in`,
 			},
 		},
@@ -111,8 +112,9 @@ func TestTransformConditionalWithStoreExpression(t *testing.T) {
 				`Admin panel`,
 				`(!($store.user.role === 'admin')) && ($store.user.role === 'moderator')`, // Note: extra parens are added by conditionals.go
 				`Moderator panel`,
-				// Updated: Alpine.js 3.x uses x-else directive, not explicit negation
-				`<template x-else`,
+				// Alpine.js 3.x: else uses negated all previous conditions
+				// Note: output format is !(...) && !(...) without outer parens around each negation
+				`!($store.user.role === 'admin') && !($store.user.role === 'moderator')`,
 				`User panel`,
 			},
 		},
@@ -245,9 +247,10 @@ func TestNestedConditionalWithStoreExpressions(t *testing.T) {
 				`<template x-if="$store.auth.isLoggedIn"`,
 				`<template x-if="$store.user.isPremium"`,
 				`Premium features available`,
-				`<template x-else`,
+				// Alpine.js 3.x: else uses negated x-if
+				`<template x-if="!($store.user.isPremium)"`,
 				`Standard features`,
-				`<template x-else`,
+				`<template x-if="!($store.auth.isLoggedIn)"`,
 				`Please log in`,
 			},
 		},
@@ -269,9 +272,9 @@ func TestNestedConditionalWithStoreExpressions(t *testing.T) {
 					},
 				},
 			},
-			dataScope: map[string]any{
-				"role": "admin",
-			},
+			// NOTE: Don't include role in dataScope to force runtime x-if generation
+			// If role is in dataScope with a value, the conditional is resolved at build-time
+			dataScope: map[string]any{},
 			contains: []string{
 				`<template x-if="$store.auth.isLoggedIn"`,
 				`<template x-if="role === 'admin'"`,
@@ -325,9 +328,8 @@ func TestStoreExpressionInConditionalContent(t *testing.T) {
 					&ast.TextNode{Content: "!"},
 				},
 			},
-			dataScope: map[string]any{
-				"isVisible": true,
-			},
+			// NOTE: Don't include isVisible in dataScope to force runtime x-if generation
+			dataScope: map[string]any{},
 			contains: []string{
 				`<template x-if="isVisible"`,
 				`Welcome, `,

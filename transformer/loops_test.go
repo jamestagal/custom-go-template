@@ -133,13 +133,13 @@ func TestTransformLoop(t *testing.T) {
 				`<template x-for="item in items"`,
 				`<template x-if="item.active">`,
 				`<span x-text="item.name"></span> (Active)`,
-				// FIXED: Alpine.js does NOT support x-else, uses negated x-if instead
-				`<template x-else>`,
+				// Alpine.js 3.x: else uses negated x-if
+				`<template x-if="!(item.active)"`,
 				`<span x-text="item.name"></span>`,
 			},
 			notContains: []string{
-				// FIXED: Ensure we're NOT using non-existent x-else
-				`x-else"`,
+				// Alpine.js 3.x doesn't support x-else directive
+				`<template x-else`,
 			},
 		},
 		{

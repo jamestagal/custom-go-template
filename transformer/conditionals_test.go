@@ -23,9 +23,9 @@ func TestTransformConditional(t *testing.T) {
 					&ast.TextNode{Content: "This is active"},
 				},
 			},
-			dataScope: map[string]any{
-				"isActive": true,
-			},
+			// NOTE: Don't include isActive in dataScope to force runtime x-if generation
+			// If isActive is in dataScope with a value, the conditional is resolved at build-time
+			dataScope: map[string]any{},
 			contains: []string{
 				`<template x-if="isActive"`,
 				`This is active`,
@@ -42,19 +42,19 @@ func TestTransformConditional(t *testing.T) {
 					&ast.TextNode{Content: "This is inactive"},
 				},
 			},
-			dataScope: map[string]any{
-				"isActive": false,
-			},
+			// NOTE: Don't include isActive in dataScope to force runtime x-if generation
+			// If isActive is in dataScope, the conditional is resolved at build-time
+			dataScope: map[string]any{},
 			contains: []string{
 				`<template x-if="isActive"`,
 				`This is active`,
-				// Alpine.js does NOT support x-else, so we use negated x-if
-				`<template x-else`,
+				// Alpine.js 3.x: else uses negated x-if
+				`<template x-if="!(isActive)"`,
 				`This is inactive`,
 			},
 			notContains: []string{
-				// Ensure we're NOT using non-existent x-else
-				`x-else"`,
+				// Alpine.js 3.x doesn't support x-else directive
+				`<template x-else`,
 			},
 		},
 		{
@@ -74,23 +74,23 @@ func TestTransformConditional(t *testing.T) {
 					&ast.TextNode{Content: "Inactive"},
 				},
 			},
-			dataScope: map[string]any{
-				"status": "pending",
-			},
+			// NOTE: Don't include status in dataScope to force runtime evaluation
+			dataScope: map[string]any{},
 			contains: []string{
 				`<template x-if="status === 'active'"`,
 				`Active`,
-				// Alpine.js does NOT support x-else-if, so we use negated x-if
+				// Alpine.js 3.x: else-if uses combined negated x-if
 				`<template x-if="(!(status === 'active')) && (status === 'pending')"`,
 				`Pending`,
-				// else branch uses negated ALL previous conditions
-				`<template x-else`,
+				// Alpine.js 3.x: else uses negated all previous conditions
+				// Note: output format is !(x) && !(y) without extra parens
+				`!(status === 'active') && !(status === 'pending')`,
 				`Inactive`,
 			},
 			notContains: []string{
-				// Ensure we're NOT using non-existent x-else-if or x-else
+				// Alpine.js 3.x doesn't support x-else-if or x-else directives
 				`x-else-if`,
-				`x-else"`,
+				`<template x-else`,
 			},
 		},
 	}
@@ -159,9 +159,8 @@ func TestTransformConditionalEdgeCases(t *testing.T) {
 					},
 				},
 			},
-			dataScope: map[string]any{
-				"showContent": true,
-			},
+			// NOTE: Don't include showContent in dataScope to force runtime x-if generation
+			dataScope: map[string]any{},
 			contains: []string{
 				`<template x-if="showContent"`,
 				`<div>`,

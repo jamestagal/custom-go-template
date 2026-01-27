@@ -115,40 +115,28 @@ func TestConditionalInLoopTransformation(t *testing.T) {
 		}
 	}
 
-	// UPDATED: With build-time loop expansion, we expect the loop to be fully expanded
-	// With animals=["cat", "dog"], we should get 2 iterations worth of content:
-	// Iteration 1 (animal="cat"): conditional + SIBLING div
-	// Iteration 2 (animal="dog"): conditional + SIBLING div
-	//
-	// Each conditional will generate templates (x-if/x-else), so we expect:
-	// - Multiple template elements (from conditionals)
-	// - Multiple div elements (SIBLING divs from each iteration)
+	// UPDATED: With build-time loop AND conditional expansion, we expect:
+	// - Loop fully expanded: 2 iterations for animals=["cat", "dog"]
+	// - Conditionals fully resolved at build-time:
+	//   - Iteration 1 (animal="cat"): condition true → <div>Hi</div> + <div>SIBLING</div>
+	//   - Iteration 2 (animal="dog"): condition false → <div>Bye</div> + <div>SIBLING</div>
+	// - No template elements (x-if) because conditionals are resolved at build-time
 
-	templateCount := 0
-	siblingDivCount := 0
-
+	divCount := 0
 	for _, node := range transformedTemplate.RootNodes {
 		if elem, ok := node.(*ast.Element); ok {
-			if elem.TagName == "template" {
-				// These are conditional templates from build-time expanded iterations
-				templateCount++
-			}
 			if elem.TagName == "div" {
-				// Check if this might be a SIBLING div (directly in root, not wrapped)
-				siblingDivCount++
+				divCount++
 			}
 		}
 	}
 
-	// With 2 iterations, each having a conditional (which produces template elements)
-	// and a SIBLING div, we expect at least some templates and divs
-	if templateCount == 0 {
-		t.Errorf("Expected some template elements from build-time expanded conditionals, got %d", templateCount)
+	// With 2 iterations, each producing 2 divs (conditional result + SIBLING), we expect 4 divs total
+	if divCount != 4 {
+		t.Errorf("Expected 4 div elements from build-time expanded loop+conditionals, got %d", divCount)
 	}
 
-	// We should have SIBLING divs from the loop iterations
-	// With 2 iterations, we expect 2 SIBLING divs (unless they're wrapped)
-	log.Printf("\n[TEST] Found %d template elements and %d divs in expanded output", templateCount, siblingDivCount)
+	log.Printf("\n[TEST] Found %d div elements in expanded output (expected 4: Hi, SIBLING, Bye, SIBLING)", divCount)
 
 	// Additional validation: check for "SIBLING" text in the output
 	// This validates that the SIBLING div was preserved during expansion

@@ -47,8 +47,8 @@ let name = "John"
 				},
 			},
 			props: map[string]any{},
-			// Updated: No x-data wrapper (Phase 1 optimization - body provides scope)
-			expected: `<div><h1>Hello, <span x-text="name"></span>!</h1><button>Count: <span x-text="count"></span></button></div>`,
+			// Updated: Build-time resolution for fence variables
+			expected: `<div><h1>Hello, John!</h1><button>Count: 0</button></div>`,
 		},
 		{
 			name: "Data Wrapper with Props",
@@ -80,8 +80,8 @@ let count = 0
 			props: map[string]any{
 				"name": "Alice",
 			},
-			// Updated: No x-data wrapper (Phase 1 optimization)
-			expected: `<div><h1>Hello, <span x-text="name"></span>!</h1><button>Count: <span x-text="count"></span></button></div>`,
+			// Updated: Build-time resolution for fence variables and props
+			expected: `<div><h1>Hello, Alice!</h1><button>Count: 0</button></div>`,
 		},
 		{
 			name: "Complex Data Structure",
@@ -118,8 +118,8 @@ let items = ["apple", "banana", "orange"]
 				},
 			},
 			props: map[string]any{},
-			// Updated: No x-data wrapper (Phase 1 optimization)
-			expected: `<div><h1>User: <span x-text="user.name"></span>, Age: <span x-text="user.age"></span></h1><ul><li>First item: <span x-text="items[0]"></span></li></ul></div>`,
+			// Updated: user.name resolves at build-time, user.age and items[0] remain runtime
+			expected: `<div><h1>User: John, Age: <span x-text="user.age"></span></h1><ul><li>First item: <span x-text="items[0]"></span></li></ul></div>`,
 		},
 		{
 			name: "Function Expressions",
@@ -148,8 +148,8 @@ let count = 0
 				},
 			},
 			props: map[string]any{},
-			// Updated: No x-data wrapper (Phase 1 optimization)
-			expected: `<div><button>Increment</button><p>Count: <span x-text="count"></span></p></div>`,
+			// Updated: count resolves at build-time to initial value
+			expected: `<div><button>Increment</button><p>Count: 0</p></div>`,
 		},
 		{
 			name: "Nested Variables Detection",
@@ -198,8 +198,8 @@ let count = 0
 			props: map[string]any{
 				"showReset": true,
 			},
-			// Updated: No x-data wrapper + x-else (Alpine.js 3.x)
-			expected: `<div><template x-if="count > 0"><p>Count is positive: <span x-text="count"></span></p></template><template x-else><div><p>Count is zero: <span x-text="count"></span></p><template x-if="showReset"><button>Reset</button></template></div></template></div>`,
+			// Updated: count resolves at build-time, showReset conditional resolved at build-time (true = inline content)
+			expected: `<div><template x-if="count > 0"><p>Count is positive: 0</p></template><template x-if="!(count > 0)"><div><p>Count is zero: 0</p><button>Reset</button></div></template></div>`,
 		},
 	}
 

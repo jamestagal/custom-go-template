@@ -198,10 +198,23 @@ func IsSimpleVariable(expr string) bool {
 // TryResolveBuildTimeValue attempts to resolve an expression to a build-time value
 // Returns (value, true) if the expression is resolvable at build time
 // Returns ("", false) if the expression needs runtime evaluation
-// Cognitive Load: 6 (scope lookup + type checking)
+// Cognitive Load: 12 (scope lookup + property navigation + type checking)
 // EXPORTED for testing
 func TryResolveBuildTimeValue(expr string, dataScope map[string]any) (string, bool) {
-	// Only resolve simple variables (not complex expressions)
+	expr = strings.TrimSpace(expr)
+
+	// Handle fallback operator (||) at build-time
+	// Example: "post.fields.title || 'Untitled'" → try main value, use fallback if falsy
+	if strings.Contains(expr, "||") {
+		return tryResolveFallbackExpression(expr, dataScope)
+	}
+
+	// Handle property access expressions like "card.icon.src"
+	if strings.Contains(expr, ".") {
+		return tryResolvePropertyAccess(expr, dataScope)
+	}
+
+	// Only resolve simple variables (not complex expressions with operators)
 	if !IsSimpleVariable(expr) {
 		logExpressionDebug("Expression '{%s}' → RUNTIME: Complex expression (not a simple variable)", expr)
 		return "", false
@@ -220,14 +233,156 @@ func TryResolveBuildTimeValue(expr string, dataScope map[string]any) (string, bo
 		return "", false
 	}
 
-
 	// FIX 3: Check if value is a reactive variable reference (__VAR_REF__ or __PROP__ marker)
 	// These should remain dynamic for Alpine.js, not interpolated at build-time
 	if strVal, ok := value.(string); ok && (strings.HasPrefix(strVal, "__VAR_REF__") || strings.HasPrefix(strVal, "__PROP__")) {
 		logExpressionDebug("Expression '{%s}' → RUNTIME: Value is reactive (marked with prefix)", expr)
 		return "", false
 	}
+
+	// FIX: Check if value is a getter/setter definition - these need runtime 'this' context
+	// Getter/setter definitions look like: "get name() { ... }" or "set name(value) { ... }"
+	if strVal, ok := value.(string); ok {
+		trimmed := strings.TrimSpace(strVal)
+		if (strings.HasPrefix(trimmed, "get ") || strings.HasPrefix(trimmed, "set ")) &&
+			strings.Contains(trimmed, "(") && strings.Contains(trimmed, "{") {
+			logExpressionDebug("Expression '{%s}' → RUNTIME: Value is getter/setter definition", expr)
+			return "", false
+		}
+		// Also check for function definitions that reference 'this'
+		if strings.HasPrefix(trimmed, "function") && strings.Contains(trimmed, "this.") {
+			logExpressionDebug("Expression '{%s}' → RUNTIME: Value is function with 'this' reference", expr)
+			return "", false
+		}
+	}
+
 	// Resolve to string value
+	return convertValueToString(value, expr)
+}
+
+// tryResolvePropertyAccess resolves property access expressions like "card.icon.src"
+// by navigating through nested objects in the dataScope
+// Also handles optional chaining (?.) by converting to regular property access
+// Cognitive Load: 10 (property navigation + type assertions)
+func tryResolvePropertyAccess(expr string, dataScope map[string]any) (string, bool) {
+	// Handle optional chaining (?.) by converting to regular property access
+	// JavaScript's ?. returns undefined for missing properties, which we handle gracefully
+	expr = strings.ReplaceAll(expr, "?.", ".")
+
+	parts := strings.Split(expr, ".")
+	if len(parts) < 2 {
+		return "", false
+	}
+
+	// Get the base variable from dataScope
+	baseVar := parts[0]
+	value, exists := dataScope[baseVar]
+	if !exists {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Base variable '%s' not in dataScope", expr, baseVar)
+		return "", false
+	}
+
+	// If base value is nil, it's a runtime-only variable (e.g., loop variable marker)
+	if value == nil {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Base variable '%s' is nil (loop variable marker)", expr, baseVar)
+		return "", false
+	}
+
+	// Navigate through the property chain
+	current := value
+	for i := 1; i < len(parts); i++ {
+		prop := parts[i]
+
+		// Current value must be a map to access properties
+		currentMap, ok := current.(map[string]interface{})
+		if !ok {
+			logExpressionDebug("Expression '{%s}' → RUNTIME: Cannot access property '%s' on non-map type %T", expr, prop, current)
+			return "", false
+		}
+
+		// Get the property value
+		propValue, exists := currentMap[prop]
+		if !exists {
+			logExpressionDebug("Expression '{%s}' → RUNTIME: Property '%s' not found in object", expr, prop)
+			return "", false
+		}
+
+		current = propValue
+	}
+
+	// Convert final value to string
+	return convertValueToString(current, expr)
+}
+
+// tryResolveFallbackExpression handles expressions with || fallback operator
+// Example: "post.fields.title || 'Untitled'" → resolves to title value or 'Untitled'
+// Example: "post.fields.publish?.date || ''" → resolves to date value or ''
+// Cognitive Load: 12 (string parsing + recursive resolution)
+func tryResolveFallbackExpression(expr string, dataScope map[string]any) (string, bool) {
+	// Split on || operator
+	parts := strings.SplitN(expr, "||", 2)
+	if len(parts) != 2 {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Invalid fallback syntax", expr)
+		return "", false
+	}
+
+	mainExpr := strings.TrimSpace(parts[0])
+	fallbackExpr := strings.TrimSpace(parts[1])
+
+	// Handle optional chaining (?.) by converting to regular property access
+	// JavaScript's ?. returns undefined for missing properties, which we treat as falsy
+	mainExpr = strings.ReplaceAll(mainExpr, "?.", ".")
+
+	// Try to resolve the main expression
+	mainValue, resolvable := tryResolvePropertyAccess(mainExpr, dataScope)
+
+	if resolvable && mainValue != "" {
+		logExpressionDebug("Expression '{%s}' → BUILD-TIME: Main value resolved to %q", expr, mainValue)
+		return mainValue, true
+	}
+
+	// Main value is falsy/missing, use fallback
+	// Parse the fallback - it could be a string literal or another expression
+
+	// Check if fallback is a string literal (single or double quotes)
+	fallbackExpr = strings.TrimSpace(fallbackExpr)
+	if (strings.HasPrefix(fallbackExpr, "'") && strings.HasSuffix(fallbackExpr, "'")) ||
+		(strings.HasPrefix(fallbackExpr, "\"") && strings.HasSuffix(fallbackExpr, "\"")) {
+		// String literal - extract the value (remove quotes)
+		fallbackValue := fallbackExpr[1 : len(fallbackExpr)-1]
+		logExpressionDebug("Expression '{%s}' → BUILD-TIME: Using fallback literal %q", expr, fallbackValue)
+		return fallbackValue, true
+	}
+
+	// Fallback might be another property access or variable
+	if strings.Contains(fallbackExpr, ".") {
+		if fallbackValue, resolvable := tryResolvePropertyAccess(fallbackExpr, dataScope); resolvable {
+			logExpressionDebug("Expression '{%s}' → BUILD-TIME: Using fallback property %q", expr, fallbackValue)
+			return fallbackValue, true
+		}
+	}
+
+	// Check if it's a simple variable in scope
+	if value, exists := dataScope[fallbackExpr]; exists && value != nil {
+		if resolved, ok := convertValueToString(value, fallbackExpr); ok {
+			logExpressionDebug("Expression '{%s}' → BUILD-TIME: Using fallback variable %q", expr, resolved)
+			return resolved, true
+		}
+	}
+
+	// Cannot resolve fallback at build-time
+	logExpressionDebug("Expression '{%s}' → RUNTIME: Cannot resolve fallback %q", expr, fallbackExpr)
+	return "", false
+}
+
+// convertValueToString converts a value to its string representation for build-time interpolation
+// Cognitive Load: 6 (type switch)
+func convertValueToString(value any, expr string) (string, bool) {
+	if value == nil {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Value is nil", expr)
+		return "", false
+	}
+
 	switch v := value.(type) {
 	case string:
 		return v, true
@@ -404,6 +559,7 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 	transformedAttributes := make([]ast.Attribute, 0, len(attributes))
 
 	for _, attr := range attributes {
+
 		// CRITICAL FIX: Track Alpine store references before skipping
 		// This handles @click="$store.theme.setLight()" style references
 		if attr.IsAlpine && strings.Contains(attr.Value, "$store.") {
@@ -442,8 +598,35 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 			continue
 		}
 
-		// Skip already dynamic attributes (unless they contain store expressions)
-		if attr.Dynamic && !strings.Contains(attr.Value, "$") {
+		// CRITICAL FIX: For attributes with expression syntax, try build-time resolution first
+		// This handles loop variables like {card.icon.src} that should be interpolated at build-time
+		// NOTE: We check hasExpressionSyntax REGARDLESS of Dynamic flag due to parser bug
+		// (parser parseAttributeValue has contradictory condition that never triggers expression detection)
+		if hasExpressionSyntax(attr.Value) && !strings.Contains(attr.Value, "$") {
+			// Extract expression from {expression} syntax
+			expression := strings.TrimSpace(attr.Value)
+			expression = strings.TrimPrefix(expression, "{")
+			expression = strings.TrimSuffix(expression, "}")
+
+			// Try to resolve at build-time (handles property access like card.icon.src)
+			if resolvedValue, resolvable := TryResolveBuildTimeValue(expression, dataScope); resolvable {
+				logExpressionDebug("Attribute '%s': interpolating {%s} → %q (build-time)", attr.Name, expression, resolvedValue)
+				transformedAttr := ast.Attribute{
+					Name:       attr.Name,
+					Value:      resolvedValue,
+					Dynamic:    false, // Now a static value
+					IsAlpine:   false,
+					AlpineType: "",
+					AlpineKey:  "",
+				}
+				transformedAttributes = append(transformedAttributes, transformedAttr)
+				continue
+			}
+			// Fall through to standard processing if not resolvable
+		}
+
+		// Skip already dynamic attributes without expression syntax (unless they contain store expressions)
+		if attr.Dynamic && !hasExpressionSyntax(attr.Value) && !strings.Contains(attr.Value, "$") {
 			transformedAttributes = append(transformedAttributes, attr)
 			continue
 		}
@@ -515,7 +698,6 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 				// If so, interpolate the value instead of creating a runtime binding
 				if resolvedValue, resolvable := TryResolveBuildTimeValue(expression, dataScope); resolvable {
 					// Build-time interpolation: replace {description} with the actual value
-					log.Printf("[BUILD-TIME] Interpolating {%s} → %q", expression, resolvedValue)
 					logExpressionDebug("Attribute '%s' expression '{%s}' → BUILD-TIME", attr.Name, expression)
 					logExpressionDebug("  ↳ Resolved value: %q", resolvedValue)
 					transformedAttr := ast.Attribute{
@@ -531,6 +713,12 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 					// Runtime expression: create Alpine.js binding
 					// Extract variables from expression to data scope
 					extractVariablesFromExpr(expression, dataScope)
+
+					// Track variables for x-data optimization
+					// Only variables in runtime expressions need to be in x-data
+					if runtimeTracker != nil {
+						runtimeTracker.TrackExpression(expression)
+					}
 
 					// Determine whether this is an Alpine directive
 					isAlpine := strings.HasPrefix(attr.Name, "x-") || strings.HasPrefix(attr.Name, "@")
@@ -671,6 +859,12 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 
 				// Combine all parts with + operator
 				combinedExpression := strings.Join(expressionParts, " + ")
+
+				// Track variables for x-data optimization
+				// Only variables in runtime expressions need to be in x-data
+				if runtimeTracker != nil {
+					runtimeTracker.TrackExpression(combinedExpression)
+				}
 
 				// Debug logging for mixed content
 				logExpressionDebug("Attribute '%s' mixed content (static + expressions) → RUNTIME", attr.Name)

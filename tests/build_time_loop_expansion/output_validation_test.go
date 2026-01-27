@@ -39,14 +39,17 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 				},
 			},
 			expectedContains: []string{
-				`<div class="item">`,      // Component structure
-				`x-text="item.name"`,      // Alpine directive (we use Alpine, not raw text)
+				`<div class="item">`,  // Component structure
+				// Build-time expression resolution: values resolved at build-time
+				"First",
+				"Second",
+				"Third",
 			},
 			shouldNotContain: []string{
 				`<template x-for`,  // No runtime loops
 				`x-for="`,          // No x-for attributes
 			},
-			description: "Simple loop should expand to separate divs (no x-for template)",
+			description: "Simple loop should expand to separate divs with resolved values",
 		},
 		{
 			name: "component_loop_with_fields",
@@ -69,12 +72,14 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 			},
 			expectedContains: []string{
 				`<div>`,
-				`x-text="comp.fields.title"`,
+				// Build-time expression resolution: nested fields resolved
+				"Welcome",
+				"Copyright 2024",
 			},
 			shouldNotContain: []string{
 				`<template x-for`,
 			},
-			description: "Loop with nested field access should expand at build time",
+			description: "Loop with nested field access should expand at build time with resolved values",
 		},
 		{
 			name: "nested_loops",
@@ -93,12 +98,15 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 			},
 			expectedContains: []string{
 				`<span>`,
-				`x-text="item"`,
+				// Build-time expression resolution: all items resolved
+				"A1",
+				"A2",
+				"B1",
 			},
 			shouldNotContain: []string{
 				`<template x-for`,  // Both loops should expand at build time
 			},
-			description: "Nested loops should both expand at build time",
+			description: "Nested loops should both expand at build time with resolved values",
 		},
 		{
 			name: "loop_with_conditionals",
@@ -112,13 +120,16 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 			},
 			expectedContains: []string{
 				`<div>`,
-				`x-text="item.name"`,
-				`<template x-if="item.active">`,  // Conditional is runtime (depends on loop variable)
+				// Build-time resolution: both loop AND conditionals resolved
+				// Only active items appear (Inactive Item is excluded)
+				"Active Item",
+				"Another Active",
 			},
 			shouldNotContain: []string{
 				`x-for="item in items"`,  // Loop itself should be build-time expanded
+				"Inactive Item",          // This item should be excluded by conditional
 			},
-			description: "Loop expands at build time, conditionals stay runtime",
+			description: "Loop and conditionals both resolve at build time",
 		},
 		{
 			name: "component_loop_with_text_expressions",
@@ -132,13 +143,16 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 			expectedContains: []string{
 				`<h1>`,
 				`<p>`,
-				`x-text="item.title"`,
-				`x-text="item.description"`,
+				// Build-time expression resolution: all values resolved
+				"First Title",
+				"First desc",
+				"Second Title",
+				"Second desc",
 			},
 			shouldNotContain: []string{
 				`<template x-for`,
 			},
-			description: "Mix of text expressions in loop should expand at build time",
+			description: "Mix of text expressions in loop should expand at build time with resolved values",
 		},
 	}
 
@@ -570,10 +584,9 @@ func TestOutputValidation_SvelteComparison(t *testing.T) {
 				t.Error("Our build-time expansion should not contain x-for (like Svelte has no loops)")
 			}
 
-			// 3. Should have Alpine directives (our difference from Svelte)
-			if !strings.Contains(markup, "x-text") && !strings.Contains(markup, "x-bind:class") {
-				t.Error("Expected Alpine directives (x-text or x-bind) in our output")
-			}
+			// 3. With build-time expression resolution, our output matches Svelte's exactly
+			// No Alpine directives needed when data is fully available at build-time
+			// This is actually better than the old behavior - we produce static HTML like Svelte
 		})
 	}
 }
