@@ -60,11 +60,9 @@ func TestNestedStructuresTransformation(t *testing.T) {
 					},
 				},
 			},
-			props: map[string]any{
-				"level1": true,
-				"level2": true,
-				"level3": false,
-			},
+			// NOTE: Don't provide boolean values in props to test RUNTIME x-if generation
+			// When condition values are in props, build-time conditional elimination kicks in
+			props: map[string]any{},
 			contains: []string{
 				`<div class="nested-conditionals">`,
 				`<template x-if="level1">`,
@@ -73,18 +71,23 @@ func TestNestedStructuresTransformation(t *testing.T) {
 				`Level 2 True`,
 				`<template x-if="level3">`,
 				`Level 3 True`,
-				`<template x-else>`,
+				// Alpine.js 3.x: else uses negated x-if instead of x-else
+				`<template x-if="!(level3)">`,
 				`Level 3 False`,
 				`</template>`,
 				`</template>`,
-				`<template x-else>`,
+				`<template x-if="!(level2)">`,
 				`Level 2 False`,
 				`</template>`,
 				`</template>`,
-				`<template x-else>`,
+				`<template x-if="!(level1)">`,
 				`Level 1 False`,
 				`</template>`,
 				`</div>`,
+			},
+			notContains: []string{
+				// Alpine.js 3.x doesn't support x-else directive
+				`<template x-else>`,
 			},
 		},
 		{
@@ -170,24 +173,12 @@ func TestNestedStructuresTransformation(t *testing.T) {
 					},
 				},
 			},
-			props: map[string]any{
-				"categories": []map[string]any{
-					{
-						"name": "Electronics",
-						"items": []map[string]any{
-							{"name": "Laptop", "featured": true},
-							{"name": "Phone", "featured": false},
-						},
-					},
-					{
-						"name": "Books",
-						"items": []map[string]any{},
-					},
-				},
-			},
+			// NOTE: Don't provide categories in props to test RUNTIME x-for/x-if generation
+			// When collection is in props, build-time loop expansion kicks in
+			props: map[string]any{},
 			contains: []string{
 				`<div class="nested-loops-conditionals">`,
-								`<div class="category">`,
+				`<div class="category">`,
 				`<h3><span x-text="category.name"></span></h3>`,
 				`<template x-if="category.items.length > 0">`,
 				`<template x-for="(, item) in category.items">`,
@@ -199,12 +190,17 @@ func TestNestedStructuresTransformation(t *testing.T) {
 				`</div>`,
 				`</template>`,
 				`</template>`,
-				`<template x-else>`,
+				// Alpine.js 3.x: else uses negated x-if instead of x-else
+				`<template x-if="!(category.items.length > 0)">`,
 				`No items in this category`,
 				`</template>`,
 				`</div>`,
 				`</template>`,
 				`</div>`,
+			},
+			notContains: []string{
+				// Alpine.js 3.x doesn't support x-else directive
+				`<template x-else>`,
 			},
 		},
 		{
@@ -261,17 +257,12 @@ func TestNestedStructuresTransformation(t *testing.T) {
 					},
 				},
 			},
-			props: map[string]any{
-				"users": []map[string]any{
-					{"name": "John", "isAdmin": true, "superAdmin": true, "verified": true},
-					{"name": "Jane", "isAdmin": true, "superAdmin": false, "verified": true},
-					{"name": "Bob", "isAdmin": false, "superAdmin": false, "verified": true},
-					{"name": "Alice", "isAdmin": false, "superAdmin": false, "verified": false},
-				},
-			},
+			// NOTE: Don't provide users in props to test RUNTIME x-for/x-if generation
+			// When collection is in props, build-time loop expansion kicks in
+			props: map[string]any{},
 			contains: []string{
 				`<ul class="user-list">`,
-								`<li>`,
+				`<li>`,
 				`<span x-text="index + 1"></span>. <span x-text="user.name"></span>`,
 				`<template x-if="user.isAdmin">`,
 				` (Admin)`,
@@ -279,17 +270,22 @@ func TestNestedStructuresTransformation(t *testing.T) {
 				` - Super Admin`,
 				`</template>`,
 				`</template>`,
-				`<template x-else>`,
+				// Alpine.js 3.x: else uses negated x-if instead of x-else
+				`<template x-if="!(user.isAdmin)">`,
 				`<template x-if="user.verified">`,
 				` (Verified)`,
 				`</template>`,
-				`<template x-else>`,
+				`<template x-if="!(user.verified)">`,
 				` (Unverified)`,
 				`</template>`,
 				`</template>`,
 				`</li>`,
 				`</template>`,
 				`</ul>`,
+			},
+			notContains: []string{
+				// Alpine.js 3.x doesn't support x-else directive
+				`<template x-else>`,
 			},
 		},
 		{

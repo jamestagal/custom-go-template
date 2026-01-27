@@ -85,9 +85,10 @@ export let content
 	// Fixed: Remove extra parameter
 	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, nil, "", "", nil)
 
-	// Verify content object is accessible
-	if !strings.Contains(markup, "x-text=\"content.title\"") {
-		t.Error("Expected content.title to be accessible")
+	// Verify content object is accessible (build-time expression resolution)
+	// With build-time resolution, content.title resolves to "Test Page" directly
+	if !strings.Contains(markup, "Test Page") {
+		t.Error("Expected content.title to be resolved to 'Test Page'")
 		t.Logf("Markup: %s", markup)
 	}
 }
@@ -256,22 +257,25 @@ export let components, content, allContent, allLayouts
 		t.Logf("Markup: %s", markup)
 	}
 
-	// UPDATED: Check for runtime conditional structure with x-if
-	// Magic variables are passed as Alpine variable references (content: content)
-	// so conditionals are evaluated at runtime, not build-time
-	if !strings.Contains(markup, `x-if="content"`) {
-		t.Error("Expected content conditional to be present")
+	// Build-time conditional resolution: content and allContent are truthy in props,
+	// so conditionals are resolved at build-time and their content is rendered directly
+	// No x-if templates are generated - the content just appears
+
+	// Check that the content from {if content} block is present
+	if !strings.Contains(markup, "Content: Page description") {
+		t.Error("Expected content conditional body to be rendered")
 		t.Logf("Markup: %s", markup)
 	}
 
-	if !strings.Contains(markup, `x-if="allContent"`) {
-		t.Error("Expected allContent conditional to be present")
+	// Check that the content from {if allContent} block is present
+	if !strings.Contains(markup, "Has all content") {
+		t.Error("Expected allContent conditional body to be rendered")
 		t.Logf("Markup: %s", markup)
 	}
 
-	// Verify the conditional content structure is present
-	if !strings.Contains(markup, "content.description") {
-		t.Error("Expected content.description reference in conditional")
+	// Verify the resolved content.description value is present
+	if !strings.Contains(markup, "Page description") {
+		t.Error("Expected content.description to be resolved to 'Page description'")
 		t.Logf("Markup: %s", markup)
 	}
 }

@@ -542,6 +542,96 @@ func (t *RuntimeVarTracker) GetTrackedVars() []string {
 	return result
 }
 
+// Snapshot returns a copy of the current tracker state.
+// Used to save state before component transformation.
+func (t *RuntimeVarTracker) Snapshot() map[string]bool {
+	if t == nil {
+		return make(map[string]bool)
+	}
+	snapshot := make(map[string]bool, len(t.vars))
+	for k, v := range t.vars {
+		snapshot[k] = v
+	}
+	return snapshot
+}
+
+// NewVarsSince returns variables tracked since a snapshot was taken.
+// This allows per-component tracking by comparing before/after states.
+func (t *RuntimeVarTracker) NewVarsSince(snapshot map[string]bool) []string {
+	if t == nil {
+		return nil
+	}
+	var newVars []string
+	for v := range t.vars {
+		if !snapshot[v] {
+			newVars = append(newVars, v)
+		}
+	}
+	return newVars
+}
+
+// FilterScopeWithSnapshot filters a dataScope using only variables tracked since snapshot.
+// This enables per-component x-data optimization.
+func (t *RuntimeVarTracker) FilterScopeWithSnapshot(dataScope map[string]any, snapshot map[string]bool) map[string]any {
+	if t == nil {
+		return dataScope
+	}
+
+	// Find variables tracked since snapshot
+	localVars := make(map[string]bool)
+	for v := range t.vars {
+		if !snapshot[v] {
+			localVars[v] = true
+		}
+	}
+
+	if len(localVars) == 0 {
+		// No new variables tracked during this component's transformation
+		// This means all expressions were resolved at build-time!
+		log.Printf("[RuntimeVarTracker] FilterScopeWithSnapshot: no new variables since snapshot (all build-time resolved)")
+		return make(map[string]any) // Return empty scope
+	}
+
+	filtered := make(map[string]any)
+
+	// First pass: include directly tracked variables (since snapshot)
+	for key, value := range dataScope {
+		if localVars[key] {
+			filtered[key] = value
+		}
+	}
+
+	// Second pass: for any getters/setters in filtered, also include their 'this.*' dependencies
+	additionalDeps := make(map[string]bool)
+	for key, value := range filtered {
+		if strVal, ok := value.(string); ok {
+			trimmed := strings.TrimSpace(strVal)
+			// Check if this is a getter or setter definition
+			if (strings.HasPrefix(trimmed, "get ") || strings.HasPrefix(trimmed, "set ")) &&
+				strings.Contains(trimmed, "(") && strings.Contains(trimmed, "{") {
+				// Extract 'this.*' references from the getter/setter body
+				deps := extractThisReferences(strVal)
+				for _, dep := range deps {
+					if _, exists := dataScope[dep]; exists && !localVars[dep] {
+						additionalDeps[dep] = true
+						log.Printf("[RuntimeVarTracker] Getter/setter '%s' depends on '%s' - adding to filtered scope", key, dep)
+					}
+				}
+			}
+		}
+	}
+
+	// Add the additional dependencies
+	for dep := range additionalDeps {
+		filtered[dep] = dataScope[dep]
+	}
+
+	log.Printf("[RuntimeVarTracker] FilterScopeWithSnapshot: %d → %d variables (local: %d, getter deps: %d)",
+		len(dataScope), len(filtered), len(localVars), len(additionalDeps))
+
+	return filtered
+}
+
 // FilterScope filters a dataScope to only include tracked runtime variables.
 // This is called before serializing to x-data to reduce page weight.
 // IMPORTANT: Also includes dependencies of getters/setters (things they reference via this.*)

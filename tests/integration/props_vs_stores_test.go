@@ -45,12 +45,13 @@ store session = {
 	// Render
 	markup, script, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", nil)
 
-	// Verify props use x-text without $store prefix
-	if !strings.Contains(markup, "x-text=\"userName\"") {
-		t.Errorf("Props should use variable name directly, not $store")
+	// Build-time expression resolution: props with default values resolve at build-time
+	// {userName} → "DefaultUser", {userAge} → 25
+	if !strings.Contains(markup, "DefaultUser") {
+		t.Errorf("Props should be resolved at build-time: expected 'DefaultUser'")
 	}
-	if !strings.Contains(markup, "x-text=\"userAge\"") {
-		t.Errorf("Props should use variable name directly")
+	if !strings.Contains(markup, "25") {
+		t.Errorf("Props should be resolved at build-time: expected '25'")
 	}
 
 	// Verify stores use $store prefix
@@ -200,9 +201,10 @@ store auth = {
 	// Render
 	markup, _, _ := renderer.RenderWithStores(tmpl, transformed, storeDefinitions, "test.html", "", nil)
 
-	// Verify prop conditional uses local scope
-	if !strings.Contains(markup, "x-if=\"isAdmin\"") {
-		t.Errorf("Prop conditional should use local scope")
+	// Build-time conditional resolution: isAdmin is false, so the entire block is eliminated
+	// No x-if template generated - the "Admin Panel" content is simply not rendered
+	if strings.Contains(markup, "Admin Panel") {
+		t.Errorf("Build-time conditional should have eliminated the isAdmin=false branch")
 	}
 
 	// Verify store conditional uses $store prefix

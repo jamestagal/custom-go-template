@@ -31,10 +31,9 @@ func TestNestedStructures(t *testing.T) {
 					},
 				},
 			},
-			dataScope: map[string]any{
-				"outerCondition": true,
-				"innerCondition": true,
-			},
+			// NOTE: Don't include conditions in dataScope to force runtime x-if generation
+			// If conditions are in dataScope, they are resolved at build-time
+			dataScope: map[string]any{},
 			contains: []string{
 				"x-if=\"outerCondition\"",
 				"Outer content",
@@ -62,8 +61,8 @@ func TestNestedStructures(t *testing.T) {
 					},
 				},
 			},
+			// NOTE: Don't include showList in dataScope to force runtime x-if generation
 			dataScope: map[string]any{
-				"showList": true,
 				// items not provided - should use runtime x-for fallback
 			},
 			contains: []string{
@@ -103,13 +102,13 @@ func TestNestedStructures(t *testing.T) {
 				},
 			},
 			contains: []string{
-				// Updated: Build-time expansion produces expanded output, not x-for templates
-				// Each item is expanded with its conditional evaluated at build-time
-				"x-if=\"item.completed\"",
+				// Build-time expansion: both loop AND conditionals are resolved at build-time
+				// For Task 1 (completed=true): ✓ Task 1
+				// For Task 2 (completed=false): ✗ Task 2
 				"✓",
-				"x-else",
 				"✗",
-				"x-text=\"item.title\"",
+				"Task 1",
+				"Task 2",
 			},
 		},
 		{
@@ -162,15 +161,17 @@ func TestNestedStructures(t *testing.T) {
 				},
 			},
 			contains: []string{
-				// Updated: Build-time expansion produces expanded output
-				// Loops are fully expanded since data is available at build-time
+				// Build-time expansion: loops AND expressions fully resolved
+				// Categories and their items are expanded to actual text
 				"<h2",
-				"<span x-text=\"category.name\">",
+				"Fruits",
+				"Vegetables",
 				"<ul",
 				"<li",
-				"<span x-text=\"item\">",
-				// Should have 2 categories expanded
-				// Should have multiple list items
+				"Apple",
+				"Banana",
+				"Carrot",
+				"Broccoli",
 			},
 		},
 		{
@@ -238,8 +239,8 @@ func TestNestedStructures(t *testing.T) {
 					},
 				},
 			},
+			// NOTE: Don't include hasData in dataScope to force runtime x-if generation
 			dataScope: map[string]any{
-				"hasData": true,
 				"sections": []map[string]any{
 					{
 						"title": "Section 1",
@@ -255,16 +256,19 @@ func TestNestedStructures(t *testing.T) {
 				},
 			},
 			contains: []string{
+				// hasData is NOT in dataScope, so outer conditional stays runtime
 				"x-if=\"hasData\"",
-				// Updated: Build-time expansion produces expanded output, NOT x-for templates
-				// since sections collection is resolvable in dataScope
+				// But sections/items ARE in dataScope, so they expand at build-time
 				"class=\"section\"",
-				"x-text=\"section.title\"",
-				// Inner content will be build-time expanded as well
+				// section.title resolved to actual values
+				"Section 1",
+				"Section 2",
+				// Inner content build-time expanded
 				"class=\"item\"",
-				"x-text=\"item.name\"",
-				"x-if=\"item.isSpecial\"",
+				// item.name and item.isSpecial resolved at build-time
+				"Item 1",
 				"(Special)",
+				"Item 2",
 				// Else branches
 				"No items available",
 			},

@@ -10,6 +10,13 @@ import (
 func TestRuntimeComponentResolution_EndToEnd(t *testing.T) {
 	baseURL := "http://localhost:3333"
 
+	// Skip if server is not running
+	resp, err := http.Get(baseURL + "/")
+	if err != nil {
+		t.Skip("Skipping E2E test: server not running on port 3333. Start server with: go run cmd/server/main.go")
+	}
+	resp.Body.Close()
+
 	t.Run("Homepage renders with build-time expanded components", func(t *testing.T) {
 		// Updated 2025-01-25: Components now expand at build-time instead of using runtime wrappers
 		// This is the correct Plenti/Svelte-like behavior for static content

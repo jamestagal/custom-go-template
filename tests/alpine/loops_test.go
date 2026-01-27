@@ -47,13 +47,14 @@ func TestLoopTransformation(t *testing.T) {
 					},
 				},
 			},
-			props: map[string]any{
-				"items": []string{"Item 1", "Item 2", "Item 3"},
-			},
+			// NOTE: Don't provide items in props to test RUNTIME x-for generation
+			// When collection is in props, build-time loop expansion kicks in
+			props: map[string]any{},
 			contains: []string{
 				`<ul class="items-list">`,
-								`<li><span x-text="item"></span></li>`,
-								`</ul>`,
+				`<template x-for="(, item) in items">`,
+				`<li><span x-text="item">`,
+				`</ul>`,
 			},
 		},
 		{
@@ -196,26 +197,26 @@ func TestLoopTransformation(t *testing.T) {
 					},
 				},
 			},
+			// NOTE: Don't provide tasks in props to test RUNTIME x-for/x-if generation
+			// When collection is in props, build-time loop expansion kicks in
 			props: map[string]any{
-				"tasks": []map[string]any{
-					{"title": "Task 1", "completed": true},
-					{"title": "Task 2", "completed": false},
-				},
 				"title": "Custom Template Showcase",
 			},
 			contains: []string{
 				`<div class="task-list">`,
-								`<div class="task-item">`,
+				`<div class="task-item">`,
 				`<span x-text="index + 1"></span>. `,
 				`<template x-if="task.completed">`,
 				`<span class="completed"><span x-text="task.title"></span></span>`,
-								`<template x-else>`,
+				// Alpine.js 3.x: else uses negated x-if instead of x-else
+				`<template x-if="!(task.completed)">`,
 				`<span x-text="task.title"></span>`,
-								`</div>`,
-								`</div>`,
+				`</div>`,
+				`</div>`,
 			},
 			notContains: []string{
-				`<template x-if="!(task.completed)">`,
+				// Alpine.js 3.x doesn't support x-else directive
+				`<template x-else>`,
 			},
 		},
 		{

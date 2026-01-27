@@ -24,6 +24,47 @@ func tryResolveBuildTimeConditional(condition string, node *ast.Conditional, dat
 		return resolved, result
 	}
 
+	// Handle negation pattern: !varName or !property.path
+	// This MUST come before the generic operator check
+	if strings.HasPrefix(condition, "!") {
+		negatedExpr := strings.TrimSpace(condition[1:])
+		// Remove optional parentheses: !(varName) -> varName
+		if strings.HasPrefix(negatedExpr, "(") && strings.HasSuffix(negatedExpr, ")") {
+			negatedExpr = strings.TrimSpace(negatedExpr[1 : len(negatedExpr)-1])
+		}
+
+		// Only handle simple variable/property negations (not complex expressions)
+		if !strings.ContainsAny(negatedExpr, "&|<>=+-*/%") {
+			log.Printf("[BUILD-TIME-COND] Negation pattern detected: !%s", negatedExpr)
+
+			var value any
+			var exists bool
+
+			// Handle property access
+			if strings.Contains(negatedExpr, ".") {
+				value, exists = resolvePropertyPath(negatedExpr, dataScope)
+			} else {
+				value, exists = dataScope[negatedExpr]
+			}
+
+			if !exists {
+				// Variable not found in scope → RUNTIME
+				log.Printf("[BUILD-TIME-COND] !%s: variable not found → RUNTIME", negatedExpr)
+				return false, ""
+			}
+
+			// Value exists (may be nil) - evaluate negation
+			// nil is falsy, so !nil is truthy
+			if value == nil || !isTruthy(value) {
+				log.Printf("[BUILD-TIME-COND] !%s: value=%v is falsy, so !value is truthy → BUILD-TIME if branch", negatedExpr, value)
+				return true, "if"
+			}
+			// Value is truthy, so !value is falsy - check else branches
+			log.Printf("[BUILD-TIME-COND] !%s: value=%v is truthy, so !value is falsy → checking else branches", negatedExpr, value)
+			return tryResolveElseBranches(node, dataScope)
+		}
+	}
+
 	// Only resolve simple variable conditions (not complex expressions with operators)
 	// e.g., "published" is simple, "items.length > 0" is complex
 	if strings.ContainsAny(condition, "!&|<>=+-*/%()") {
@@ -82,15 +123,61 @@ func tryResolveElseBranches(node *ast.Conditional, dataScope map[string]any) (bo
 	// Check else-if conditions
 	for i, elseIfCond := range node.ElseIfConditions {
 		elseIfCond = strings.TrimSpace(elseIfCond)
-		// Only handle simple conditions
-		if !strings.ContainsAny(elseIfCond, "!&|<>=+-*/%()") && !strings.HasPrefix(elseIfCond, "$") {
-			if value, exists := dataScope[elseIfCond]; exists && value != nil && isTruthy(value) {
-				return true, fmt.Sprintf("else-if-%d", i)
-			}
-		} else {
-			// Complex else-if condition - can't resolve at build time
+
+		// Skip store expressions
+		if strings.HasPrefix(elseIfCond, "$") {
 			return false, ""
 		}
+
+		// Handle negation pattern in else-if: !varName
+		if strings.HasPrefix(elseIfCond, "!") {
+			negatedExpr := strings.TrimSpace(elseIfCond[1:])
+			// Remove optional parentheses
+			if strings.HasPrefix(negatedExpr, "(") && strings.HasSuffix(negatedExpr, ")") {
+				negatedExpr = strings.TrimSpace(negatedExpr[1 : len(negatedExpr)-1])
+			}
+
+			// Only handle simple negations
+			if !strings.ContainsAny(negatedExpr, "&|<>=+-*/%") {
+				var value any
+				var exists bool
+				if strings.Contains(negatedExpr, ".") {
+					value, exists = resolvePropertyPath(negatedExpr, dataScope)
+				} else {
+					value, exists = dataScope[negatedExpr]
+				}
+
+				if exists && value != nil {
+					if !isTruthy(value) {
+						// !falsy = truthy - render this else-if branch
+						return true, fmt.Sprintf("else-if-%d", i)
+					}
+					// !truthy = falsy - continue to next branch
+					continue
+				}
+				// Can't resolve - fall to runtime
+				return false, ""
+			}
+		}
+
+		// Handle simple conditions (no operators)
+		if !strings.ContainsAny(elseIfCond, "!&|<>=+-*/%()") {
+			var value any
+			var exists bool
+			if strings.Contains(elseIfCond, ".") {
+				value, exists = resolvePropertyPath(elseIfCond, dataScope)
+			} else {
+				value, exists = dataScope[elseIfCond]
+			}
+			if exists && value != nil && isTruthy(value) {
+				return true, fmt.Sprintf("else-if-%d", i)
+			}
+			// Continue to next else-if
+			continue
+		}
+
+		// Complex else-if condition - can't resolve at build time
+		return false, ""
 	}
 
 	// All else-if conditions were false (or none exist), render else branch

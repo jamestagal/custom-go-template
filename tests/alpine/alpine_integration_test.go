@@ -29,8 +29,8 @@ func TestAlpineIntegration(t *testing.T) {
 				"title":       "Hello Alpine",
 				"description": "This is a test",
 			},
-			// Updated: No x-data wrapper (Phase 1 optimization - body provides scope)
-			expected: `<div><h1><span x-text="title"></span></h1><p><span x-text="description"></span></p></div>`,
+			// Build-time resolution: expressions with values in props get resolved
+			expected: `<div><h1>Hello Alpine</h1><p>This is a test</p></div>`,
 		},
 		{
 			name: "conditional_rendering",
@@ -42,13 +42,13 @@ func TestAlpineIntegration(t *testing.T) {
 					{/if}
 				</div>
 			`,
+			// NOTE: Don't provide showDetails in props to test RUNTIME x-if
 			props: map[string]any{
 				"title":       "Product",
 				"description": "Product details",
-				"showDetails": true,
 			},
-			// Updated: No x-data wrapper (Phase 1 optimization)
-			expected: `<div><h1><span x-text="title"></span></h1><template x-if="showDetails"><p><span x-text="description"></span></p></template></div>`,
+			// Runtime x-if since showDetails not in props
+			expected: `<div><h1>Product</h1><template x-if="showDetails"><p>Product details</p></template></div>`,
 		},
 		{
 			name: "loop_rendering",
@@ -62,17 +62,13 @@ func TestAlpineIntegration(t *testing.T) {
 					</ul>
 				</div>
 			`,
+			// NOTE: Don't provide items in props to test RUNTIME x-for
 			props: map[string]any{
 				"title": "Shopping List",
-				"items": []map[string]any{
-					{"name": "Apples"},
-					{"name": "Bananas"},
-					{"name": "Oranges"},
-				},
 			},
-			// Build-time expansion: Loop expands to 3 <li> elements
-			// No x-data wrapper (Phase 1 optimization)
-			expected: `<div><h1><span x-text="title"></span></h1><ul><li><span x-text="item.name"></span></li><li><span x-text="item.name"></span></li><li><span x-text="item.name"></span></li></ul></div>`,
+			// Runtime x-for since items not in props
+			// Format: "item in items" (no index) when parsed from template
+			expected: `<div><h1>Shopping List</h1><ul><template x-for="item in items"><li><span x-text="item.name"></span></li></template></ul></div>`,
 		},
 		{
 			name: "component_integration",
@@ -86,8 +82,8 @@ func TestAlpineIntegration(t *testing.T) {
 				"title":       "Component Test",
 				"handleClick": "() => { alert('Button clicked!') }",
 			},
-			// Updated: No x-data wrapper (Phase 1 optimization)
-			expected: `<div><h1><span x-text="title"></span></h1><div x-component="Button" data-prop-label="Click me" data-prop-onClick="handleClick"></div></div>`,
+			// Build-time resolution for expressions
+			expected: `<div><h1>Component Test</h1><div x-component="Button" data-prop-label="Click me" data-prop-onClick="handleClick"></div></div>`,
 		},
 		{
 			name: "nested_conditionals_and_loops",
@@ -116,6 +112,8 @@ func TestAlpineIntegration(t *testing.T) {
 					{/if}
 				</div>
 			`,
+			// Provide categories to test build-time loop expansion
+			// Note: This tests that loops expand correctly with actual data
 			props: map[string]any{
 				"title": "Product Catalog",
 				"categories": []map[string]any{
@@ -132,14 +130,9 @@ func TestAlpineIntegration(t *testing.T) {
 					},
 				},
 			},
-			// Build-time expansion (hybrid approach):
-			// - Outer conditional stays runtime (x-if)
-			// - Categories loop expands to 2 <div> elements (build-time)
-			// - Inner conditional stays runtime (x-if/x-else) - BOTH branches in each iteration
-			// - Inner items loop expands (build-time): Electronics has 2 items, Books has 0 items
-			// Note: Conditionals inside loops remain runtime, so each category gets both x-if and x-else
-			// Updated: No x-data wrapper (Phase 1 optimization)
-			expected: `<div><h1><span x-text="title"></span></h1><template x-if="categories.length > 0"><div><div><h2><span x-text="category.name"></span></h2><template x-if="category.items.length > 0"><ul><li><span x-text="item.name"></span> - $<span x-text="item.price"></span></li><li><span x-text="item.name"></span> - $<span x-text="item.price"></span></li></ul></template><template x-else><p>No items in this category</p></template></div><div><h2><span x-text="category.name"></span></h2><template x-if="category.items.length > 0"><ul></ul></template><template x-else><p>No items in this category</p></template></div></div></template><template x-else><p>No categories found</p></template></div>`,
+			// Build-time loop expansion with runtime inner conditionals
+			// Alpine.js 3.x: else uses negated x-if
+			expected: `<div><h1>Product Catalog</h1><template x-if="categories.length > 0"><div><div><h2>Electronics</h2><template x-if="category.items.length > 0"><ul><li>Laptop - $999.99</li><li>Phone - $699.99</li></ul></template><template x-if="!(category.items.length > 0)"><p>No items in this category</p></template></div><div><h2>Books</h2><template x-if="category.items.length > 0"><ul></ul></template><template x-if="!(category.items.length > 0)"><p>No items in this category</p></template></div></div></template><template x-if="!(categories.length > 0)"><p>No categories found</p></template></div>`,
 		},
 		{
 			name: "dynamic_components_with_conditionals",
@@ -153,13 +146,14 @@ func TestAlpineIntegration(t *testing.T) {
 					{/if}
 				</div>
 			`,
+			// NOTE: Don't provide isAdmin in props to test RUNTIME x-if
 			props: map[string]any{
 				"title":       "User Dashboard",
-				"isAdmin":     true,
 				"currentUser": map[string]any{"name": "John Doe", "role": "admin"},
 			},
-			// Updated: No x-data wrapper (Phase 1 optimization)
-			expected: `<div><h1><span x-text="title"></span></h1><template x-if="isAdmin"><div x-component="AdminPanel" data-prop-user="currentUser"></div></template><template x-else><div x-component="UserProfile" data-prop-user="currentUser"></div></template></div>`,
+			// Runtime x-if/negated x-if since isAdmin not in props
+			// Alpine.js 3.x: else uses negated x-if
+			expected: `<div><h1>User Dashboard</h1><template x-if="isAdmin"><div x-component="AdminPanel" data-prop-user="currentUser"></div></template><template x-if="!(isAdmin)"><div x-component="UserProfile" data-prop-user="currentUser"></div></template></div>`,
 		},
 	}
 
@@ -230,22 +224,11 @@ func renderIntegrationNode(sb *strings.Builder, node ast.Node) {
 		}
 
 		// Special case for template with x-if, x-else-if, or x-else
+		// Alpine.js 3.x: else branches use negated x-if pattern, NOT x-else
 		if n.TagName == "template" && len(n.Attributes) > 0 {
 			for _, attr := range n.Attributes {
-				if attr.Name == "x-if" && strings.HasPrefix(attr.Value, "!(") {
-					// This is an else condition (negated condition)
-					// Convert to x-else for test output
-					sb.WriteString("<template x-else>")
-
-					// Render children
-					for _, child := range n.Children {
-						renderIntegrationNode(sb, child)
-					}
-
-					sb.WriteString("</template>")
-					return
-				} else if attr.Name == "x-if" {
-					// This is a regular if condition
+				if attr.Name == "x-if" {
+					// Render all x-if conditions (including negated ones for else branches)
 					sb.WriteString("<template x-if=\"")
 					sb.WriteString(attr.Value)
 					sb.WriteString("\">")

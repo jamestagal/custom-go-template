@@ -857,8 +857,26 @@ func TransformComponentWithResolvedProps(componentName string, resolvedProps map
 		}
 	}
 
+	// CRITICAL: Use a FRESH tracker for this component's transformation
+	// This ensures each component instance tracks only ITS OWN runtime variables,
+	// even when multiple components use the same variable names (like 'user')
+	savedTracker := runtimeTracker
+	componentTracker := NewRuntimeVarTracker()
+	runtimeTracker = componentTracker
+	log.Printf("[X-Data] TransformComponentWithResolvedProps '%s': created fresh tracker", componentName)
+
 	// Recursively transform component body with its isolated scope
 	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
+
+	// Restore global tracker and merge component's tracked vars into it
+	trackedVars := componentTracker.GetTrackedVars()
+	runtimeTracker = savedTracker
+	if runtimeTracker != nil {
+		for _, v := range trackedVars {
+			runtimeTracker.Track(v)
+		}
+	}
+	log.Printf("[X-Data] TransformComponentWithResolvedProps '%s': restored global tracker, merged %d vars", componentName, len(trackedVars))
 
 	// Wrap with x-data if component has data
 	if len(componentDataScope) == 0 {
@@ -867,13 +885,10 @@ func TransformComponentWithResolvedProps(componentName string, resolvedProps map
 
 	// Apply x-data optimization: filter to only runtime-tracked variables
 	if OptimizeXData {
-		runtimeTracker := GetRuntimeTracker()
-		filteredScope := componentDataScope
-		if runtimeTracker != nil {
-			filteredScope = runtimeTracker.FilterScope(componentDataScope)
-			log.Printf("[X-Data] TransformComponentWithResolvedProps '%s' filtered scope from %d to %d variables",
-				componentName, len(componentDataScope), len(filteredScope))
-		}
+		// Use the component's own tracker for filtering (not global)
+		filteredScope := componentTracker.FilterScope(componentDataScope)
+		log.Printf("[X-Data] TransformComponentWithResolvedProps '%s' filtered scope from %d to %d variables (per-component tracking)",
+			componentName, len(componentDataScope), len(filteredScope))
 
 		// Only wrap if there are runtime variables left
 		if len(filteredScope) == 0 {
@@ -1085,8 +1100,25 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 			componentBodyNodes = append(componentBodyNodes, node)
 		}
 	}
+
+	// CRITICAL: Use a FRESH tracker for this component's transformation
+	// This ensures each component instance tracks only ITS OWN runtime variables,
+	// even when multiple components use the same variable names (like 'user')
+	savedTracker := runtimeTracker
+	componentTracker := NewRuntimeVarTracker()
+	runtimeTracker = componentTracker
+	log.Printf("[X-Data] Component '%s': created fresh tracker (saved global with %d vars)", componentName, len(savedTracker.GetTrackedVars()))
+
 	// Recursively transform component body with its isolated scope
 	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
+
+	// Restore global tracker and merge component's tracked vars into it
+	trackedVars := componentTracker.GetTrackedVars()
+	runtimeTracker = savedTracker
+	for _, v := range trackedVars {
+		runtimeTracker.Track(v)
+	}
+	log.Printf("[X-Data] Component '%s': restored global tracker, merged %d vars", componentName, len(trackedVars))
 
 	// PHASE 4: Wrap with x-data (Task 2.4 + PHASE 2 OPTIMIZATION) ✓
 
@@ -1111,15 +1143,11 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 	//
 	// Without wrappers, both would share parent scope and show same values!
 	if OptimizeXData {
-		// OPTIMIZATION: Filter component scope to only include runtime-tracked variables
-		// Variables only used at build-time (like allContent for loop expansion)
-		// are excluded from x-data to reduce page weight
-		filteredScope := componentDataScope
-		if runtimeTracker != nil {
-			filteredScope = runtimeTracker.FilterScope(componentDataScope)
-			log.Printf("[X-Data] Component '%s' filtered scope from %d to %d variables",
-				componentName, len(componentDataScope), len(filteredScope))
-		}
+		// OPTIMIZATION: Filter component scope using ONLY variables tracked during
+		// THIS component's transformation (using the fresh componentTracker)
+		filteredScope := componentTracker.FilterScope(componentDataScope)
+		log.Printf("[X-Data] Component '%s' filtered scope from %d to %d variables (per-component tracking)",
+			componentName, len(componentDataScope), len(filteredScope))
 
 		// Only wrap if there are runtime variables left
 		if len(filteredScope) == 0 {

@@ -59,12 +59,10 @@ func TestComponentTransformation(t *testing.T) {
 	// Render the transformed template to HTML
 	html := testutils.RenderNode(transformedTemplate.RootNodes[0])
 
-	// Updated expectation: The transformer now outputs JavaScript object literal format
-	// instead of JSON-escaped format. This is actually better for Alpine.js compatibility
-	// as it matches Alpine's native data format (e.g., x-data="{ count: 0 }").
-	// Old format: x-data="{&quot;message&quot;:&quot;Hello World&quot;}"
-	// New format: x-data="{ message: 'Hello World' }" (JavaScript object literal)
-	expected := `<div class="component-content" x-data="{ message: 'Hello World' }">Component Content: <span x-text="message"></span></div>`
+	// Build-time expression resolution: {message} resolves to "Hello World" directly
+	// since message is in the component's data scope with a known value.
+	// No x-text span generated - the value is inlined at build-time.
+	expected := `<div class="component-content" x-data="{ message: 'Hello World' }">Component Content: Hello World</div>`
 
 	// Normalize whitespace for comparison
 	normalizedHTML := testutils.NormalizeWhitespace(html)
@@ -129,11 +127,10 @@ func TestDynamicPropsComponentTransformation(t *testing.T) {
 	// Render the transformed template to HTML
 	html := testutils.RenderNode(transformedTemplate.RootNodes[0])
 
-	// Updated 2025-01-25: With build-time expansion, props are resolved to actual values
-	// for build-time loop expansion support. The parent scope value (42) is now directly
-	// embedded in the component's x-data instead of referencing the variable name.
-	// This enables nested property access in loops (e.g., content.components).
-	expected := `<div class="dynamic-component" x-data="{ count: 42 }">Count: <span x-text="count"></span></div>`
+	// Build-time expression resolution: {count} resolves to 42 directly
+	// since count is in the component's data scope with a known value.
+	// No x-text span generated - the value is inlined at build-time.
+	expected := `<div class="dynamic-component" x-data="{ count: 42 }">Count: 42</div>`
 
 	// Normalize whitespace for comparison
 	normalizedHTML := testutils.NormalizeWhitespace(html)

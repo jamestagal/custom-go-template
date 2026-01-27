@@ -300,30 +300,38 @@ func TestComponentLoopIntegration_NestedPropertyAccess(t *testing.T) {
 		t.Errorf("Expected 2 divs from loop expansion, got %d", divCount)
 	}
 
-	// VERIFICATION: Check for expression nodes (will have x-text in transformed output)
-	hasExpressions := false
+	// VERIFICATION: Check for resolved text nodes (build-time expression resolution)
+	// When expressions are resolvable at build-time, they become TextNodes with actual values
+	resolvedTexts := []string{}
 	for _, node := range result {
 		if elem, ok := node.(*ast.Element); ok {
 			for _, child := range elem.Children {
-				if childElem, ok := child.(*ast.Element); ok {
-					// Check for x-text attribute (transformed expression)
-					for _, attr := range childElem.Attributes {
-						if attr.Name == "x-text" {
-							hasExpressions = true
-							// In build-time expansion, the x-text value should reference
-							// the iteration scope variable
-							if !strings.Contains(attr.Value, "component.fields.title") {
-								t.Logf("x-text attribute: %s", attr.Value)
-							}
-						}
-					}
+				if textNode, ok := child.(*ast.TextNode); ok {
+					resolvedTexts = append(resolvedTexts, textNode.Content)
 				}
 			}
 		}
 	}
 
-	if !hasExpressions {
-		t.Error("Expected expression nodes to be present in loop content")
+	// Should have resolved "Welcome" and "Services" from the component fields
+	if len(resolvedTexts) < 2 {
+		t.Errorf("Expected 2 resolved text nodes (build-time expression resolution), got %d: %v", len(resolvedTexts), resolvedTexts)
+	}
+
+	// Check that the expected values are present
+	foundWelcome := false
+	foundServices := false
+	for _, text := range resolvedTexts {
+		if strings.Contains(text, "Welcome") {
+			foundWelcome = true
+		}
+		if strings.Contains(text, "Services") {
+			foundServices = true
+		}
+	}
+
+	if !foundWelcome || !foundServices {
+		t.Errorf("Expected resolved values 'Welcome' and 'Services', got: %v", resolvedTexts)
 	}
 }
 
