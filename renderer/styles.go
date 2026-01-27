@@ -201,7 +201,7 @@ func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transfor
 			if compTemplate, exists := transformer.GetComponentTemplate(compName); exists {
 				log.Printf("[collectStyles] Found component template for '%s', collecting styles recursively", compName)
 				// Recursively collect styles from dependency
-				collectStyles(compTemplate.Template, compName)
+				collectStyles(compTemplate.AST, compName)
 			} else {
 				log.Printf("[collectStyles] WARNING: Component '%s' referenced but not found in registry", compName)
 			}
@@ -250,7 +250,7 @@ func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transfor
 		// Collect styles from these components
 		for _, compName := range transformedComponents {
 			if compTemplate, exists := transformer.GetComponentTemplate(compName); exists {
-				collectStyles(compTemplate.Template, compName)
+				collectStyles(compTemplate.AST, compName)
 			}
 		}
 	}
@@ -265,7 +265,7 @@ func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transfor
 			log.Printf("[AggregateComponentStyles] Found dynamic layout template: %s", dynamicLayoutName)
 
 			// Collect styles from the layout itself and its imports
-			collectStyles(layoutTemplate.Template, dynamicLayoutName)
+			collectStyles(layoutTemplate.AST, dynamicLayoutName)
 		} else {
 			log.Printf("[AggregateComponentStyles] Warning: dynamic layout %s not found in component registry", dynamicLayoutName)
 		}
@@ -287,7 +287,7 @@ func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transfor
 
 			if compTemplate, exists := transformer.GetComponentTemplate(capitalizedName); exists {
 				log.Printf("[AggregateComponentStyles] Found JSON component template: %s", capitalizedName)
-				collectStyles(compTemplate.Template, capitalizedName)
+				collectStyles(compTemplate.AST, capitalizedName)
 			} else {
 				log.Printf("[AggregateComponentStyles] Warning: JSON component %s (capitalized: %s) not found in component registry", compName, capitalizedName)
 			}
@@ -396,7 +396,7 @@ func AggregateComponentStyles(rootTemplate *ast.Template, componentName string) 
 		for _, compName := range uniqueComponentNames {
 			if compTemplate, exists := transformer.GetComponentTemplate(compName); exists {
 				// Recursively collect styles from dependency
-				collectStyles(compTemplate.Template, compName)
+				collectStyles(compTemplate.AST, compName)
 			}
 			// Gracefully skip missing components (no panic)
 		}

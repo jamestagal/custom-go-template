@@ -39,8 +39,9 @@ func TestRuntimeComponentResolution_EndToEnd(t *testing.T) {
 		}
 
 		// Check runtime-components.js included (still needed for dynamic cases)
-		if !strings.Contains(html, "/js/runtime-components.js") {
-			t.Error("runtime-components.js not found in HTML")
+		// Path is now /core/runtime-components.js for Plenti compatibility
+		if !strings.Contains(html, "/core/runtime-components.js") && !strings.Contains(html, "/js/runtime-components.js") {
+			t.Error("runtime-components.js not found in HTML (checked /core/ and /js/)")
 		}
 
 		// With build-time expansion, components are inlined directly
@@ -58,7 +59,7 @@ func TestRuntimeComponentResolution_EndToEnd(t *testing.T) {
 	})
 
 	t.Run("Component registry is accessible", func(t *testing.T) {
-		resp, err := http.Get(baseURL + "/js/component-registry.js")
+		resp, err := http.Get(baseURL + "/generated/layouts.js")
 		if err != nil {
 			t.Fatalf("Failed to fetch component registry: %v", err)
 		}
@@ -71,9 +72,12 @@ func TestRuntimeComponentResolution_EndToEnd(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		registry := string(body)
 
-		// Check ES module format
-		if !strings.HasPrefix(registry, "export default {") {
-			t.Error("Registry doesn't start with 'export default {'")
+		// Check ES module format - registry uses const registry = { ... } and export default registry
+		if !strings.Contains(registry, "const registry = {") {
+			t.Error("Registry doesn't contain 'const registry = {'")
+		}
+		if !strings.Contains(registry, "export default registry") {
+			t.Error("Registry doesn't contain 'export default registry'")
 		}
 
 		// Check that registry contains component entries (using relative path format)
@@ -92,7 +96,7 @@ func TestRuntimeComponentResolution_EndToEnd(t *testing.T) {
 	})
 
 	t.Run("Runtime components script is accessible", func(t *testing.T) {
-		resp, err := http.Get(baseURL + "/js/runtime-components.js")
+		resp, err := http.Get(baseURL + "/core/runtime-components.js")
 		if err != nil {
 			t.Fatalf("Failed to fetch runtime components: %v", err)
 		}

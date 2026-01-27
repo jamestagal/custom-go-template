@@ -46,7 +46,7 @@ func TestGenerateComponentRegistry_SingleComponent(t *testing.T) {
 				},
 			},
 			expectContains: []string{
-				"export default {",
+				"const registry = {",
 				"'Hero2436': (props) =>",
 				"${props.title}",
 				"${props.description}",
@@ -112,13 +112,13 @@ func TestGenerateComponentRegistry_SingleComponent(t *testing.T) {
 				}
 			}
 
-			// Verify ES module structure
-			if !strings.HasPrefix(result, "export default {") {
-				t.Errorf("GenerateComponentRegistry() should start with 'export default {', got: %s", result[:50])
+			// Verify ES module structure (Plenti-compatible format with header comment)
+			if !strings.Contains(result, "const registry = {") {
+				t.Errorf("GenerateComponentRegistry() should contain 'const registry = {', got: %s", result[:100])
 			}
 
-			if !strings.HasSuffix(strings.TrimSpace(result), "};") {
-				t.Errorf("GenerateComponentRegistry() should end with '};'")
+			if !strings.HasSuffix(strings.TrimSpace(result), "export default registry;") {
+				t.Errorf("GenerateComponentRegistry() should end with 'export default registry;'")
 			}
 		})
 	}
@@ -470,7 +470,7 @@ func TestGenerateComponentRegistry_MixedContent(t *testing.T) {
 
 	expectedElements := []string{
 		// Structure
-		"export default {",
+		"const registry = {",
 		"'MixedComponent': (props) =>",
 		"<div",
 		"class=\"container\"",
@@ -516,8 +516,8 @@ func TestGenerateComponentRegistry_EmptyComponent(t *testing.T) {
 		t.Errorf("GenerateComponentRegistry() should handle empty component")
 	}
 
-	// Output should be valid JS
-	if !strings.HasPrefix(result, "export default {") {
+	// Output should be valid JS (Plenti-compatible format with header comment)
+	if !strings.Contains(result, "const registry = {") {
 		t.Errorf("GenerateComponentRegistry() should maintain valid ES module structure")
 	}
 }
@@ -665,14 +665,14 @@ func TestGenerateComponentRegistry_ValidJSOutput(t *testing.T) {
 
 	result := GenerateComponentRegistry(components)
 
-	// Check ES module structure
-	if !strings.HasPrefix(result, "export default {") {
-		t.Errorf("GenerateComponentRegistry() should start with ES module export")
+	// Check ES module structure (new Plenti-compatible format)
+	if !strings.Contains(result, "const registry = {") {
+		t.Errorf("GenerateComponentRegistry() should contain 'const registry = {'")
 	}
 
-	// Check proper closing
-	if !strings.HasSuffix(strings.TrimSpace(result), "};") {
-		t.Errorf("GenerateComponentRegistry() should end with '};'")
+	// Check proper closing with export
+	if !strings.HasSuffix(strings.TrimSpace(result), "export default registry;") {
+		t.Errorf("GenerateComponentRegistry() should end with 'export default registry;'\nGot: %s", result)
 	}
 
 	// Check arrow function syntax
@@ -1140,11 +1140,13 @@ func TestGenerateComponentRegistry_WithExpressions(t *testing.T) {
 		t.Errorf("Generated registry contains invalid ${props. syntax with space\nGot: %s", result)
 	}
 
-	// Verify the component function is properly formatted
-	expectedPrefix := `export default {
-  'TestComponent': (props) => `
-	if !strings.HasPrefix(result, expectedPrefix) {
-		t.Errorf("Generated registry does not have expected prefix\nGot: %s", result)
+	// Verify the component function is properly formatted (Plenti-compatible format)
+	// The new format includes header comments and uses const registry = {...}
+	if !strings.Contains(result, "'TestComponent': (props) =>") {
+		t.Errorf("Generated registry does not contain TestComponent function\nGot: %s", result)
+	}
+	if !strings.Contains(result, "const registry = {") {
+		t.Errorf("Generated registry does not use const registry format\nGot: %s", result)
 	}
 }
 

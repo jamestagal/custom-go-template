@@ -8,17 +8,16 @@ import (
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
+	"github.com/jimafisk/custom_go_template/types"
 )
 
-// ComponentTemplate represents a registered component template
-type ComponentTemplate struct {
-	Name     string
-	Template *ast.Template
-	Props    []string // List of prop names this component accepts
-}
+// ComponentTemplate is an alias for types.ComponentTemplate for backward compatibility.
+// New code should use types.ComponentTemplate directly.
+type ComponentTemplate = types.ComponentTemplate
 
-// componentTemplateRegistry stores registered component templates
-var componentTemplateRegistry = make(map[string]*ComponentTemplate)
+// componentTemplateRegistry stores registered component templates.
+// Components are registered by BOTH short name and full signature for Plenti compatibility.
+var componentTemplateRegistry = make(map[string]*types.ComponentTemplate)
 
 // resetComponentTemplateRegistry resets the component template registry
 // Note: This doesn't clear registered templates, only the instance tracking
@@ -28,14 +27,64 @@ func resetComponentTemplateRegistry() {
 	log.Printf("Component template registry reset")
 }
 
-// RegisterComponent registers a component template for later use
+// RegisterComponent registers a component template for later use.
+// For Plenti compatibility, components are registered by BOTH short name and full signature.
+//
+// The name parameter can be:
+//   - A short name: "Hero2436" (registered as-is)
+//   - A file path: "layouts/components/Hero2436.html" (registered by both name and signature)
+//
+// This maintains backward compatibility while enabling Plenti-style lookups.
 func RegisterComponent(name string, template *ast.Template, props []string) {
-	componentTemplateRegistry[name] = &ComponentTemplate{
-		Name:     name,
-		Template: template,
+	// Create the component template using the shared type
+	ct := &types.ComponentTemplate{
+		Name:     types.ExtractNameFromPath(name),
+		Signature: types.GenerateSignature(name),
+		FilePath: name,
+		Category: types.CategoryFromPath(name),
+		AST:      template,
 		Props:    props,
 	}
-	log.Printf("Registered component template: %s with %d props", name, len(props))
+
+	// Always register by the provided name (for backward compatibility)
+	componentTemplateRegistry[name] = ct
+
+	// Also register by short name if different from provided name
+	shortName := ct.Name
+	if shortName != name {
+		componentTemplateRegistry[shortName] = ct
+		log.Printf("Registered component template: %s (also as %s) with %d props", name, shortName, len(props))
+	} else {
+		log.Printf("Registered component template: %s with %d props", name, len(props))
+	}
+
+	// Also register by full signature if it looks like a path
+	if strings.Contains(name, "/") {
+		componentTemplateRegistry[ct.Signature] = ct
+		log.Printf("  → Also registered by signature: %s", ct.Signature)
+	}
+}
+
+// RegisterComponentTemplate registers a pre-built component template.
+// This is the preferred method for new code - it ensures consistent registration
+// by both short name and full signature.
+func RegisterComponentTemplate(ct *types.ComponentTemplate) {
+	if ct == nil {
+		return
+	}
+
+	// Register by short name
+	componentTemplateRegistry[ct.Name] = ct
+
+	// Register by full signature
+	componentTemplateRegistry[ct.Signature] = ct
+
+	// Register by file path if different
+	if ct.FilePath != ct.Name && ct.FilePath != ct.Signature {
+		componentTemplateRegistry[ct.FilePath] = ct
+	}
+
+	log.Printf("Registered component: %s (signature: %s) with %d props", ct.Name, ct.Signature, len(ct.Props))
 }
 
 // UnregisterComponent removes a component from the registry
@@ -49,11 +98,26 @@ func UnregisterComponent(name string) {
 // Supports case-insensitive lookup to match JSON component names like "hero2436" with registered "Hero2436"
 // Also handles PascalCase template names like "Head" → "head" component
 // Also handles PascalCase → snake_case conversion: "FeaturedPostsSidebar" → "featured_posts_sidebar"
+// Also handles path variants: "../components/foo.html" → "layouts/components/foo.html"
 func GetComponentTemplate(name string) (*ComponentTemplate, bool) {
 	// Try exact match first (most common case)
 	template, exists := componentTemplateRegistry[name]
 	if exists {
 		return template, exists
+	}
+
+	// Try all normalized path variants for path-based lookups
+	// This handles: "../components/userprofile.html" → "layouts/components/userprofile.html"
+	pathVariants := normalizeComponentPath(name)
+	for _, variant := range pathVariants {
+		if variant == name {
+			continue // Skip, already tried
+		}
+		template, exists = componentTemplateRegistry[variant]
+		if exists {
+			log.Printf("[GetComponentTemplate] Found component via path variant: %q → %q", name, variant)
+			return template, exists
+		}
 	}
 
 	// Try case-insensitive match by capitalizing first letter
@@ -194,6 +258,13 @@ func normalizeComponentPath(path string) []string {
 			nameParts := strings.Split(filename, ".")
 			nameWithoutExt := strings.Join(nameParts[:len(nameParts)-1], ".")
 			keys = append(keys, nameWithoutExt)
+
+			// Add Plenti-compatible path format for relative paths
+			// ../components/userprofile.html -> layouts/components/userprofile.html
+			if strings.Contains(path, "../components/") || strings.Contains(path, "./components/") {
+				plentiPath := "layouts/components/" + filename
+				keys = append(keys, plentiPath)
+			}
 		}
 
 		// Add path without extension
@@ -209,8 +280,10 @@ func normalizeComponentPath(path string) []string {
 		keys = append(keys, nameWithoutExt)
 	} else {
 		// FIXED: Bare component name (e.g., "UserProfile")
-		// Generate common path variations
-		keys = append(keys, "./components/"+path+".html")
+		// Generate common path variations for all registration formats
+		keys = append(keys, "layouts/components/"+path+".html")  // Plenti format
+		keys = append(keys, "./components/"+path+".html")        // Legacy format
+		keys = append(keys, "../components/"+path+".html")       // Relative from content
 		keys = append(keys, path+".html")
 	}
 
@@ -826,7 +899,7 @@ func TransformComponentWithResolvedProps(componentName string, resolvedProps map
 	log.Printf("TransformComponentWithResolvedProps: Created isolated scope for '%s'", componentName)
 
 	// Extract component's fence data (props, variables, functions)
-	for _, rootNode := range componentTemplate.Template.RootNodes {
+	for _, rootNode := range componentTemplate.AST.RootNodes {
 		if fence, ok := rootNode.(*ast.FenceSection); ok {
 			collectComponentFenceData(fence, componentDataScope)
 			log.Printf("TransformComponentWithResolvedProps: Collected fence data, scope now has %d entries", len(componentDataScope))
@@ -849,7 +922,7 @@ func TransformComponentWithResolvedProps(componentName string, resolvedProps map
 
 	// Filter out fence section and style section from component body
 	componentBodyNodes := []ast.Node{}
-	for _, node := range componentTemplate.Template.RootNodes {
+	for _, node := range componentTemplate.AST.RootNodes {
 		_, isFence := node.(*ast.FenceSection)
 		_, isStyle := node.(*ast.StyleSection)
 		if !isFence && !isStyle {
@@ -1065,7 +1138,7 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 
 	// Step 1: Extract component's fence data (props, variables, AND functions including getters/setters)
 	// Look for fence section in the component template
-	for _, rootNode := range componentTemplate.Template.RootNodes {
+	for _, rootNode := range componentTemplate.AST.RootNodes {
 		if fence, ok := rootNode.(*ast.FenceSection); ok {
 			log.Printf("DEBUG: Found fence section with %d props and %d variables", len(fence.Props), len(fence.Variables))
 
@@ -1093,7 +1166,7 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 	// Filter out fence section and style section from component body
 	// Style sections are extracted separately by GetAggregatedStyles()
 	componentBodyNodes := []ast.Node{}
-	for _, node := range componentTemplate.Template.RootNodes {
+	for _, node := range componentTemplate.AST.RootNodes {
 		_, isFence := node.(*ast.FenceSection)
 		_, isStyle := node.(*ast.StyleSection)
 		if !isFence && !isStyle {

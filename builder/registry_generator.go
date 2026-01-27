@@ -6,14 +6,12 @@ import (
 	"strings"
 
 	"github.com/jimafisk/custom_go_template/ast"
+	"github.com/jimafisk/custom_go_template/types"
 )
 
-// ComponentTemplate represents a component with its name and parsed AST
-// This structure is used by the registry generator to convert components to JavaScript
-type ComponentTemplate struct {
-	Name string        // Component name (e.g., "Hero2436", "Services2437")
-	AST  *ast.Template // Parsed and transformed component AST
-}
+// ComponentTemplate is an alias for types.ComponentTemplate for backward compatibility.
+// New code should use types.ComponentTemplate directly.
+type ComponentTemplate = types.ComponentTemplate
 
 // RenderContext tracks rendering context to handle expressions differently in different contexts
 // Pattern: Context Object Pattern [Load: 5]
@@ -23,8 +21,17 @@ type RenderContext struct {
 	loopVars         map[string]bool // Track loop variables (iterator, value) that should NOT get props. prefix
 }
 
-// GenerateComponentRegistry converts component ASTs to ES module with template literal factories
-// Cognitive Load: 8 (Main orchestration with clear structure)
+// GenerateComponentRegistry converts component ASTs to ES module with template literal factories.
+// For Plenti compatibility, uses signatures as primary keys with short-name aliases.
+//
+// Output format:
+//
+//	const registry = {
+//	  'layouts_components_Hero2436_html': (props) => `...`,
+//	  'Hero2436': (props) => registry['layouts_components_Hero2436_html'](props),
+//	};
+//
+// Cognitive Load: 10 (Main orchestration with signature handling)
 // Pattern: Service Implementation Pattern
 func GenerateComponentRegistry(components []ComponentTemplate) string {
 	if len(components) == 0 {
@@ -32,12 +39,36 @@ func GenerateComponentRegistry(components []ComponentTemplate) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("export default {\n")
 
-	// Preallocate for performance (COGNITIVE LOAD RULE)
+	// Header comment
+	sb.WriteString("// Auto-generated Plenti-compatible component registry\n")
+	sb.WriteString("// Signature format: layouts_{category}_{name}_{extension}\n")
+	sb.WriteString("// Lookup: registry['layouts_components_' + name + '_html']\n\n")
+
+	sb.WriteString("const registry = {\n")
+
+	// Track which signatures we've added to avoid duplicates
+	addedSignatures := make(map[string]bool)
+	// Track short names for alias generation
+	shortNameAliases := make(map[string]string) // shortName -> signature
+
+	// First pass: Add components by their signature (primary key)
 	for i, component := range components {
-		// Generate component entry: 'ComponentName': (props) => `...`
-		sb.WriteString(fmt.Sprintf("  '%s': (props) => `", component.Name))
+		// Determine the signature - use component.Signature if available,
+		// otherwise generate from Name
+		signature := component.Signature
+		if signature == "" {
+			signature = types.GenerateSignature(component.Name)
+		}
+
+		// Skip if we've already added this signature
+		if addedSignatures[signature] {
+			continue
+		}
+		addedSignatures[signature] = true
+
+		// Generate component entry with signature as key
+		sb.WriteString(fmt.Sprintf("  '%s': (props) => `", signature))
 
 		// Convert AST to JavaScript template literal
 		templateContent := convertToJSTemplate(component.AST)
@@ -45,15 +76,47 @@ func GenerateComponentRegistry(components []ComponentTemplate) string {
 
 		sb.WriteString("`")
 
-		// Add comma separator except for last component
-		if i < len(components)-1 {
+		// Track short name for alias
+		shortName := component.Name
+		if shortName == "" {
+			shortName = types.SignatureToShortName(signature)
+		}
+		if shortName != "" && shortName != signature {
+			shortNameAliases[shortName] = signature
+		}
+
+		// Add comma separator
+		if i < len(components)-1 || len(shortNameAliases) > 0 {
 			sb.WriteString(",\n")
 		} else {
 			sb.WriteString("\n")
 		}
 	}
 
-	sb.WriteString("};")
+	// Second pass: Add short-name aliases for backward compatibility
+	aliasCount := 0
+	totalAliases := len(shortNameAliases)
+	for shortName, signature := range shortNameAliases {
+		// Skip if short name is same as signature (no alias needed)
+		if shortName == signature {
+			continue
+		}
+		// Skip if short name was already added as a signature
+		if addedSignatures[shortName] {
+			continue
+		}
+
+		aliasCount++
+		sb.WriteString(fmt.Sprintf("  '%s': (props) => registry['%s'](props)", shortName, signature))
+
+		if aliasCount < totalAliases {
+			sb.WriteString(",\n")
+		} else {
+			sb.WriteString("\n")
+		}
+	}
+
+	sb.WriteString("};\n\nexport default registry;")
 	return sb.String()
 }
 

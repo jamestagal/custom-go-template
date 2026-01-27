@@ -42,18 +42,18 @@ func main() {
 	// Generate registry
 	registryJS := builder.GenerateComponentRegistry(components)
 
-	// Write to file
-	outputDir := "static/js"
+	// Write to file (Plenti-compatible location)
+	outputDir := "generated"
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		log.Fatalf("Failed to create directory: %v", err)
 	}
 
-	outputPath := filepath.Join(outputDir, "component-registry.js")
+	outputPath := filepath.Join(outputDir, "layouts.js")
 	if err := os.WriteFile(outputPath, []byte(registryJS), 0644); err != nil {
 		log.Fatalf("Failed to write file: %v", err)
 	}
 
-	log.Printf("Component registry generated successfully: %s (%d components)", outputPath, len(components))
+	log.Printf("Layouts registry generated successfully: %s (%d components)", outputPath, len(components))
 }
 
 func loadComponentsFromDir(dir string, pathPrefix string, storeRegistry map[string]string) []builder.ComponentTemplate {

@@ -21,6 +21,7 @@ import (
 	"github.com/jimafisk/custom_go_template/parser"
 	"github.com/jimafisk/custom_go_template/renderer"
 	"github.com/jimafisk/custom_go_template/transformer"
+	"github.com/jimafisk/custom_go_template/types"
 	"github.com/jimafisk/custom_go_template/utils"
 )
 
@@ -69,6 +70,11 @@ func main() {
 		log.Printf("Runtime component resolution may not work correctly")
 	}
 
+	// Generate content.js from content directory
+	if err := generateContentJS(); err != nil {
+		log.Printf("WARNING: Failed to generate content.js: %v", err)
+	}
+
 	// Register static file handlers (must be registered first to avoid conflicts)
 	http.HandleFunc("/scripts/", func(w http.ResponseWriter, r *http.Request) {
 		serveStaticFile(w, r)
@@ -87,6 +93,13 @@ func main() {
 	})
 	http.HandleFunc("/public/", func(w http.ResponseWriter, r *http.Request) {
 		serveStaticFile(w, r)
+	})
+	// Plenti-compatible core and generated directories
+	http.HandleFunc("/core/", func(w http.ResponseWriter, r *http.Request) {
+		serveCoreFile(w, r)
+	})
+	http.HandleFunc("/generated/", func(w http.ResponseWriter, r *http.Request) {
+		serveGeneratedFile(w, r)
 	})
 	log.Println("Registered static file handlers")
 
@@ -141,6 +154,36 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request) {
 
 	// Serve the file
 	log.Printf("[serveStaticFile] Serving: %s from %s", path, filePath)
+	http.ServeFile(w, r, filePath)
+}
+
+// serveCoreFile serves files from the core/ directory (Plenti ejectable core)
+// Route: /core/* → ./core/*
+func serveCoreFile(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	filePath := "." + path // /core/main.js → ./core/main.js
+
+	// Set appropriate content type for JS files
+	if strings.HasSuffix(path, ".js") {
+		w.Header().Set("Content-Type", "application/javascript")
+	}
+
+	log.Printf("[serveCoreFile] Serving: %s from %s", path, filePath)
+	http.ServeFile(w, r, filePath)
+}
+
+// serveGeneratedFile serves files from the generated/ directory (Plenti build output)
+// Route: /generated/* → ./generated/*
+func serveGeneratedFile(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	filePath := "." + path // /generated/layouts.js → ./generated/layouts.js
+
+	// Set appropriate content type for JS files
+	if strings.HasSuffix(path, ".js") {
+		w.Header().Set("Content-Type", "application/javascript")
+	}
+
+	log.Printf("[serveGeneratedFile] Serving: %s from %s", path, filePath)
 	http.ServeFile(w, r, filePath)
 }
 
@@ -1162,18 +1205,19 @@ func escapeXDataForAttr(value string) string {
 // Cognitive Load: 15 (read 3 dirs: 6, iterate: 2, read file: 2, parse: 2, fence parsing: 2, register: 3)
 func registerComponents(storeRegistry map[string]string) {
 	// Register regular components from layouts/components
+	// Use full Plenti-compatible path prefix for signatures (layouts_components_*)
 	componentDir := "layouts/components"
-	registerComponentsFromDir(componentDir, "../components/", storeRegistry)
+	registerComponentsFromDir(componentDir, "layouts/components/", storeRegistry)
 
 	// Register global layout components from layouts/global
 	globalDir := "layouts/global"
-	registerComponentsFromDir(globalDir, "../global/", storeRegistry)
+	registerComponentsFromDir(globalDir, "layouts/global/", storeRegistry)
 
 	// Register content layouts from layouts/content
 	// All layouts need to be registered (matching Plenti's architecture where pages.svelte is a component)
 	// Components without fence sections won't get x-data wrapping (handled by transformer)
 	contentDir := "layouts/content"
-	registerComponentsFromDir(contentDir, "../content/", storeRegistry)
+	registerComponentsFromDir(contentDir, "layouts/content/", storeRegistry)
 }
 
 // registerContentLayoutsSelectively registers content layouts from layouts/content/
@@ -1324,24 +1368,21 @@ func registerComponentsFromDir(dir string, pathPrefix string, storeRegistry map[
 			// Extract props from the component template
 			componentProps := extractComponentProps(componentAST)
 
-			// PROPER PLENTI PATTERN: Single registration with exact filename
-			// Register with exact base name (case-sensitive, matches filename exactly)
+			// PLENTI PATTERN: Register using types.NewComponentTemplate for proper signatures
+			// The path prefix follows Plenti's layout structure: layouts/{category}/{name}.html
 			// Examples:
-			//   - hero2436.html → Register as "hero2436"
-			//   - jim_test_greeting.html → Register as "jim_test_greeting"
-			//   - Footer.html → Register as "footer" (lowercased by filename)
+			//   - layouts/components/hero2436.html → Signature: layouts_components_hero2436_html
+			//   - layouts/global/nav.html → Signature: layouts_global_nav_html
 			//
-			// JSON files must reference components with EXACT matching names:
-			//   { "name": "hero2436", ... } ✓
-			//   { "name": "jim_test_greeting", ... } ✓
-			transformer.RegisterComponent(baseName, componentAST, componentProps)
+			// Registration uses RegisterComponentTemplate which registers by:
+			//   1. Short name (hero2436) - for backward compatibility
+			//   2. Full signature (layouts_components_hero2436_html) - for Plenti lookup
+			//   3. File path (layouts/components/hero2436.html) - for import resolution
+			filePath := fmt.Sprintf("%s%s", pathPrefix, file.Name())
+			ct := types.NewComponentTemplate(filePath, componentAST, componentProps)
+			transformer.RegisterComponentTemplate(ct)
 
-			// Also register with path prefix for import resolution
-			// This handles import statements: import Hero from "../components/hero2436.html"
-			pathWithPrefix := fmt.Sprintf("%s%s", pathPrefix, file.Name())
-			transformer.RegisterComponent(pathWithPrefix, componentAST, componentProps)
-
-			log.Printf("✓ Registered: '%s' and '%s'", baseName, pathWithPrefix)
+			log.Printf("✓ Registered: '%s' (signature: %s)", ct.Name, ct.Signature)
 		}
 	}
 }
@@ -1370,10 +1411,12 @@ func generateComponentRegistry() error {
 
 	// Get all registered component keys from transformer
 	componentKeys := transformer.GetAllRegisteredKeys()
-	log.Printf("Found %d registered components", len(componentKeys))
+	log.Printf("Found %d registered component keys", len(componentKeys))
 
-	// Convert transformer.ComponentTemplate to builder.ComponentTemplate
-	builderComponents := make([]builder.ComponentTemplate, 0, len(componentKeys))
+	// Deduplicate components by signature to avoid generating the same component multiple times.
+	// Components may be registered under multiple keys (short name, path, signature).
+	seenSignatures := make(map[string]bool)
+	builderComponents := make([]builder.ComponentTemplate, 0)
 	for _, key := range componentKeys {
 		tmpl, exists := transformer.GetComponentTemplate(key)
 		if !exists {
@@ -1381,28 +1424,54 @@ func generateComponentRegistry() error {
 			continue
 		}
 
-		builderComponents = append(builderComponents, builder.ComponentTemplate{
-			Name: key,
-			AST:  tmpl.Template,
-		})
+		// Deduplicate by signature
+		if seenSignatures[tmpl.Signature] {
+			continue
+		}
+		seenSignatures[tmpl.Signature] = true
+
+		// Use the component directly (types.ComponentTemplate is now the shared type)
+		builderComponents = append(builderComponents, *tmpl)
 	}
+	log.Printf("Deduplicated to %d unique components", len(builderComponents))
 
 	// Generate the registry JavaScript
 	registryJS := builder.GenerateComponentRegistry(builderComponents)
 
-	// Ensure the static/js directory exists
-	jsDir := "static/js"
-	if err := os.MkdirAll(jsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", jsDir, err)
+	// Ensure the generated directory exists (Plenti structure)
+	generatedDir := "generated"
+	if err := os.MkdirAll(generatedDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", generatedDir, err)
 	}
 
-	// Write the registry file
-	registryPath := filepath.Join(jsDir, "component-registry.js")
-	if err := os.WriteFile(registryPath, []byte(registryJS), 0644); err != nil {
-		return fmt.Errorf("failed to write registry file: %w", err)
+	// Write layouts.js (Plenti-compatible name for component registry)
+	layoutsPath := filepath.Join(generatedDir, "layouts.js")
+	if err := os.WriteFile(layoutsPath, []byte(registryJS), 0644); err != nil {
+		return fmt.Errorf("failed to write layouts file: %w", err)
 	}
 
-	log.Printf("✓ Component registry generated: %s (%d components)", registryPath, len(builderComponents))
+	log.Printf("✓ Layouts registry generated: %s (%d components)", layoutsPath, len(builderComponents))
+	return nil
+}
+
+// generateContentJS generates the content.js file from the content directory
+// This creates a Plenti-compatible allContent array
+func generateContentJS() error {
+	contentDir := "content"
+	outputPath := "generated/content.js"
+
+	// Check if content directory exists
+	if _, err := os.Stat(contentDir); os.IsNotExist(err) {
+		log.Printf("Content directory not found: %s (skipping content.js generation)", contentDir)
+		return nil
+	}
+
+	// Generate content.js using the builder
+	if err := builder.WriteContentJS(contentDir, outputPath); err != nil {
+		return fmt.Errorf("failed to generate content.js: %w", err)
+	}
+
+	log.Printf("✓ Content generated: %s", outputPath)
 	return nil
 }
 

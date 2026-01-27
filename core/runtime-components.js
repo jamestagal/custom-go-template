@@ -20,7 +20,9 @@ let componentRegistry = null;
 let registryLoadPromise = null;
 
 // Configuration
-const REGISTRY_URL = '/js/component-registry.js';
+// Path is relative to built location: {fingerprint}/core/runtime-components.js
+// Loads layouts from: {fingerprint}/generated/layouts.js
+const REGISTRY_URL = '../generated/layouts.js';
 const MAX_RETRY_ATTEMPTS = 3;
 const INITIAL_RETRY_DELAY = 500; // milliseconds
 
@@ -102,6 +104,56 @@ async function loadComponentRegistry() {
 }
 
 /**
+ * Resolve component signature for Plenti compatibility
+ *
+ * Pattern: Component Resolution [Cognitive Load: 8]
+ * - Signature generation: 3
+ * - Multi-strategy lookup: 5
+ *
+ * Resolution order:
+ * 1. Full Plenti signature (layouts_components_{name}_html)
+ * 2. Exact short name (Hero2436)
+ * 3. Case-insensitive match (hero2436 → Hero2436)
+ *
+ * @param {Object} registry - Component registry object
+ * @param {string} componentName - Name to resolve (short name or signature)
+ * @returns {Function|null} Template function if found, null otherwise
+ */
+function resolveComponentSignature(registry, componentName) {
+    // Strategy 1: Try full Plenti signature first
+    // This matches: allLayouts["layouts_components_" + name + "_html"]
+    const signature = `layouts_components_${componentName}_html`;
+    if (registry[signature]) {
+        console.log(`[Runtime Components] Signature match: '${componentName}' → '${signature}'`);
+        return registry[signature];
+    }
+
+    // Strategy 2: Try exact short name match
+    if (registry[componentName]) {
+        console.log(`[Runtime Components] Exact match: '${componentName}'`);
+        return registry[componentName];
+    }
+
+    // Strategy 3: Try case-insensitive match
+    const lowerName = componentName.toLowerCase();
+    const registryKey = Object.keys(registry).find(key => key.toLowerCase() === lowerName);
+    if (registryKey) {
+        console.log(`[Runtime Components] Case-insensitive match: '${componentName}' → '${registryKey}'`);
+        return registry[registryKey];
+    }
+
+    // Strategy 4: Try case-insensitive signature match
+    const lowerSignature = signature.toLowerCase();
+    const signatureKey = Object.keys(registry).find(key => key.toLowerCase() === lowerSignature);
+    if (signatureKey) {
+        console.log(`[Runtime Components] Case-insensitive signature match: '${componentName}' → '${signatureKey}'`);
+        return registry[signatureKey];
+    }
+
+    return null;
+}
+
+/**
  * Render dynamic component at runtime
  *
  * Pattern: Alpine.js Magic Function [Cognitive Load: 12]
@@ -113,6 +165,11 @@ async function loadComponentRegistry() {
  * This is the main entry point called by Alpine.js x-init directive.
  * It loads the registry (if needed), gets the template function, and renders
  * the component HTML into the target element.
+ *
+ * For Plenti compatibility, component lookup tries:
+ * 1. Full Plenti signature (layouts_components_{name}_html)
+ * 2. Short name (Hero2436)
+ * 3. Case-insensitive fallback
  *
  * Error Handling Strategy (non-fatal, graceful degradation):
  * - Missing component: HTML comment warning (silent to user)
@@ -144,26 +201,15 @@ async function renderDynamicComponent(el, componentName, props) {
             return;
         }
 
-        // STEP 2: Get component template function (COGNITIVE LOAD: 2)
-        // Try exact match first, then case-insensitive match
-        let templateFn = registry[componentName];
-
-        if (!templateFn) {
-            // Try case-insensitive lookup
-            // This handles cases where JSON has 'hero2436' but registry has 'Hero2436'
-            const lowerName = componentName.toLowerCase();
-            const registryKey = Object.keys(registry).find(key => key.toLowerCase() === lowerName);
-            if (registryKey) {
-                templateFn = registry[registryKey];
-                console.log(`[Runtime Components] Case-insensitive match: '${componentName}' → '${registryKey}'`);
-            }
-        }
+        // STEP 2: Get component template function using Plenti-compatible resolution
+        // Try signature first, then short name, then case-insensitive
+        let templateFn = resolveComponentSignature(registry, componentName);
 
         if (!templateFn) {
             // Component not found - graceful degradation
             const warningMsg = `Component '${componentName}' not found in registry`;
             console.warn(warningMsg);
-            console.log('Available components:', Object.keys(registry).join(', '));
+            console.log('Available components:', Object.keys(registry).slice(0, 20).join(', ') + '...');
 
             // Insert HTML comment (visible in DevTools, not to user)
             el.innerHTML = `<!-- Warning: ${warningMsg} -->`;
