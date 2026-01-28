@@ -13,9 +13,9 @@ prop description = "A template engine powered app"
 	<!-- Alpine.js - Global reactive framework (MUST load first) -->
 	<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-	<!-- Runtime Components - Load as module to ensure proper timing -->
-	<!-- CRITICAL: Must load BEFORE Alpine initializes, so use immediate execution -->
-	<script src="/static/js/runtime-components.js"></script>
+	<!-- Runtime Components - CONDITIONALLY INJECTED by server -->
+	<!-- Only pages that use runtime component resolution get these scripts -->
+	<!-- See: transformer.HasRuntimeComponents() -->
 
 	<!-- App Scripts -->
 	<script defer type="text/javascript" src="/scripts/script.js"></script>

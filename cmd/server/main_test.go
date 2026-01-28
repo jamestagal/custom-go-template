@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/jimafisk/custom_go_template/transformer"
 )
 
 // TestRenderTemplate tests the unified renderTemplate function
@@ -343,5 +345,116 @@ let showList = true
 	// The conditional is eliminated and its content is rendered directly
 	if strings.Contains(body, `"showList"`) || strings.Contains(body, `showList:`) {
 		t.Logf("Note: showList found in x-data - this is acceptable but not required")
+	}
+}
+
+// TestInjectRuntimeScripts tests the conditional runtime script injection
+// Phase 3: Only inject runtime-components.js when HasRuntimeComponents() is true
+func TestInjectRuntimeScripts(t *testing.T) {
+	tests := []struct {
+		name           string
+		hasRuntime     bool
+		expectScript   bool
+		inputHTML      string
+	}{
+		{
+			name:         "Static page - no runtime components",
+			hasRuntime:   false,
+			expectScript: false,
+			inputHTML:    "<!DOCTYPE html><html><head><title>Test</title></head><body>Static content</body></html>",
+		},
+		{
+			name:         "Runtime page - has runtime components",
+			hasRuntime:   true,
+			expectScript: true,
+			inputHTML:    "<!DOCTYPE html><html><head><title>Test</title></head><body>Dynamic content</body></html>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup: Configure runtime component tracking
+			transformer.ResetRuntimeComponentTracking()
+			if tt.hasRuntime {
+				transformer.MarkRuntimeComponentUsed()
+			}
+
+			// Execute
+			result := injectRuntimeScripts(tt.inputHTML)
+
+			// Assert
+			hasScript := strings.Contains(result, "runtime-components.js")
+
+			if hasScript != tt.expectScript {
+				if tt.expectScript {
+					t.Errorf("Expected runtime-components.js to be injected, but it wasn't\nHTML: %s", result)
+				} else {
+					t.Errorf("Expected NO runtime-components.js, but it was injected\nHTML: %s", result)
+				}
+			}
+
+			// Additional assertions for runtime pages
+			if tt.expectScript {
+				// Verify script is in head
+				if !strings.Contains(result, `<script src="/core/runtime-components.js"></script></head>`) {
+					t.Errorf("Expected runtime script to be injected before </head>")
+				}
+			}
+		})
+	}
+}
+
+// TestStaticPageNoRuntimeScripts verifies static pages don't get runtime scripts
+func TestStaticPageNoRuntimeScripts(t *testing.T) {
+	// Template with only static content - no dynamic components
+	staticTemplate := `---
+let title = "Static Page"
+---
+
+<!DOCTYPE html>
+<html>
+<head>
+	<title>{title}</title>
+</head>
+<body>
+	<h1>{title}</h1>
+	<p>This is static content with no runtime components.</p>
+</body>
+</html>`
+
+	tmpFile, err := os.CreateTemp("", "test-static-*.html")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(staticTemplate); err != nil {
+		t.Fatalf("Failed to write test template: %v", err)
+	}
+	tmpFile.Close()
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	renderTemplate(tmpFile.Name(), w, req)
+
+	body := w.Body.String()
+	resp := w.Result()
+
+	// DEBUG: Print the generated HTML
+	t.Logf("Static page HTML (first 500 chars):\n%s\n", body[:min(500, len(body))])
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	// CRITICAL: Static page should NOT have runtime-components.js
+	if strings.Contains(body, "runtime-components.js") {
+		t.Error("Static page should NOT include runtime-components.js")
+	}
+
+	// Alpine.js should still be present (always needed)
+	if !strings.Contains(body, "alpinejs") {
+		t.Error("Expected Alpine.js CDN to be present")
 	}
 }

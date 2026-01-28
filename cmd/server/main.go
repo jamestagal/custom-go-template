@@ -463,6 +463,10 @@ func renderWithWrapper(layoutName string, w http.ResponseWriter, r *http.Request
 func renderTemplateWithProps(entrypoint string, explicitProps map[string]interface{}, w http.ResponseWriter, r *http.Request) error {
 	startTime := time.Now()
 
+	// PHASE 3: Reset runtime component tracking for this page
+	// Each page gets fresh tracking to determine if runtime scripts are needed
+	transformer.ResetRuntimeComponentTracking()
+
 	log.Printf("[TRACE-SERVER] ========== renderTemplateWithProps START ==========")
 	log.Printf("[TRACE-SERVER] renderTemplateWithProps: entrypoint=%s", entrypoint)
 	log.Printf("[TRACE-SERVER] renderTemplateWithProps: explicitProps keys=%v", getKeys(explicitProps))
@@ -691,12 +695,16 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 		finalHTML = bodyEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<script>\n%s\n</script></body>", script))
 	}
 
-	// Add Alpine.js CDN if not already present
+	// Add Alpine.js CDN if not already present (always needed)
 	if !strings.Contains(finalHTML, "alpinejs") {
 		headEndRegex := regexp.MustCompile(`(?i)</head>`)
 		finalHTML = headEndRegex.ReplaceAllString(finalHTML,
 			`<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script></head>`)
 	}
+
+	// PHASE 3: Conditionally inject runtime component scripts
+	// Only pages that use runtime component resolution get these scripts
+	finalHTML = injectRuntimeScripts(finalHTML)
 
 	// Add build time comment
 	totalBuildTime := time.Since(startTime)
@@ -731,6 +739,10 @@ func getKeys(m map[string]interface{}) []string {
 // Cognitive Load: 20 (read: 2, parse: 3, fence parsing: 3, content loading: 3, transform: 3, store merge: 3, render: 2, inject: 1)
 func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
+
+	// PHASE 3: Reset runtime component tracking for this page
+	// Each page gets fresh tracking to determine if runtime scripts are needed
+	transformer.ResetRuntimeComponentTracking()
 
 	// Read template file (COGNITIVE LOAD RULE: wrapped error)
 	templateContent, err := os.ReadFile(entrypoint)
@@ -1005,12 +1017,16 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 		finalHTML = bodyEndRegex.ReplaceAllString(finalHTML, fmt.Sprintf("<script>\n%s\n</script></body>", script))
 	}
 
-	// Add Alpine.js CDN if not already present
+	// Add Alpine.js CDN if not already present (always needed)
 	if !strings.Contains(finalHTML, "alpinejs") {
 		headEndRegex := regexp.MustCompile(`(?i)</head>`)
 		finalHTML = headEndRegex.ReplaceAllString(finalHTML,
 			`<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script></head>`)
 	}
+
+	// PHASE 3: Conditionally inject runtime component scripts
+	// Only pages that use runtime component resolution get these scripts
+	finalHTML = injectRuntimeScripts(finalHTML)
 
 	// Add build time comment
 	totalBuildTime := time.Since(startTime)
@@ -1134,6 +1150,34 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// injectRuntimeScripts conditionally injects runtime component scripts into HTML.
+// Only injects if transformer.HasRuntimeComponents() returns true for this page.
+//
+// Scripts injected (when needed):
+//   - /core/runtime-components.js - Alpine.js magic function for runtime resolution
+//   - /generated/layouts.js - Component registry (loaded by runtime-components.js)
+//
+// Pattern: Helper Function [Load: 5]
+// Cognitive Load: 5 (check: 1, regex: 2, replace: 2)
+func injectRuntimeScripts(html string) string {
+	if !transformer.HasRuntimeComponents() {
+		log.Printf("[injectRuntimeScripts] Page has no runtime components - skipping script injection")
+		return html
+	}
+
+	log.Printf("[injectRuntimeScripts] Page uses runtime components - injecting scripts")
+
+	// Inject runtime-components.js BEFORE Alpine.js loads
+	// This ensures $renderDynamicComponent is registered before Alpine.init()
+	runtimeScript := `<script src="/core/runtime-components.js"></script>`
+
+	// Find </head> and inject before it (after Alpine.js CDN which also goes in head)
+	headEndRegex := regexp.MustCompile(`(?i)</head>`)
+	html = headEndRegex.ReplaceAllString(html, runtimeScript+"</head>")
+
+	return html
 }
 
 // minifyFunction removes unnecessary whitespace from function definitions

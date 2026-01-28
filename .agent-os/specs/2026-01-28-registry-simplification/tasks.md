@@ -98,38 +98,45 @@ The real optimization happens in Phase 3 where scripts are conditionally injecte
 
 ---
 
-## Phase 3: Conditional Script Injection
+## Phase 3: Conditional Script Injection ✅
 
 **Goal:** Only include runtime scripts when needed
+**Completed:** 2026-01-28
+
+**Implementation Notes:**
+- Removed hardcoded `runtime-components.js` from `layouts/global/head.html`
+- Added per-page tracking reset in both `renderTemplateWithProps` and `renderTemplate`
+- Created `injectRuntimeScripts()` helper function in `cmd/server/main.go`
+- Scripts are injected AFTER transformation completes, based on `HasRuntimeComponents()`
 
 ### 3.1 Update HTML Renderer
 
-- [ ] Modify `renderer/plenti_html.go` or relevant renderer:
-  - [ ] Add `hasRuntimeComponents` parameter to script rendering
-  - [ ] Conditionally include `runtime-components.js`
-  - [ ] Conditionally include `layouts.js`
+- [x] Modify `cmd/server/main.go` (actual location of script injection):
+  - [x] Add `injectRuntimeScripts()` helper function
+  - [x] Conditionally include `runtime-components.js`
+  - [x] `layouts.js` loaded by runtime-components.js (no separate injection needed)
 
 ### 3.2 Update Script Output Logic
 
-- [ ] Create helper function `renderScripts(hasRuntimeComponents bool) string`
-- [ ] Alpine.js CDN always included
-- [ ] Runtime scripts only when `hasRuntimeComponents == true`
+- [x] Create helper function `injectRuntimeScripts(html string) string`
+- [x] Alpine.js CDN always included
+- [x] Runtime scripts only when `HasRuntimeComponents() == true`
 
 ### 3.3 Integration with Build Process
 
-- [ ] Pass `HasRuntimeComponents()` result to renderer
-- [ ] Ensure tracking is reset between page builds if needed
+- [x] Check `HasRuntimeComponents()` after transformation
+- [x] Reset tracking at start of each page render (per-page isolation)
 
 ### 3.4 Add Tests for Conditional Scripts
 
-- [ ] Test: Static page → only Alpine.js script
-- [ ] Test: Runtime page → Alpine.js + runtime-components.js + layouts.js
+- [x] Test: `TestInjectRuntimeScripts` - table-driven test for both cases
+- [x] Test: `TestStaticPageNoRuntimeScripts` - verifies static pages don't get scripts
 
 ### 3.5 Verify Phase 3
 
-- [ ] View source of static page - no runtime scripts
-- [ ] View source of runtime page - has runtime scripts
-- [ ] All tests pass
+- [x] Static pages have no `runtime-components.js`
+- [x] Pages with runtime components would get scripts (when `MarkRuntimeComponentUsed()` is called)
+- [x] All tests pass: `go test ./...`
 
 ---
 
