@@ -147,21 +147,23 @@ func TestRuntimeComponentResolution_EndToEnd(t *testing.T) {
 		//
 		// The homepage doesn't use this pattern, so we check for inlined components instead.
 
-		// Check for hero2436 component content (inlined, not in runtime wrapper)
-		if !strings.Contains(html, "hero2436") {
-			t.Error("hero2436 component name not found in HTML")
+		// Check for hero2436 component content (inlined via id="hero-2436")
+		// The component uses id="hero-2436" (with hyphen) in the rendered HTML
+		if !strings.Contains(html, "hero-2436") {
+			t.Error("hero-2436 component ID not found in HTML")
 		}
 
-		// Check for services2437 component content (inlined, not in runtime wrapper)
-		if !strings.Contains(html, "services2437") {
-			t.Error("services2437 component name not found in HTML")
+		// Check for services2437 component content (inlined via id="services-2437")
+		// The component uses id="services-2437" (with hyphen) in the rendered HTML
+		if !strings.Contains(html, "services-2437") {
+			t.Error("services-2437 component ID not found in HTML")
 		}
 
 		// Log component occurrences
-		heroCount := strings.Count(html, "hero2436")
-		servicesCount := strings.Count(html, "services2437")
+		heroCount := strings.Count(html, "hero-2436")
+		servicesCount := strings.Count(html, "services-2437")
 
-		t.Logf("\n=== Static Component Inlining ===\nComponents are statically imported and inlined (not runtime resolved)\nhero2436 appears: %d times\nservices2437 appears: %d times\n",
+		t.Logf("\n=== Static Component Inlining ===\nComponents are statically imported and inlined (not runtime resolved)\nhero-2436 appears: %d times\nservices-2437 appears: %d times\n",
 			heroCount, servicesCount)
 
 		// NOTE: To test actual runtime component resolution, create a separate test page
