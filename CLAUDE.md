@@ -280,14 +280,15 @@ Template Source → Parser → AST → Transformer → Rendered HTML/CSS/JS
    - Converts `{expr}` to `${props.expr}` for JavaScript template literals
    - Preserves Alpine.js directives (x-text, x-if, etc.)
    - Context tracking for literal content blocks (style/script tags)
-   - Auto-generates `static/js/component-registry.js` on server startup
+   - Auto-generates `generated/layouts.js` on server startup
 
 9. **`cmd/server/`** - Development server
-   - Serves templates at http://localhost:3000
-   - Registers components from `examples/components/`
+   - Serves templates at http://localhost:3333
+   - Registers components from `layouts/components/`
    - Extracts props, variables, and functions from fence sections
-   - Auto-generates component registry on startup (65 components)
-   - Serves runtime JavaScript: `/js/component-registry.js`, `/js/runtime-components.js`
+   - Auto-generates component registry on startup
+   - **Conditional Script Injection**: Only injects `runtime-components.js` on pages that use runtime component resolution (see `transformer.HasRuntimeComponents()`)
+   - Serves runtime JavaScript: `/generated/layouts.js`, `/core/runtime-components.js`
 
 ## Template Syntax
 
@@ -380,14 +381,15 @@ The system supports **dynamic component resolution** for components whose names 
    </template>
    ```
 
-4. **Client-Side Resolution** (`static/js/runtime-components.js`):
+4. **Client-Side Resolution** (`core/runtime-components.js`):
    - Alpine.js magic: `$renderDynamicComponent(el, name, props)`
-   - Loads component registry from `/js/component-registry.js`
+   - Loads component registry from `/generated/layouts.js`
    - Renders component template function with props
    - Re-initializes Alpine directives with `Alpine.initTree(el)`
+   - **Conditionally loaded**: Only injected on pages that use runtime components
 
-5. **Component Registry** (`static/js/component-registry.js`):
-   - Auto-generated on server startup (65 components)
+5. **Component Registry** (`generated/layouts.js`):
+   - Auto-generated on server startup
    - ES module format: `export default { 'Hero2436': (props) => \`...\`, ... }`
    - Template functions convert `{expr}` to `${props.expr}`
    - Alpine directives preserved for client-side hydration
@@ -395,11 +397,34 @@ The system supports **dynamic component resolution** for components whose names 
 **Key Files:**
 - `analyzer/scope.go` - Runtime expression detection
 - `transformer/dynamic_component_by_name.go` - Routing and wrapper emission
+- `transformer/runtime_tracker.go` - Tracks if page uses runtime components
 - `builder/registry_generator.go` - Component registry generation
-- `static/js/runtime-components.js` - Alpine.js magic function
-- `static/js/component-registry.js` - Auto-generated component templates
+- `core/runtime-components.js` - Alpine.js magic function
+- `generated/layouts.js` - Auto-generated component templates
 
 **See:** `.agent-os/specs/2025-10-15-runtime-component-resolution/` for full implementation details
+
+### Conditional Script Injection
+
+The server conditionally injects runtime component scripts to reduce page weight:
+
+**How it works:**
+1. Each page render resets the runtime tracking state (`ResetRuntimeComponentTracking()`)
+2. During transformation, if a `Component:dynamic` with a runtime-only name is detected, `MarkRuntimeComponentUsed()` is called
+3. After transformation, `injectRuntimeScripts()` checks `HasRuntimeComponents()` and only injects scripts if true
+
+**Scripts injected when needed:**
+- `/core/runtime-components.js` - Alpine.js magic function for `$renderDynamicComponent`
+- `/generated/layouts.js` - Component registry (loaded by runtime-components.js)
+
+**Always included:**
+- Alpine.js CDN (required for all Alpine.js directives)
+
+**Result:** Static pages load faster without unnecessary runtime component infrastructure.
+
+**Key Files:**
+- `transformer/runtime_tracker.go` - Thread-safe tracking (`MarkRuntimeComponentUsed`, `HasRuntimeComponents`)
+- `cmd/server/main.go` - `injectRuntimeScripts()` helper function
 
 ### Fence Section
 Front matter between `---` markers containing:

@@ -2,7 +2,7 @@
 
 **Spec:** [spec.md](spec.md)
 **Branch:** `feature/registry-simplification`
-**Status:** Phase 1 Complete ✅
+**Status:** All Phases Complete ✅
 
 ---
 
@@ -140,33 +140,34 @@ The real optimization happens in Phase 3 where scripts are conditionally injecte
 
 ---
 
-## Phase 4: Server Cleanup
+## Phase 4: Server Cleanup ✅
 
 **Goal:** Remove obsolete code paths and update documentation
+**Completed:** 2026-01-28
 
 ### 4.1 Clean Up cmd/server/main.go
 
-- [ ] Remove `generateTreeShakenBundles()` call (if exists)
-- [ ] Remove tree-shaking summary logging
-- [ ] Remove bundle-related routes (if unused)
-- [ ] Remove `generated/bundles/` directory creation
+- [x] Tree-shaking code already removed in Phase 1
+- [x] No bundle-related routes remaining
+- [x] No `generated/bundles/` directory creation
 
 ### 4.2 Clean Up Generated Directories
 
-- [ ] Remove `generated/bundles/` if it exists
-- [ ] Verify `generated/layouts.js` still works when needed
+- [x] `generated/bundles/` already removed in Phase 1
+- [x] `generated/layouts.js` verified working
 
 ### 4.3 Update CLAUDE.md
 
-- [ ] Remove tree-shaking documentation section
-- [ ] Update architecture description
-- [ ] Document conditional registry generation
-- [ ] Add note about runtime vs build-time component resolution
+- [x] No tree-shaking section to remove (was never added)
+- [x] Updated architecture description for `builder/` and `cmd/server/`
+- [x] Added "Conditional Script Injection" section documenting the new system
+- [x] Updated runtime component resolution section with correct file paths
 
 ### 4.4 Update Other Documentation
 
-- [ ] Review and update any references to tree-shaking
-- [ ] Update architecture diagrams if present
+- [x] Removed unused bundle fields from `renderer/plenti_html.go`
+- [x] Removed `addBundleDataAttributes()` function (dead code)
+- [x] Updated integration tests to reflect conditional script injection
 
 ---
 
