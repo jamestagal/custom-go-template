@@ -1,0 +1,202 @@
+---
+<!-- News Content Type Layout -->
+<!-- Maps to: content/committee/*.json files -->
+<!-- Each JSON file in content/committee/ becomes a page using this layout -->
+<!-- Real-world pattern from Plenti capitaltigers project -->
+import FeaturedPostsSidebar from '../components/featured_posts_sidebar.html'
+export let title, author, publish, textItems, allContent
+---
+
+<div class="blog-container main-content-wrapper">
+  <div class="main-content">
+    <article class="blog-article">
+
+      <div class="article-group">
+        <h1 class="blog-h1">
+          {title}
+        </h1>
+        <div class="blog-authorGroup">
+          <picture class="blog-author-img">
+            <img
+              alt="{author.image.alt}"
+              decoding="async"
+              height="32"
+              src="{author.image.src}"
+              width="32"
+            />
+          </picture>
+          <span class="blog-author">{author.name}</span>
+          <span class="blog-dot" aria-hidden="true"></span>
+          <span class="blog-date">{publish.date}</span>
+        </div>
+      </div>
+      <section id="blog-content">
+        {for item in textItems}
+          <h4>{item.title}</h4>
+          <p>{item.paragraph}</p>
+        {/for}
+      </section>
+    </article>
+    <!-- TODO: Add Socials component -->
+  </div>
+   <!-- Sidebar with Featured Posts -->
+  <FeaturedPostsSidebar allContent={allContent} />
+</div>
+
+<style>
+  /* Page container - needs padding to clear fixed nav */
+  .blog-container.main-content-wrapper {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 10rem 2rem 2rem 2rem;
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 3rem;
+    background-color: #fff;
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (max-width: 1024px) {
+    .blog-container.main-content-wrapper {
+      grid-template-columns: 1fr;
+      padding: 8rem 1.5rem 2rem 1.5rem;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .blog-container.main-content-wrapper {
+      padding: 7rem 1rem 1.5rem 1rem;
+    }
+  }
+
+  /*-- -------------------------- -->
+  <---        Blog Articles       -->
+  <--- -------------------------- -*/
+  /* Mobile - 360px */
+  @media only screen and (min-width: 0em) {
+    .blog-article {
+      width: 100%;
+      max-width: 49.6875em;
+      display: block;
+    }
+    .blog-article .blog-mainImage img {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .blog-article .blog-author-img {
+      width: 2em;
+      height: 2em;
+      border-radius: 50%;
+      display: block;
+      position: relative;
+      overflow: hidden;
+    }
+    .blog-article .blog-author-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .blog-article .blog-authorGroup {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .blog-article .blog-author,
+    .blog-article .blog-date {
+      font-size: 0.875rem;
+      line-height: 1.5em;
+      color: var(--bodyTextColor);
+    }
+    .blog-article .blog-dot {
+      width: 3px;
+      height: 3px;
+      background-color: #fe4f70;
+      border-radius: 50%;
+      display: block;
+    }
+    .blog-article .blog-h1 {
+      font-size: clamp(20px, 7vw, 36px);
+      font-weight: 700;
+      line-height: 1.4em;
+      max-width: 42.375rem;
+      margin: 1rem 0;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content {
+      margin-top: 1em;
+      padding-top: 1.5625em;
+      border-top: 1px solid #ebebeb;
+    }
+    .blog-article #blog-content h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      line-height: 1.75em;
+      margin-bottom: 1rem;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1.5em;
+      margin-bottom: 1rem;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content h3 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1.5em;
+      margin-bottom: 1rem;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content h4,
+    .blog-article #blog-content h5,
+    .blog-article #blog-content h6 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1.5em;
+      margin-bottom: 1rem;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content p {
+      font-size: 1rem;
+      line-height: 1.6em;
+      margin: 0;
+      margin-bottom: 1rem;
+      color: var(--bodyTextColor);
+    }
+    .blog-article #blog-content a {
+      font-size: inherit;
+      text-decoration: underline;
+      color: var(--primary);
+    }
+    .blog-article #blog-content ul,
+    .blog-article #blog-content ol {
+      margin: 0;
+      margin: 1rem 0;
+      padding-left: 0.5rem;
+    }
+    .blog-article #blog-content ul li,
+    .blog-article #blog-content ol li {
+      font-size: 1rem;
+      line-height: 1.6em;
+      list-style: circle;
+      margin-bottom: 1rem;
+      color: var(--bodyTextColor);
+    }
+    .blog-article #blog-content img {
+      width: 100%;
+      height: auto;
+      margin: 1rem 0;
+      border-radius: 0.5rem;
+      display: block;
+    }
+  }
+</style>

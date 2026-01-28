@@ -85,6 +85,9 @@ func main() {
 	http.HandleFunc("/images/", func(w http.ResponseWriter, r *http.Request) {
 		serveStaticFile(w, r)
 	})
+	http.HandleFunc("/media/", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r)
+	})
 	http.HandleFunc("/js/", func(w http.ResponseWriter, r *http.Request) {
 		serveStaticFile(w, r)
 	})
@@ -112,6 +115,10 @@ func main() {
 
 	// Register routes from content type directories (news, blog, etc.)
 	registerContentTypeRoutes()
+
+	// Register routes for single content type files (content/*.json)
+	// These are one-off pages like news_page.json, committee_page.json
+	registerSingleContentTypeRoutes()
 
 	// Register routes from layouts/content/*.html files (custom layouts)
 	registerContentRoutes()
@@ -144,6 +151,8 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/styles/"):
 		filePath = "." + path
 	case strings.HasPrefix(path, "/images/"):
+		filePath = "." + path
+	case strings.HasPrefix(path, "/media/"):
 		filePath = "." + path
 	case strings.HasPrefix(path, "/js/"):
 		// Map /js/* to ./static/js/*
@@ -1254,7 +1263,7 @@ func injectBuildTimeLabel(html string, buildTime time.Duration) string {
 		transition: transform 0.2s, opacity 0.2s;
 		border: 1px solid #e5e7eb;
 	" onclick="this.style.display='none'" title="Click to dismiss">
-		<img src="/images/plenti.png" alt="Plenti" style="height: 20px; width: auto;">
+		<img src="/media/images/plenti.png" alt="Plenti" style="height: 20px; width: auto;">
 		<span>Build: <strong>%s</strong></span>
 	</div>`, buildTimeStr)
 
@@ -1767,6 +1776,20 @@ func registerContentRoutes() {
 		}
 	}
 
+	// Also get single content type JSON files in content/ root to avoid conflicts
+	contentRootDir := "content"
+	rootFiles, err := os.ReadDir(contentRootDir)
+	if err == nil {
+		for _, rootFile := range rootFiles {
+			if !rootFile.IsDir() && strings.HasSuffix(rootFile.Name(), ".json") {
+				routeName := strings.TrimSuffix(rootFile.Name(), ".json")
+				if routeName != "_defaults" && routeName != "_schema" {
+					contentPageRoutes[routeName] = true
+				}
+			}
+		}
+	}
+
 	routeCount := 0
 	for _, file := range files {
 		// Skip directories and non-HTML files
@@ -1927,6 +1950,132 @@ func registerContentTypeRoutes() {
 	}
 
 	log.Printf("Registered %d total content type routes", totalRoutes)
+}
+
+// registerSingleContentTypeRoutes registers routes for single content type JSON files in content/ root
+// These are one-off pages (Plenti --single=true) like news_page.json, committee_page.json
+// Pattern: Single Content Type Route Registration [Load: 12]
+func registerSingleContentTypeRoutes() {
+	contentDir := "content"
+	layoutDir := "layouts/content"
+
+	// Read all entries in content/ directory
+	entries, err := os.ReadDir(contentDir)
+	if err != nil {
+		log.Printf("Warning: Failed to read content directory %s: %v", contentDir, err)
+		return
+	}
+
+	routeCount := 0
+
+	for _, entry := range entries {
+		// Only process JSON files (not directories)
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+
+		fileName := entry.Name()
+
+		// Skip special files
+		if fileName == "_defaults.json" || fileName == "_schema.json" {
+			continue
+		}
+
+		// Extract type name from filename: "news_page.json" → "news_page"
+		typeName := strings.TrimSuffix(fileName, ".json")
+
+		// Check if matching layout exists
+		layoutPath := filepath.Join(layoutDir, typeName+".html")
+		if _, err := os.Stat(layoutPath); os.IsNotExist(err) {
+			log.Printf("Skipping single content type %s - no matching layout at %s", typeName, layoutPath)
+			continue
+		}
+
+		// Create route: "news_page" → "/news_page"
+		route := "/" + typeName
+
+		// Capture variables for closure
+		currentRoute := route
+		currentTypeName := typeName
+
+		http.HandleFunc(currentRoute, func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("[SingleContentType Handler] %s called for URL: %s", currentRoute, r.URL.Path)
+			if err := renderSingleContentTypePage(currentTypeName, w, r); err != nil {
+				log.Printf("Error rendering %s: %v", currentRoute, err)
+				http.Error(w, "Failed to render page", http.StatusInternalServerError)
+			}
+		})
+
+		routeCount++
+		log.Printf("Registered single content type route: %s → content/%s (layout: %s)", route, fileName, typeName)
+	}
+
+	log.Printf("Registered %d single content type routes", routeCount)
+}
+
+// renderSingleContentTypePage renders a single content type page with the global wrapper
+// Pattern: Single Content Type Rendering [Load: 15]
+func renderSingleContentTypePage(typeName string, w http.ResponseWriter, r *http.Request) error {
+	log.Printf("[TRACE-SERVER] ========== renderSingleContentTypePage START ==========")
+	log.Printf("[TRACE-SERVER] renderSingleContentTypePage: typeName=%s", typeName)
+
+	// Step 1: Load content from content/<typeName>.json
+	contentPath := filepath.Join("content", typeName+".json")
+	contentData, err := loader.LoadContentJSON(contentPath)
+	if err != nil {
+		return fmt.Errorf("renderSingleContentTypePage: failed to load content %s: %w", contentPath, err)
+	}
+
+	log.Printf("[TRACE-SERVER] renderSingleContentTypePage: Loaded content from %s: %d keys", contentPath, len(contentData))
+
+	// Step 2: Build props map for wrapper
+	props := map[string]interface{}{
+		"layout":        typeName,
+		"env":           make(map[string]interface{}),
+		"user":          make(map[string]interface{}),
+		"shadowContent": make(map[string]interface{}),
+	}
+
+	// Step 3: Add all content fields as top-level props
+	for key, val := range contentData {
+		props[key] = val
+	}
+
+	// Step 4: Build content object
+	contentObj := map[string]interface{}{
+		"fields": contentData,
+	}
+	for key, val := range contentData {
+		contentObj[key] = val
+	}
+	props["content"] = contentObj
+
+	// Step 5: Add allContent (for aggregate pages that loop through all content)
+	allContent := getAllContent()
+	props["allContent"] = allContent
+
+	// Step 6: Add allLayouts
+	layoutNames := make([]string, 0)
+	for name := range transformer.GetAllComponentNames() {
+		layoutNames = append(layoutNames, name)
+	}
+	props["allLayouts"] = layoutNames
+
+	log.Printf("[TRACE-SERVER] renderSingleContentTypePage: Built props with %d keys", len(props))
+	log.Printf("[TRACE-SERVER] renderSingleContentTypePage: allContent has %d entries", len(allContent))
+
+	// Step 7: Render with html.html wrapper
+	wrapperPath := "layouts/global/html.html"
+	log.Printf("[TRACE-SERVER] renderSingleContentTypePage: Rendering with wrapper: %s, layout: %s", wrapperPath, typeName)
+
+	err = renderTemplateWithProps(wrapperPath, props, w, r)
+	if err != nil {
+		return fmt.Errorf("renderSingleContentTypePage: failed to render wrapper: %w", err)
+	}
+
+	log.Printf("[TRACE-SERVER] renderSingleContentTypePage: Successfully rendered %s", typeName)
+	log.Printf("[TRACE-SERVER] ========== renderSingleContentTypePage END ==========")
+	return nil
 }
 
 // registerContentTypeFiles registers routes for all JSON files in a content type directory

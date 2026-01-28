@@ -29,52 +29,61 @@ function toggleMobileMenu() {
                 <div class="cs-ul-wrapper" id="cs-ul-wrapper">
                     <ul class="cs-ul">
                         <li class="cs-li">
-                            <a href="" class="cs-li-link cs-active" aria-current="page">
+                            <a href="/" class="cs-li-link cs-active" aria-current="page">
                                 Home
                             </a>
                         </li>
                         <li class="cs-li">
-                            <a href="" class="cs-li-link">
+                            <a href="/jim-test" class="cs-li-link">
                                 About
                             </a>
                         </li>
-                        <!--Copy and paste this cs-dropdown list item and replace any .cs-li with this cs-dropdown group to make a new dropdown and it will work-->
-                        <!-- Note: When copying this dropdown, update the id attribute with an appropriate name (e.g., "services-dropdown-toggle", "products-dropdown-toggle") and ensure the aria-labelledby attribute on the ul matches the button's id -->
+                        <!-- News Dropdown -->
                         <li class="cs-li cs-dropdown">
-                            <button class="cs-li-link cs-dropdown-toggle" aria-expanded="false" aria-haspopup="menu" id="services-dropdown-toggle">
-                                Services
+                            <button class="cs-li-link cs-dropdown-toggle" aria-expanded="false" aria-haspopup="menu" id="news-dropdown-toggle">
+                                News
                                 <img class="cs-drop-icon" src="https://csimages2.nyc3.digitaloceanspaces.com/Icons/chevron-dropdown.svg" alt="" width="15" height="15" decoding="async" aria-hidden="true">
                             </button>
-                            <ul class="cs-drop-ul" aria-labelledby="services-dropdown-toggle">
+                            <ul class="cs-drop-ul" aria-labelledby="news-dropdown-toggle">
                                 <li class="cs-drop-li">
-                                    <a href="" class="cs-li-link cs-drop-link">Service 1</a>
+                                    <a href="/news_page" class="cs-li-link cs-drop-link">All News</a>
                                 </li>
                                 <li class="cs-drop-li">
-                                    <a href="" class="cs-li-link cs-drop-link">Service 2</a>
+                                    <a href="/news/new-product-launch" class="cs-li-link cs-drop-link">Product Launch</a>
+                                </li>
+                                <li class="cs-drop-li">
+                                    <a href="/news/quarterly-results" class="cs-li-link cs-drop-link">Quarterly Results</a>
+                                </li>
+                                <li class="cs-drop-li">
+                                    <a href="/news/team-expansion" class="cs-li-link cs-drop-link">Team Expansion</a>
                                 </li>
                             </ul>
                         </li>
                     </ul>
                     <ul class="cs-ul">
+                        <!-- Committee Dropdown -->
                         <li class="cs-li cs-dropdown">
-                            <button class="cs-li-link cs-dropdown-toggle" aria-expanded="false" aria-haspopup="menu" id="services-dropdown-toggle">
-                                Artists
+                            <button class="cs-li-link cs-dropdown-toggle" aria-expanded="false" aria-haspopup="menu" id="committee-dropdown-toggle">
+                                Committee
                                 <img class="cs-drop-icon" src="https://csimages2.nyc3.digitaloceanspaces.com/Icons/chevron-dropdown.svg" alt="" width="15" height="15" decoding="async" aria-hidden="true">
                             </button>
-                            <ul class="cs-drop-ul" aria-labelledby="services-dropdown-toggle">
+                            <ul class="cs-drop-ul" aria-labelledby="committee-dropdown-toggle">
                                 <li class="cs-drop-li">
-                                    <a href="" class="cs-li-link cs-drop-link">Artist 1</a>
+                                    <a href="/committee_page" class="cs-li-link cs-drop-link">All Meetings</a>
                                 </li>
                                 <li class="cs-drop-li">
-                                    <a href="" class="cs-li-link cs-drop-link">Artist 2</a>
+                                    <a href="/committee/post1" class="cs-li-link cs-drop-link">October 2025</a>
+                                </li>
+                                <li class="cs-drop-li">
+                                    <a href="/committee/post2" class="cs-li-link cs-drop-link">September 2025</a>
+                                </li>
+                                <li class="cs-drop-li">
+                                    <a href="/committee/post3" class="cs-li-link cs-drop-link">July 2025</a>
                                 </li>
                             </ul>
                         </li>
                         <li class="cs-li">
-                            <a href="" class="cs-li-link">FAQ</a>
-                        </li>
-                        <li class="cs-li">
-                            <a href="" class="cs-li-link">Contact</a>
+                            <a href="/store-demo" class="cs-li-link">Store</a>
                         </li>
                     </ul>
                 </div>

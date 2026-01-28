@@ -3,6 +3,220 @@
 
 const allContent = [
   {
+    type: "",
+    path: "committee_page",
+    filepath: "content/committee_page.json",
+    filename: "committee_page.json",
+    fields: {
+      "meta": {
+        "desc": "Access Capital Tigers committee meeting records and decisions. View past minutes, resolutions and AGM documents from our Richmond FC supporter group meetings.",
+        "keywords": "Capital Tigers minutes, committee meetings, Tigers governance, meeting records ACT, supporter group minutes, Richmond supporters meetings",
+        "title": "Committee Meeting Minutes | Canberra Capital Tigers"
+      },
+      "page_title": "Committee Meetings Minutes",
+      "subtitle": "Capital Tiger Meetings",
+      "title": "Committee Meeting Minutes | Canberra Capital Tigers"
+    }
+  },
+  {
+    type: "",
+    path: "news_page",
+    filepath: "content/news_page.json",
+    filename: "news_page.json",
+    fields: {
+      "meta": {
+        "desc": "Stay connected with Capital Tigers' match reports, community events, and club activities. Your source for Tigers news, player updates, and upcoming events in Canberra.",
+        "keywords": "Capital Tigers news, Canberra Tigers events, ACT football club, Tigers match reports, Capital Tigers community, Canberra football news, Tigers club activities, ACT Tigers updates",
+        "title": "Latest News \u0026 Events | Canberra Capital Tigers"
+      },
+      "page_title": "Hear about the news from the Capital Tigers",
+      "title": "Latest News \u0026 Events | Canberra Capital Tigers",
+      "topper": "News And Events"
+    }
+  },
+  {
+    type: "committee",
+    path: "post1",
+    filepath: "content/committee/post1.json",
+    filename: "post1.json",
+    fields: {
+      "author": {
+        "image": {
+          "alt": "author Raylene Easton \u0026 Jenni Shoring",
+          "src": "/media/images/uifaces-popular-image-female.jpg"
+        },
+        "name": "Raylene Easton \u0026 Jenni Shoring"
+      },
+      "publish": {
+        "date": "October 13, 2025",
+        "title": "Annual General Meeting"
+      },
+      "textItems": [
+        {
+          "paragraph": "\u003cb\u003eDate:\u003c/b\u003e 13th October, 2025\u003cbr\u003e\u003cb\u003eMeeting started:\u003c/b\u003e 7:33pm\u003cbr\u003e\u003cb\u003eMeeting ended:\u003c/b\u003e 8:24pm\u003cbr\u003e\u003cb\u003eVenue:\u003c/b\u003e Eastlakes FC, Kingston ACT\u003cbr\u003e\u003cb\u003eAttendees:\u003c/b\u003e Raylene Easton, Cherie Roe, Jenni Shoring, Tony Allocca, Michael Dacoster, Rod Powell, Rhiannon Powell, Rowan Powell, Tony Watt, Benjamin Waller, George Easton\u003cbr\u003e\u003cb\u003eApologies:\u003c/b\u003e Paul Simper\u003cbr\u003e\u003cbr\u003e\u003cb\u003ePrevious Minutes:\u003c/b\u003e\u003cbr\u003e2024 AGM Minutes read and accepted - Moved by Cherie, Seconded by Raylene.",
+          "title": "Capital Tigers AGM Details"
+        },
+        {
+          "paragraph": "President Raylene Easton welcomed members and acknowledged 2025 as a challenging year for both Richmond FC and Capital Tigers. Key points included:\u003cbr\u003e- Game day attendance at Eastlakes was lower than previous years, though core supporters remained dedicated\u003cbr\u003e- Unable to organize Sydney bus trip for GWS game - apologies to disappointed members\u003cbr\u003e- Special recognition of treasurer Cherie Roe's 9 years of exceptional service\u003cbr\u003e- Welcome to new committee members Ben Waller (website designer) and Jenni Shoring (secretary)\u003cbr\u003e- Thanks to VP Tony Allocca and Liam Pickering (tipping competition coordinator)\u003cbr\u003e- Richmond FC liaison change: Marcus Crocitti replaced by Cameron Cripps\u003cbr\u003e- Personal health update and thanks for member support\u003cbr\u003e- Optimism for future success remembering premierships in 2017, 2019, and 2020",
+          "title": "President's Report - Raylene Easton"
+        },
+        {
+          "paragraph": "Treasurer Cherie Roe presented the 2025 financial report. Following the report, President Raylene Easton thanked Cherie for her amazing work as treasurer over the past 9 years, acknowledging her valuable contributions to the committee. Cherie reciprocated by thanking Raylene for stepping up as president and leading both the committee and wider Capital Tigers membership.",
+          "title": "Treasurer's Report - Cherie Roe"
+        },
+        {
+          "paragraph": "Returning Officer George Easton conducted the elections with all positions declared vacant:\u003cbr\u003e\u003cbr\u003e\u003cb\u003eExecutive Positions:\u003c/b\u003e\u003cbr\u003e- \u003cb\u003ePresident:\u003c/b\u003e Raylene Easton (elected unopposed)\u003cbr\u003e- \u003cb\u003eVice President:\u003c/b\u003e Tony Allocca (elected unopposed)\u003cbr\u003e- \u003cb\u003eSecretary:\u003c/b\u003e Jenni Shoring (elected unopposed)\u003cbr\u003e- \u003cb\u003eTreasurer:\u003c/b\u003e Position vacant - to be advertised (interim handover with Tony \u0026 Jenni)\u003cbr\u003e\u003cbr\u003e\u003cb\u003eGeneral Committee Members elected:\u003c/b\u003e\u003cbr\u003e- Paul Simper\u003cbr\u003e- Benjamin Waller\u003cbr\u003e- Rod Powell\u003cbr\u003e- Rhiannon Powell\u003cbr\u003e- Liam Pickering (to be confirmed)",
+          "title": "2026 Committee Elections"
+        },
+        {
+          "paragraph": "\u003cb\u003e2025 Tipping Competition Results:\u003c/b\u003e\u003cbr\u003e- \u003cb\u003eKnockout Winner:\u003c/b\u003e Liam Pickering\u003cbr\u003e\u003cbr\u003e\u003cb\u003eWeekly Tipping Prize Winners:\u003c/b\u003e\u003cbr\u003e- Rob Delitz: $105\u003cbr\u003e- Tony Watt: $90\u003cbr\u003e- Craig Hammond: $20\u003cbr\u003e- Greg Watt: $20\u003cbr\u003e- Andrew Murray: $5",
+          "title": "Tipping Competition Winners"
+        },
+        {
+          "paragraph": "\u003cb\u003e2025 Major Raffle Winners:\u003c/b\u003e\u003cbr\u003e- \u003cb\u003e1st Prize (2025 Signed Guernsey):\u003c/b\u003e Jan Headon\u003cbr\u003e- \u003cb\u003e2nd Prize (Signed Sherrin Ball):\u003c/b\u003e Liam French\u003cbr\u003e- \u003cb\u003e3rd Prize (2024 Signed Guernsey):\u003c/b\u003e Jim Aravanis\u003cbr\u003e\u003cbr\u003eCongratulations to all winners!",
+          "title": "Major Raffle Draw Results"
+        },
+        {
+          "paragraph": "The committee discussed the annual contribution to Richmond FC. A motion was passed to contribute $500 while ensuring the club retains sufficient funds for early 2026 activities including a Bunnings BBQ fundraiser and potential bus trip deposit. The committee aims to increase contributions in 2026 with more active fundraising.\u003cbr\u003e\u003cbr\u003e\u003cb\u003eMotion:\u003c/b\u003e $500 contribution to Richmond FC\u003cbr\u003e\u003cb\u003eMoved by:\u003c/b\u003e Jenni Shoring\u003cbr\u003e\u003cb\u003eSeconded by:\u003c/b\u003e Raylene Easton\u003cbr\u003e\u003cb\u003eResult:\u003c/b\u003e Carried",
+          "title": "Financial Contribution to Richmond FC"
+        },
+        {
+          "paragraph": "\u003cb\u003eDate:\u003c/b\u003e 17th November, 2025\u003cbr\u003e\u003cb\u003eTime:\u003c/b\u003e TBC\u003cbr\u003e\u003cb\u003eVenue:\u003c/b\u003e TBC\u003cbr\u003e\u003cbr\u003e2026 meeting schedule to be determined at the November committee meeting.",
+          "title": "Next Committee Meeting"
+        },
+        {
+          "paragraph": "Minutes prepared by: Jenni Shoring\u003cbr\u003eDate prepared: 14/10/2025\u003cbr\u003eStatus: Draft - To be confirmed at next committee meeting",
+          "title": "Meeting Administration"
+        }
+      ],
+      "title": "Annual General Meeting Minutes - October 2025"
+    }
+  },
+  {
+    type: "committee",
+    path: "post2",
+    filepath: "content/committee/post2.json",
+    filename: "post2.json",
+    fields: {
+      "author": {
+        "image": {
+          "alt": "author Raylene Easton",
+          "src": "/media/images/uifaces-popular-image-female.jpg"
+        },
+        "name": "Raylene Easton"
+      },
+      "publish": {
+        "date": "September 8, 2025",
+        "title": "Committee Meeting"
+      },
+      "textItems": [
+        {
+          "paragraph": "\u003cdiv\u003e\u003cb\u003eDate: \u003c/b\u003e8th September, 2025\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eMeeting started:\u003c/b\u003e 7:30pm\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eMeeting ended:\u003c/b\u003e 7:55pm\u003c/div\u003e\u003cdiv\u003e\u003cb\u003ePresent:\u003c/b\u003e Tony, Jenni, Ben\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eRemote Attendees:\u003c/b\u003e Raylene\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eApologies:\u003c/b\u003e Cherie, Liam, Paul\u003c/div\u003e\u003cdiv\u003e\u003cbr\u003e\u003cb\u003eApproval of Previous Minutes:\u003c/b\u003e\u003cbr\u003eRaylene moved, Tony seconded.\u003c/div\u003e",
+          "title": "Capital Tigers Meeting Details"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- AGM October 13th\u003c/div\u003e\u003cdiv\u003e\u003cbr\u003e\u003cb\u003eActions:\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- Full email to be sent out -- Full AGM Minutes, Notice including returning officer details. To be sent out post September 8th 2025 Meeting.\u003c/div\u003e\u003cdiv\u003e- Raylene to send minutes to Ben 9/9/25\u003c/div\u003e\u003cdiv\u003e- Returning Officer - George\u003c/div\u003e\u003cdiv\u003e- Tony will draft letter to Cameron Cripps (new Marcus)\u003c/div\u003e\u003cdiv\u003e- Current committee to apply to returning officer to reapply for position.\u003c/div\u003e\u003cdiv\u003e- Check Room Booking -- Room confirmed\u003c/div\u003e",
+          "title": "1. Meetings"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- 2025 Signed Guernsey\u003c/div\u003e\u003cdiv\u003e- 2025 Signed Ball\u003c/div\u003e\u003cdiv\u003e- 2024 Away Guernsey\u003c/div\u003e\u003cdiv\u003e- Tipping Comp -- 2022 Signed Indigenous Jumper\u003c/div\u003e\u003cdiv\u003e\u003cbr\u003e\u003cb\u003eActions:\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- \u003cb\u003eRaffletix -- to be used.\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- \u003cb\u003eOther states where raffletix not available -- Tony to send email to Raylene.\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- \u003cb\u003eDrawn AGM\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- \u003cb\u003eContact Other supporter groups for raffle -- Getting Cameron to share.\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- \u003cb\u003eTony to send photos to Raylene, up by end of week 14/9/25\u003c/b\u003e\u003c/div\u003e",
+          "title": "2. Raffle -- To be started"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- 1 person outstanding -- Liam to follow up if still not paid.\u003c/div\u003e\u003cdiv\u003e\u003cbr\u003e\u003cb\u003eActions:\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- Liam sent details through via whatsapp group.\u003c/div\u003e\u003cdiv\u003e- Tony to attempt to contact winner.\u003c/div\u003e",
+          "title": "3. Tipping Comp"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- Roar Roundup -- Eastlakes Logo to be added and thanked them as ongoing sponsor.\u003c/div\u003e\u003cdiv\u003e- Do Draft Night, Pre-Season Start, Build to start season.\u003c/div\u003e",
+          "title": "4. Newsletter"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- Raffle -- to be started asap.\u003c/div\u003e\u003cdiv\u003e- Bunnings before the 2026 season starts.\u003c/div\u003e",
+          "title": "Standing Items - Fundraising"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- None until 2026\u003c/div\u003e",
+          "title": "Standing Items - Game Day Promotion"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- Website updated -- Constitution, guidelines and minutes have been added -- Ben.\u003c/div\u003e\u003cdiv\u003e- Correspondence in: Raylene advised that we have received some positive feedback on the work the committee has been doing and it is greatly appreciated.\u003c/div\u003e\u003cdiv\u003e- See how membership number go, may look at another shirt for next year\u003c/div\u003e",
+          "title": "Other Business"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e\u003cb\u003eNext meeting:\u003c/b\u003e AGM -- October 13th 2025 -- 7:30pm\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eKnown absences:\u003c/b\u003e n/a\u003c/div\u003e",
+          "title": "Future Meetings and Events"
+        },
+        {
+          "paragraph": "\u003cdiv\u003eMinutes prepared by: Jenni\u003c/div\u003e\u003cdiv\u003eDate prepared: 11/9/25\u003c/div\u003e",
+          "title": "Meeting Administration"
+        }
+      ],
+      "title": "General Meeting Minutes - September 2025"
+    }
+  },
+  {
+    type: "committee",
+    path: "post3",
+    filepath: "content/committee/post3.json",
+    filename: "post3.json",
+    fields: {
+      "author": {
+        "image": {
+          "alt": "author Raylene Easton",
+          "src": "/media/images/uifaces-popular-image-female.jpg"
+        },
+        "name": "Raylene Easton"
+      },
+      "publish": {
+        "date": "July 21, 2025",
+        "title": "Committee Meeting"
+      },
+      "textItems": [
+        {
+          "paragraph": "\u003cdiv\u003e\u003cb\u003eDate: \u003c/b\u003e21st July, 2025\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eMeeting started:\u003c/b\u003e 7:34pm\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eMeeting ended:\u003c/b\u003e 8:24pm\u003c/div\u003e\u003cdiv\u003e\u003cb\u003ePresent:\u003c/b\u003e Raylene, Tony, Cherie, Ben, Jenni\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eRemote Attendees:\u003c/b\u003e Paul\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eApologies:\u003c/b\u003e Liam\u003c/div\u003e\u003cdiv\u003e\u003cbr\u003e\u003cb\u003eApproval of Previous Minutes:\u003c/b\u003e\u003cbr\u003eCherie moved, Tony seconded.\u003c/div\u003e",
+          "title": "Capital Tigers Meeting Details"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- Date for September -- 8th\u003c/div\u003e\u003cdiv\u003e- AGM October 13th\u003c/div\u003e\u003cdiv\u003e\u003cbr\u003e\u003cb\u003eActions:\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- Full email send out -- Full AGM Minutes, Notice, Returning Officer -- Cherie sharing to committee. To be sent out post September 8th 2025 Meeting.\u003c/div\u003e\u003cdiv\u003e- Constitution and Guidelines to be added to website -- Raylene to send to Ben.\u003c/div\u003e",
+          "title": "1. Meetings"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- 2025 Signed Guernsey\u003c/div\u003e\u003cdiv\u003e- 2025 Signed Ball\u003c/div\u003e\u003cdiv\u003e- 2024 Away Guernsey\u003c/div\u003e\u003cdiv\u003e- Tipping Comp -- 2022 Signed Indigenous Jumper\u003c/div\u003e\u003cdiv\u003e\u003cbr\u003e\u003cb\u003eActions:\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- Photos to be taken.\u003c/div\u003e\u003cdiv\u003e- Raffletix to be used like last year. Promote at games. -- Date to be drawn October 13th\u003c/div\u003e\u003cdiv\u003e- Tony to follow up with Marcus about eligibility for other states.\u003c/div\u003e",
+          "title": "2. Raffle Allocation"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- Most money has been collected.\u003c/div\u003e\u003cdiv\u003e- 1 person outstanding -- Liam to contact.\u003c/div\u003e\u003cdiv\u003e\u003cbr\u003e\u003cb\u003eActions:\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- Cherie to follow up with Liam.\u003c/div\u003e",
+          "title": "3. Tipping Comp"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- Roar Roundup Interactions -- No summary\u003c/div\u003e\u003cdiv\u003e- Should it be on our facebook page -- Link put on facebook page.\u003c/div\u003e\u003cdiv\u003e\u003cbr\u003e\u003cb\u003eActions:\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- This week -- No summary, just link to roundup in email to drive traction.\u003c/div\u003e\u003cdiv\u003e- Copy and paste link into facebook to also drive traction to webpage.\u003c/div\u003e",
+          "title": "4. Newsletter"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- Raffle -- to be started asap.\u003c/div\u003e",
+          "title": "Standing Items - Fundraising"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- None presently\u003c/div\u003e",
+          "title": "Standing Items - Game Day Promotion"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e- \u003cb\u003eTreasury update from Cherie -- Tony to go to the bank. May need an extra signatory -- Jenni to be set up.\u003c/b\u003e\u003c/div\u003e\u003cdiv\u003e- \u003cb\u003eMarcus still to send other things through.\u003c/b\u003e\u003c/div\u003e",
+          "title": "Other Business"
+        },
+        {
+          "paragraph": "\u003cdiv\u003e\u003cb\u003eNext meeting:\u003c/b\u003e September Date 8th\u003c/div\u003e\u003cdiv\u003e\u003cb\u003eKnown absences:\u003c/b\u003e n/a\u003c/div\u003e",
+          "title": "Future Meetings and Events"
+        },
+        {
+          "paragraph": "\u003cdiv\u003eMinutes prepared by: Jenni\u003c/div\u003e\u003cdiv\u003eDate prepared: 28/7/25\u003c/div\u003e",
+          "title": "Meeting Administration"
+        }
+      ],
+      "title": "General Meeting Minutes - July 2025"
+    }
+  },
+  {
     type: "news",
     path: "new-product-launch",
     filepath: "content/news/new-product-launch.json",
@@ -152,7 +366,7 @@ const allContent = [
       "blogImage": {
         "alt": "Team photo",
         "height": 600,
-        "src": "/images/blogImage1.png",
+        "src": "/media/images/blogImage1.png",
         "width": 1200
       },
       "figcaption": {
@@ -508,87 +722,6 @@ const allContent = [
       },
       "path": "/news",
       "title": "Quarterly Results Announced",
-      "type": "news"
-    }
-  },
-  {
-    type: "pages",
-    path: "news-post-4",
-    filepath: "content/pages/news-post-4.json",
-    filename: "news-post-4.json",
-    fields: {
-      "fields": {
-        "blogImage": {
-          "alt": "Quarterly results chart",
-          "height": 300,
-          "src": "https://picsum.photos/400/300?random=4",
-          "width": 400
-        },
-        "excerpt": "We're proud to announce our quarterly results...",
-        "post": {
-          "id": "4"
-        },
-        "publish": {
-          "date": "2025-01-15"
-        },
-        "title": "Quarterly Results Announced"
-      },
-      "path": "/news/quarterly-results",
-      "title": "Quarterly Results Announced",
-      "type": "news"
-    }
-  },
-  {
-    type: "pages",
-    path: "news-post-5",
-    filepath: "content/pages/news-post-5.json",
-    filename: "news-post-5.json",
-    fields: {
-      "fields": {
-        "blogImage": {
-          "alt": "New product showcase",
-          "height": 300,
-          "src": "https://picsum.photos/400/300?random=5",
-          "width": 400
-        },
-        "excerpt": "Introducing our latest innovation...",
-        "post": {
-          "id": "5"
-        },
-        "publish": {
-          "date": "2025-02-10"
-        },
-        "title": "New Product Launch"
-      },
-      "path": "/news/new-product-launch",
-      "title": "New Product Launch",
-      "type": "news"
-    }
-  },
-  {
-    type: "pages",
-    path: "news-post-6",
-    filepath: "content/pages/news-post-6.json",
-    filename: "news-post-6.json",
-    fields: {
-      "fields": {
-        "blogImage": {
-          "alt": "Team photo",
-          "height": 300,
-          "src": "https://picsum.photos/400/300?random=6",
-          "width": 400
-        },
-        "excerpt": "We're growing our team with talented individuals...",
-        "post": {
-          "id": "6"
-        },
-        "publish": {
-          "date": "2025-03-05"
-        },
-        "title": "Team Expansion Update"
-      },
-      "path": "/news/team-expansion",
-      "title": "Team Expansion Update",
       "type": "news"
     }
   },
