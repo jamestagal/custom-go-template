@@ -21,6 +21,18 @@ type PlentiRenderOptions struct {
 
 	// BaseHref is the base URL for assets (default: "/")
 	BaseHref string
+
+	// BundlePath is the path to the tree-shaken page bundle (e.g., "/generated/bundles/pages/_index.abc123.js")
+	// This is added as data-bundle on the <html> tag.
+	BundlePath string
+
+	// CommonChunkPath is the path to the shared component chunk (e.g., "/generated/bundles/common.def456.js")
+	// This is added as data-common on the <html> tag.
+	CommonChunkPath string
+
+	// FallbackPath is the path to the full component registry for fallback (e.g., "/generated/layouts.js")
+	// This is added as data-fallback on the <html> tag.
+	FallbackPath string
 }
 
 // AddPlentiAttributes adds Plenti-compatible attributes to HTML.
@@ -46,6 +58,11 @@ func AddPlentiAttributes(html string, opts PlentiRenderOptions) string {
 		html = addDataContentFilepath(html, opts.ContentFilePath)
 	}
 
+	// Add tree-shaking bundle data attributes to <html> tag
+	if opts.BundlePath != "" {
+		html = addBundleDataAttributes(html, opts.BundlePath, opts.CommonChunkPath, opts.FallbackPath)
+	}
+
 	// Add <base href="/"> if not present
 	html = ensureBaseHref(html, opts.BaseHref)
 
@@ -69,6 +86,37 @@ func addDataContentFilepath(html, contentFilePath string) string {
 		// Insert attribute before closing >
 		tagWithoutClose := strings.TrimSuffix(match, ">")
 		return fmt.Sprintf(`%s data-content-filepath="%s">`, tagWithoutClose, contentFilePath)
+	})
+}
+
+// addBundleDataAttributes adds tree-shaking bundle attributes to the <html> tag.
+// These attributes tell the runtime which bundles to load:
+//   - data-bundle: Path to page-specific bundle
+//   - data-common: Path to shared component chunk (optional)
+//   - data-fallback: Path to full registry for fallback
+func addBundleDataAttributes(html, bundlePath, commonPath, fallbackPath string) string {
+	htmlTagRegex := regexp.MustCompile(`(?i)<html([^>]*)>`)
+	return htmlTagRegex.ReplaceAllStringFunc(html, func(match string) string {
+		// Check if bundle attributes already exist
+		if strings.Contains(match, "data-bundle") {
+			return match
+		}
+
+		// Build attributes string
+		var attrs strings.Builder
+		attrs.WriteString(fmt.Sprintf(` data-bundle="%s"`, bundlePath))
+
+		if commonPath != "" {
+			attrs.WriteString(fmt.Sprintf(` data-common="%s"`, commonPath))
+		}
+
+		if fallbackPath != "" {
+			attrs.WriteString(fmt.Sprintf(` data-fallback="%s"`, fallbackPath))
+		}
+
+		// Insert attributes before closing >
+		tagWithoutClose := strings.TrimSuffix(match, ">")
+		return tagWithoutClose + attrs.String() + ">"
 	})
 }
 

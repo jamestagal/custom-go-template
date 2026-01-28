@@ -842,13 +842,124 @@ func extractPropValue(prop ast.ComponentProp, parentDataScope map[string]any) an
 			log.Printf("extractPropValue: Could not resolve nested property '%s', keeping as expression", varName)
 		}
 
-		// For other expressions (age + 10, function calls), return as-is for Alpine.js
+		// Case 3: Simple arithmetic expressions (e.g., "age + 50", "count * 2")
+		// Try to evaluate at build time if all variables are resolvable
+		if result, ok := tryEvaluateArithmeticExpression(varName, parentDataScope); ok {
+			log.Printf("extractPropValue: Evaluated arithmetic expression '%s' to %v", varName, result)
+			return result
+		}
+
+		// For other expressions (complex math, function calls), return as-is for Alpine.js
 		log.Printf("extractPropValue: Passing expression '%s' as-is", varName)
 		return varName
 	}
 
 	// Static prop value - return as string literal
 	return prop.Value
+}
+
+// tryEvaluateArithmeticExpression attempts to evaluate simple arithmetic expressions at build time
+// Supports: +, -, *, / operators with variables and numeric literals
+// Returns (result, true) if evaluation succeeds, (nil, false) if runtime evaluation needed
+//
+// Pattern: Build-Time Expression Evaluator [Cognitive Load: 15]
+// Cognitive Load: 15 (tokenization: 5, variable resolution: 5, arithmetic: 5)
+//
+// Examples:
+//   tryEvaluateArithmeticExpression("age + 50", {"age": 55}) → (105, true)
+//   tryEvaluateArithmeticExpression("count * 2", {"count": 10}) → (20, true)
+//   tryEvaluateArithmeticExpression("unknown + 5", {}) → (nil, false)
+func tryEvaluateArithmeticExpression(expr string, dataScope map[string]any) (any, bool) {
+	expr = strings.TrimSpace(expr)
+
+	// Detect arithmetic operators
+	operators := []string{" + ", " - ", " * ", " / "}
+	var foundOp string
+	var opIndex int = -1
+
+	for _, op := range operators {
+		if idx := strings.Index(expr, op); idx != -1 {
+			foundOp = op
+			opIndex = idx
+			break
+		}
+	}
+
+	// No arithmetic operator found
+	if opIndex == -1 {
+		return nil, false
+	}
+
+	// Split into left and right operands
+	leftStr := strings.TrimSpace(expr[:opIndex])
+	rightStr := strings.TrimSpace(expr[opIndex+len(foundOp):])
+
+	// Resolve left operand
+	leftVal, leftOk := resolveOperandValue(leftStr, dataScope)
+	if !leftOk {
+		log.Printf("tryEvaluateArithmeticExpression: Could not resolve left operand '%s'", leftStr)
+		return nil, false
+	}
+
+	// Resolve right operand
+	rightVal, rightOk := resolveOperandValue(rightStr, dataScope)
+	if !rightOk {
+		log.Printf("tryEvaluateArithmeticExpression: Could not resolve right operand '%s'", rightStr)
+		return nil, false
+	}
+
+	// Perform the arithmetic operation
+	op := strings.TrimSpace(foundOp)
+	switch op {
+	case "+":
+		return leftVal + rightVal, true
+	case "-":
+		return leftVal - rightVal, true
+	case "*":
+		return leftVal * rightVal, true
+	case "/":
+		if rightVal == 0 {
+			log.Printf("tryEvaluateArithmeticExpression: Division by zero")
+			return nil, false
+		}
+		return leftVal / rightVal, true
+	}
+
+	return nil, false
+}
+
+// resolveOperandValue resolves an operand (variable name or numeric literal) to a float64 value
+// Returns (value, true) if successful, (0, false) if the operand cannot be resolved
+func resolveOperandValue(operand string, dataScope map[string]any) (float64, bool) {
+	operand = strings.TrimSpace(operand)
+
+	// Try to parse as a number literal first
+	if num, err := strconv.ParseFloat(operand, 64); err == nil {
+		return num, true
+	}
+
+	// Try to resolve as a variable from dataScope
+	if value, exists := dataScope[operand]; exists && value != nil {
+		// Convert the value to float64
+		switch v := value.(type) {
+		case int:
+			return float64(v), true
+		case int64:
+			return float64(v), true
+		case float64:
+			return v, true
+		case float32:
+			return float64(v), true
+		case string:
+			// Try to parse string as number
+			if num, err := strconv.ParseFloat(v, 64); err == nil {
+				return num, true
+			}
+		}
+		log.Printf("resolveOperandValue: Variable '%s' exists but is not numeric (type: %T)", operand, value)
+	}
+
+	return 0, false
 }
 
 // transformComponentProps converts component props to a data scope map
@@ -941,15 +1052,13 @@ func TransformComponentWithResolvedProps(componentName string, resolvedProps map
 	// Recursively transform component body with its isolated scope
 	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
 
-	// Restore global tracker and merge component's tracked vars into it
+	// Restore global tracker WITHOUT merging component's tracked vars
+	// FIX: Don't pollute parent/global tracker with component's runtime vars
+	// Each component handles its own x-data independently - merging would cause
+	// all component vars to bubble up to body x-data, bloating page weight
 	trackedVars := componentTracker.GetTrackedVars()
 	setRuntimeTracker(savedTracker)
-	if savedTracker != nil {
-		for _, v := range trackedVars {
-			savedTracker.Track(v)
-		}
-	}
-	log.Printf("[X-Data] TransformComponentWithResolvedProps '%s': restored global tracker, merged %d vars", componentName, len(trackedVars))
+	log.Printf("[X-Data] TransformComponentWithResolvedProps '%s': restored global tracker (component had %d vars, NOT merged)", componentName, len(trackedVars))
 
 	// Wrap with x-data if component has data
 	if len(componentDataScope) == 0 {
@@ -1189,15 +1298,13 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 	// Recursively transform component body with its isolated scope
 	transformedNodes := transformNodes(componentBodyNodes, componentDataScope, false, false)
 
-	// Restore global tracker and merge component's tracked vars into it
+	// Restore global tracker WITHOUT merging component's tracked vars
+	// FIX: Don't pollute parent/global tracker with component's runtime vars
+	// Each component handles its own x-data independently - merging would cause
+	// all component vars to bubble up to body x-data, bloating page weight
 	trackedVars := componentTracker.GetTrackedVars()
 	setRuntimeTracker(savedTracker)
-	if savedTracker != nil {
-		for _, v := range trackedVars {
-			savedTracker.Track(v)
-		}
-	}
-	log.Printf("[X-Data] Component '%s': restored global tracker, merged %d vars", componentName, len(trackedVars))
+	log.Printf("[X-Data] Component '%s': restored global tracker (component had %d vars, NOT merged)", componentName, len(trackedVars))
 
 	// PHASE 4: Wrap with x-data (Task 2.4 + PHASE 2 OPTIMIZATION) ✓
 

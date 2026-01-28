@@ -223,35 +223,102 @@ func renderComponentNode(sb *strings.Builder, node ast.Node) {
 }
 
 // registerTestComponents registers test component templates
+// NOTE: Components include x-text directives for ALL props to ensure runtime variables are tracked
+// and x-data wrappers are generated (required after x-data optimization)
 func registerTestComponents() {
-	// Button component
+	// Button component (no props, no x-data needed)
 	buttonTemplate := &ast.Template{
 		RootNodes: []ast.Node{
-			&ast.TextNode{Content: "Button Component"},
+			&ast.Element{
+				TagName: "button",
+				Children: []ast.Node{
+					&ast.TextNode{Content: "Button Component"},
+				},
+			},
 		},
 	}
 	transformer.RegisterComponent("Button", buttonTemplate, []string{})
 
-	// Card component
+	// Card component - uses x-text for ALL props (title, subtitle)
 	cardTemplate := &ast.Template{
 		RootNodes: []ast.Node{
-			&ast.TextNode{Content: "Card Component"},
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "card"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "Card Component"},
+					&ast.Element{
+						TagName: "h2",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "title"},
+						},
+					},
+					&ast.Element{
+						TagName: "p",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "subtitle"},
+						},
+					},
+				},
+			},
 		},
 	}
 	transformer.RegisterComponent("Card", cardTemplate, []string{"title", "subtitle"})
 
-	// UserProfile component
+	// UserProfile component - uses x-text for ALL props (user, showDetails)
 	userProfileTemplate := &ast.Template{
 		RootNodes: []ast.Node{
-			&ast.TextNode{Content: "UserProfile Component"},
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "user-profile"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "UserProfile Component"},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "user"},
+						},
+					},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "showDetails"},
+						},
+					},
+				},
+			},
 		},
 	}
 	transformer.RegisterComponent("UserProfile", userProfileTemplate, []string{"user", "showDetails"})
 
-	// ProductCard component
+	// ProductCard component - uses x-text for ALL props (product, inStock)
 	productCardTemplate := &ast.Template{
 		RootNodes: []ast.Node{
-			&ast.TextNode{Content: "ProductCard Component"},
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "product-card"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "ProductCard Component"},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "product"},
+						},
+					},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "inStock"},
+						},
+					},
+				},
+			},
 		},
 	}
 	transformer.RegisterComponent("ProductCard", productCardTemplate, []string{"product", "inStock"})

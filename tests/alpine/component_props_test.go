@@ -262,35 +262,123 @@ func min(a, b int) int {
 }
 
 // registerTestPropComponents registers test component templates for prop tests
+// NOTE: Components include x-text directives for ALL props to ensure runtime variables are tracked
+// and x-data wrappers are generated (required after x-data optimization)
 func registerTestPropComponents() {
-	// DataCard component
+	// DataCard component - uses x-text for ALL props (title, count)
 	dataCardTemplate := &ast.Template{
 		RootNodes: []ast.Node{
-			&ast.TextNode{Content: "DataCard Component"},
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "data-card"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "DataCard Component"},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "title"},
+						},
+					},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "count"},
+						},
+					},
+				},
+			},
 		},
 	}
 	transformer.RegisterComponent("DataCard", dataCardTemplate, []string{"title", "count"})
 
-	// UserProfile component
+	// UserProfile component - uses x-text for ALL props (username, isAdmin, avatar)
 	userProfileTemplate := &ast.Template{
 		RootNodes: []ast.Node{
-			&ast.TextNode{Content: "UserProfile Component"},
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "user-profile"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "UserProfile Component"},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "username"},
+						},
+					},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "isAdmin"},
+						},
+					},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "avatar"},
+						},
+					},
+				},
+			},
 		},
 	}
 	transformer.RegisterComponent("UserProfile", userProfileTemplate, []string{"username", "isAdmin", "avatar"})
 
-	// ProductCard component
+	// ProductCard component - uses x-text for ALL props (price, discount)
 	productCardTemplate := &ast.Template{
 		RootNodes: []ast.Node{
-			&ast.TextNode{Content: "ProductCard Component"},
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "product-card"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "ProductCard Component"},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "price"},
+						},
+					},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "discount"},
+						},
+					},
+				},
+			},
 		},
 	}
 	transformer.RegisterComponent("ProductCard", productCardTemplate, []string{"price", "discount"})
 
-	// Form component
+	// Form component - uses x-text for ALL props (formData, errors)
 	formTemplate := &ast.Template{
 		RootNodes: []ast.Node{
-			&ast.TextNode{Content: "Form Component"},
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "form"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "Form Component"},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "formData"},
+						},
+					},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "errors"},
+						},
+					},
+				},
+			},
 		},
 	}
 	transformer.RegisterComponent("Form", formTemplate, []string{"formData", "errors"})

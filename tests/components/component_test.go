@@ -62,7 +62,9 @@ func TestComponentTransformation(t *testing.T) {
 	// Build-time expression resolution: {message} resolves to "Hello World" directly
 	// since message is in the component's data scope with a known value.
 	// No x-text span generated - the value is inlined at build-time.
-	expected := `<div class="component-content" x-data="{ message: 'Hello World' }">Component Content: Hello World</div>`
+	// X-DATA OPTIMIZATION: No x-data wrapper needed since no runtime Alpine.js
+	// evaluation is required - all expressions resolved at build-time.
+	expected := `<div class="component-content">Component Content: Hello World</div>`
 
 	// Normalize whitespace for comparison
 	normalizedHTML := testutils.NormalizeWhitespace(html)
@@ -130,7 +132,9 @@ func TestDynamicPropsComponentTransformation(t *testing.T) {
 	// Build-time expression resolution: {count} resolves to 42 directly
 	// since count is in the component's data scope with a known value.
 	// No x-text span generated - the value is inlined at build-time.
-	expected := `<div class="dynamic-component" x-data="{ count: 42 }">Count: 42</div>`
+	// X-DATA OPTIMIZATION: No x-data wrapper needed since no runtime Alpine.js
+	// evaluation is required - all expressions resolved at build-time.
+	expected := `<div class="dynamic-component">Count: 42</div>`
 
 	// Normalize whitespace for comparison
 	normalizedHTML := testutils.NormalizeWhitespace(html)

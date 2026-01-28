@@ -175,8 +175,8 @@ func TestResolvePropValue(t *testing.T) {
 				IsDynamic: true,
 			},
 			parentScope: parentScope,
-			expected:    "count + 10",
-			description: "Should return expression string for arithmetic",
+			expected:    float64(52), // count=42 + 10 = 52 (evaluated at build-time)
+			description: "Should evaluate arithmetic to actual value when variables resolvable",
 		},
 		{
 			name: "dynamic prop - comparison expression",

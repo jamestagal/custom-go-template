@@ -188,9 +188,25 @@ func TestDynamicComponentTransformation(t *testing.T) {
 // TestDynamicComponentBuildTimeOptimization tests build-time path resolution
 func TestDynamicComponentBuildTimeOptimization(t *testing.T) {
 	// Register component with resolved path
+	// NOTE: Component must include x-text directive to trigger x-data generation
+	// (required after x-data optimization that skips wrapper when no runtime vars are tracked)
 	cardTemplate := &ast.Template{
 		RootNodes: []ast.Node{
-			&ast.TextNode{Content: "Dynamic Card Component"},
+			&ast.Element{
+				TagName: "div",
+				Attributes: []ast.Attribute{
+					{Name: "class", Value: "dynamic-card"},
+				},
+				Children: []ast.Node{
+					&ast.TextNode{Content: "Dynamic Card Component"},
+					&ast.Element{
+						TagName: "span",
+						Attributes: []ast.Attribute{
+							{Name: "x-text", Value: "title"},
+						},
+					},
+				},
+			},
 		},
 	}
 	transformer.RegisterComponent("./views/Card.html", cardTemplate, []string{"title"})

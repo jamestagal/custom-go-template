@@ -560,16 +560,49 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 
 	for _, attr := range attributes {
 
+		// Helper to detect Alpine directives by name pattern
+		isAlpineByName := strings.HasPrefix(attr.Name, "x-") || strings.HasPrefix(attr.Name, "@") || strings.HasPrefix(attr.Name, ":")
+
+		// Check if this is x-data (contains JavaScript object literals, not template expressions)
+		isXData := attr.Name == "x-data"
+
+		// Check if value contains untransformed store expressions {$...} that need processing
+		// These MUST go through the store expression transformation path below
+		hasUntransformedStoreExpr := storeAttrPattern.MatchString(attr.Value)
+
 		// CRITICAL FIX: Track Alpine store references before skipping
-		// This handles @click="$store.theme.setLight()" style references
-		if attr.IsAlpine && strings.Contains(attr.Value, "$store.") {
+		// This handles @click="$store.theme.setLight()" style references (already transformed)
+		if (attr.IsAlpine || isAlpineByName) && strings.Contains(attr.Value, "$store.") {
 			trackAlpineStoreReferences(attr.Value)
 			transformedAttributes = append(transformedAttributes, attr)
 			continue
 		}
 
-		// Skip other Alpine directives - they're already handled
-		if attr.IsAlpine {
+		// CRITICAL FIX: Track variables from all Alpine directives (x-text, x-if, x-for, :bindings, etc.)
+		// These variables need to be in x-data for Alpine.js to evaluate them at runtime
+		// Check both IsAlpine flag AND name pattern (some AST nodes don't have IsAlpine set)
+		// BUT: Skip if value contains {$...} - those need store expression transformation first!
+		// EXCEPTION: x-data contains JavaScript object literals with curly braces - don't treat those as expressions
+		if (attr.IsAlpine || isAlpineByName) && attr.Value != "" && !hasUntransformedStoreExpr && (!hasExpressionSyntax(attr.Value) || isXData) {
+			if tracker := getRuntimeTracker(); tracker != nil {
+				// For x-for, extract the collection name (e.g., "item in items" → "items")
+				if strings.HasPrefix(attr.Name, "x-for") && strings.Contains(attr.Value, " in ") {
+					parts := strings.SplitN(attr.Value, " in ", 2)
+					if len(parts) == 2 {
+						tracker.TrackExpression(strings.TrimSpace(parts[1]))
+					}
+				} else {
+					// For x-text, x-if, x-show, :bindings, etc. - track the expression
+					tracker.TrackExpression(attr.Value)
+				}
+			}
+			transformedAttributes = append(transformedAttributes, attr)
+			continue
+		}
+
+		// Skip other Alpine directives that don't need expression transformation
+		// EXCEPTION: x-data contains JavaScript object literals with curly braces - don't treat those as expressions
+		if (attr.IsAlpine || isAlpineByName) && !hasUntransformedStoreExpr && (!hasExpressionSyntax(attr.Value) || isXData) {
 			transformedAttributes = append(transformedAttributes, attr)
 			continue
 		}

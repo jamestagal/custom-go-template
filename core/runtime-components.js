@@ -18,86 +18,153 @@
 // Registry cache - loaded once and reused
 let componentRegistry = null;
 let registryLoadPromise = null;
+let commonChunk = null;
 
 // Configuration
 // Path is relative to built location: {fingerprint}/core/runtime-components.js
 // Loads layouts from: {fingerprint}/generated/layouts.js
-const REGISTRY_URL = '../generated/layouts.js';
+const FALLBACK_REGISTRY_URL = '../generated/layouts.js';
 const MAX_RETRY_ATTEMPTS = 3;
 const INITIAL_RETRY_DELAY = 500; // milliseconds
 
 /**
+ * Get bundle configuration from HTML data attributes
+ *
+ * Tree-shaking data attributes:
+ * - data-bundle: Path to page-specific bundle
+ * - data-common: Path to shared component chunk
+ * - data-fallback: Path to full registry (fallback)
+ *
+ * @returns {Object} Bundle configuration
+ */
+function getBundleConfig() {
+    const htmlElement = document.documentElement;
+    return {
+        bundle: htmlElement.getAttribute('data-bundle'),
+        common: htmlElement.getAttribute('data-common'),
+        fallback: htmlElement.getAttribute('data-fallback') || FALLBACK_REGISTRY_URL
+    };
+}
+
+/**
+ * Load a JavaScript module with retry logic
+ *
+ * @param {string} url - Module URL to load
+ * @param {string} name - Name for logging
+ * @returns {Promise<Object>} Module default export
+ * @throws {Error} If all retry attempts fail
+ */
+async function loadModuleWithRetry(url, name) {
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+        try {
+            console.log(`[Runtime Components] ${name} load attempt ${attempt}/${MAX_RETRY_ATTEMPTS}: ${url}`);
+            const module = await import(url);
+            const exports = module.default;
+
+            if (!exports || typeof exports !== 'object') {
+                throw new Error(`Invalid ${name} format: expected object`);
+            }
+
+            console.log(`[Runtime Components] ${name} loaded successfully (${Object.keys(exports).length} entries)`);
+            return exports;
+
+        } catch (error) {
+            lastError = error;
+            console.warn(`[Runtime Components] ${name} load attempt ${attempt} failed:`, error.message);
+
+            if (attempt < MAX_RETRY_ATTEMPTS) {
+                const delay = INITIAL_RETRY_DELAY * attempt;
+                console.log(`[Runtime Components] Retrying ${name} in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+
+    throw new Error(`Failed to load ${name} after ${MAX_RETRY_ATTEMPTS} attempts: ${lastError.message}`);
+}
+
+/**
  * Load component registry from server
  *
- * Pattern: Async Loading with Retry [Cognitive Load: 10]
- * - Dynamic import: 3
- * - Retry logic: 5
- * - Error handling: 2
+ * Pattern: Tree-Shaking Bundle Loading [Cognitive Load: 12]
+ * - Bundle config detection: 3
+ * - Common chunk loading: 3
+ * - Page bundle loading: 3
+ * - Fallback handling: 3
  *
- * Implements exponential backoff retry strategy:
- * - Attempt 1: immediate
- * - Attempt 2: 500ms delay
- * - Attempt 3: 1000ms delay
+ * Loading order:
+ * 1. Check for tree-shaking data attributes
+ * 2. If data-common exists, load common chunk first
+ * 3. Load page bundle (data-bundle) or fallback registry
+ * 4. Merge common + page bundle into final registry
  *
  * @returns {Promise<Object>} Component registry object
- * @throws {Error} If all retry attempts fail
+ * @throws {Error} If all loading attempts fail
  */
 async function loadComponentRegistry() {
     // If already loaded, return cached registry
     if (componentRegistry) {
-        console.log('Component registry already loaded (cached)');
+        console.log('[Runtime Components] Registry already loaded (cached)');
         return componentRegistry;
     }
 
     // If loading is in progress, wait for it
     if (registryLoadPromise) {
-        console.log('Component registry loading in progress, waiting...');
+        console.log('[Runtime Components] Registry loading in progress, waiting...');
         return registryLoadPromise;
     }
 
     // Start loading
-    console.log('Loading component registry...');
+    console.log('[Runtime Components] Loading component registry...');
 
     registryLoadPromise = (async () => {
-        let lastError = null;
+        const config = getBundleConfig();
+        console.log('[Runtime Components] Bundle config:', config);
 
-        // Retry loop with exponential backoff
-        for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
-            try {
-                console.log(`Registry load attempt ${attempt}/${MAX_RETRY_ATTEMPTS}`);
+        try {
+            // If tree-shaking is enabled (data-bundle attribute present)
+            if (config.bundle) {
+                console.log('[Runtime Components] Tree-shaking enabled, loading optimized bundles');
 
-                // Dynamic import of registry module
-                const module = await import(REGISTRY_URL);
-
-                // Extract default export (registry object)
-                componentRegistry = module.default;
-
-                if (!componentRegistry || typeof componentRegistry !== 'object') {
-                    throw new Error('Invalid registry format: expected object with component templates');
+                // Step 1: Load common chunk if present
+                if (config.common && !commonChunk) {
+                    try {
+                        commonChunk = await loadModuleWithRetry(config.common, 'common chunk');
+                    } catch (error) {
+                        console.warn('[Runtime Components] Common chunk failed, continuing without it:', error.message);
+                        commonChunk = {};
+                    }
                 }
 
-                console.log(`Component registry loaded successfully (${Object.keys(componentRegistry).length} components)`);
-                registryLoadPromise = null;
-                return componentRegistry;
-
-            } catch (error) {
-                lastError = error;
-                console.warn(`Registry load attempt ${attempt} failed:`, error.message);
-
-                // Don't delay after last attempt
-                if (attempt < MAX_RETRY_ATTEMPTS) {
-                    const delay = INITIAL_RETRY_DELAY * attempt; // Exponential backoff
-                    console.log(`Retrying in ${delay}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
+                // Step 2: Load page-specific bundle
+                let pageBundle;
+                try {
+                    pageBundle = await loadModuleWithRetry(config.bundle, 'page bundle');
+                } catch (error) {
+                    console.warn('[Runtime Components] Page bundle failed, falling back to full registry');
+                    pageBundle = await loadModuleWithRetry(config.fallback, 'fallback registry');
                 }
+
+                // Step 3: Merge common chunk and page bundle
+                componentRegistry = { ...(commonChunk || {}), ...pageBundle };
+                console.log(`[Runtime Components] Registry assembled: ${Object.keys(componentRegistry).length} components`);
+
+            } else {
+                // No tree-shaking, load full registry
+                console.log('[Runtime Components] No tree-shaking config, loading full registry');
+                componentRegistry = await loadModuleWithRetry(config.fallback, 'fallback registry');
             }
-        }
 
-        // All attempts failed
-        registryLoadPromise = null;
-        const errorMsg = `Failed to load component registry after ${MAX_RETRY_ATTEMPTS} attempts`;
-        console.error(errorMsg, lastError);
-        throw new Error(`${errorMsg}: ${lastError.message}`);
+            registryLoadPromise = null;
+            return componentRegistry;
+
+        } catch (error) {
+            registryLoadPromise = null;
+            console.error('[Runtime Components] All loading strategies failed:', error);
+            throw error;
+        }
     })();
 
     return registryLoadPromise;

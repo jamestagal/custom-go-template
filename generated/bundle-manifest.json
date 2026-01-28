@@ -1,0 +1,72 @@
+{
+  "version": "7cf61752d137",
+  "generated": "2026-01-28T01:16:14Z",
+  "fingerprint": "",
+  "common": {
+    "path": "/generated/bundles/common.5fe3ef5b.js",
+    "components": [
+      "footer",
+      "head",
+      "header",
+      "hero2436",
+      "html",
+      "nav",
+      "services2437"
+    ],
+    "size": 60290
+  },
+  "bundles": {
+    "pages/_index": {
+      "path": "/generated/bundles/pages/_index.210706ab.js",
+      "components": [
+        "whyChoose2425"
+      ],
+      "includes_common": true,
+      "total_size": 70439,
+      "unique_size": 10545
+    },
+    "pages/about": {
+      "path": "/generated/bundles/pages/about.72e315ea.js",
+      "components": [
+        "hero",
+        "team"
+      ],
+      "includes_common": true,
+      "total_size": 44302,
+      "unique_size": 0
+    },
+    "pages/jim-test": {
+      "path": "/generated/bundles/pages/jim-test.56261d0e.js",
+      "components": [
+        "jim_test_advanced_loops",
+        "jim_test_age_examples",
+        "jim_test_animals_loop",
+        "jim_test_greeting",
+        "jim_test_notifications",
+        "jim_test_todos",
+        "jim_test_user_profiles"
+      ],
+      "includes_common": true,
+      "total_size": 52286,
+      "unique_size": 7984
+    },
+    "pages/test-dynamic": {
+      "path": "/generated/bundles/pages/test-dynamic.d539b52b.js",
+      "components": [],
+      "includes_common": true,
+      "total_size": 59894,
+      "unique_size": 0
+    }
+  },
+  "fallback": {
+    "path": "/generated/layouts.js",
+    "size": 181732
+  },
+  "stats": {
+    "total_components": 43,
+    "common_components": 7,
+    "orphan_components": 43,
+    "average_bundle_size": 56730,
+    "average_savings_percent": 68.78370347544735
+  }
+}

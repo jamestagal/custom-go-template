@@ -698,9 +698,16 @@ func (t *RuntimeVarTracker) FilterScopeWithSnapshot(dataScope map[string]any, sn
 // This is called before serializing to x-data to reduce page weight.
 // IMPORTANT: Also includes dependencies of getters/setters (things they reference via this.*)
 func (t *RuntimeVarTracker) FilterScope(dataScope map[string]any) map[string]any {
-	if t == nil || len(t.vars) == 0 {
-		// No tracking info, return original scope
+	if t == nil {
+		// No tracker at all - be safe, return original scope
 		return dataScope
+	}
+
+	// FIX: If tracker exists but has 0 tracked vars, return EMPTY scope
+	// This means nothing was used in runtime Alpine directives
+	if len(t.vars) == 0 {
+		log.Printf("[RuntimeVarTracker] FilterScope: tracker has 0 vars, returning empty scope (nothing needs runtime)")
+		return make(map[string]any)
 	}
 
 	filtered := make(map[string]any)
