@@ -1404,11 +1404,18 @@ func registerStores() map[string]string {
 }
 
 // generateComponentRegistry generates the JavaScript component registry file
-// for runtime component resolution
+// for runtime component resolution.
+//
+// NOTE: Registry is always generated at startup because we can't know ahead of time
+// which pages will use runtime components. The optimization happens in Phase 3
+// where scripts are conditionally injected based on per-page runtime component usage.
 //
 // Pattern: Code Generation Pattern [Load: 12]
 // Cognitive Load: 12 (get components: 3, generate registry: 5, write file: 4)
 func generateComponentRegistry() error {
+	// Reset runtime component tracking for fresh state
+	transformer.ResetRuntimeComponentTracking()
+
 	log.Println("Generating component registry...")
 
 	// Get all registered component keys from transformer

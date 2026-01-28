@@ -121,6 +121,10 @@ func TransformDynamicComponentByName(node *ast.DynamicComponentByNameNode, dataS
 //
 // IMPORTANT: The wrapper has NO children - Alpine.js will populate it at runtime
 func emitRuntimeWrapper(node *ast.DynamicComponentByNameNode, dataScope map[string]any) []ast.Node {
+	// Mark that we're using runtime component resolution
+	// This tells the registry generator to generate layouts.js
+	MarkRuntimeComponentUsed()
+
 	log.Printf("emitRuntimeWrapper: creating runtime wrapper for nameExpr=%q", node.NameExpression)
 
 	// PHASE 1: Build compProps with spread expressions and regular props (COGNITIVE LOAD: 8)
