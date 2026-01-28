@@ -913,8 +913,7 @@ body {
   }
   .blog-sidebar .blog-featured-group {
     width: 100%;
-    padding: 2.1875em 1.875em;
-    border: 1px solid #ebebeb;
+    /* padding: 2.1875em 1.875em; */
     display: flex;
     flex-direction: column;
     justify-content: flex-start;

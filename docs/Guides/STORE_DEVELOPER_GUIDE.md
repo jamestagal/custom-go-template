@@ -1,5 +1,7 @@
 # Global Store System - Developer Guide
 
+**Last Updated**: 2026-01-28
+
 This guide provides best practices, patterns, and conventions for using the global store system in the template engine.
 
 ## Table of Contents
@@ -682,8 +684,46 @@ get itemCount() {
 
 ## Additional Resources
 
-- [README.md](../README.md) - User guide with store syntax
-- [CLAUDE.md](../CLAUDE.md) - Technical architecture
-- [stores/](../stores/) - Example store files
-- [examples/pages/store-components-demo.html](../examples/pages/store-components-demo.html) - Full demo
-- [.agent-os/specs/2025-10-07-global-store-system/](../.agent-os/specs/2025-10-07-global-store-system/) - Implementation specs
+- [README.md](../../README.md) - User guide with store syntax
+- [CLAUDE.md](../../CLAUDE.md) - Technical architecture
+- [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) - Complete developer guide
+- [stores/](../../stores/) - Example store files
+  - `auth.js` - Authentication store
+  - `cart.js` - Shopping cart store
+  - `theme.js` - Theme/UI preferences store
+- [examples/pages/store-demo.html](../../examples/pages/store-demo.html) - Full interactive demo
+- [.agent-os/specs/2025-10-07-global-store-system/](../../.agent-os/specs/2025-10-07-global-store-system/) - Implementation specs
+
+## Stores and Content Types
+
+When building aggregate pages or content listings, stores can complement the `allContent` magic variable:
+
+```html
+---
+export let allContent
+import store from './stores/filters.js'
+---
+
+<!-- Filter controls using store -->
+<div class="filters">
+  <button @click="$store.filters.setType('news')">News</button>
+  <button @click="$store.filters.setType('committee')">Committee</button>
+  <button @click="$store.filters.setType('all')">All</button>
+</div>
+
+<!-- Content filtered by store state -->
+{for post in allContent}
+  {if $filters.currentType === 'all' || post.type === $filters.currentType}
+    <article>
+      <h2>{post.fields.title}</h2>
+      <span class="type-badge">{post.type}</span>
+    </article>
+  {/if}
+{/for}
+```
+
+**Note**: The example above shows a hybrid pattern where:
+- `allContent` provides the data (from JSON files)
+- Stores provide the interactive filtering state (client-side)
+
+For simple aggregate pages without filtering, just use `allContent` with `{if post.type === "..."}` directly.

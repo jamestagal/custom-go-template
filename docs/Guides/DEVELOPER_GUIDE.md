@@ -322,12 +322,13 @@ function increment() {
 
 ### Component Registration
 
-Components are auto-registered from `layouts/components/` and `examples/components/`:
+Components are auto-registered from three directories on server startup:
 
 ```go
 // Server startup (cmd/server/main.go)
-RegisterAllComponents("layouts/components")
-RegisterAllComponents("examples/components")
+registerComponentsFromDir("layouts/components", ...)  // Reusable components (65+)
+registerComponentsFromDir("layouts/global", ...)      // Global layouts (nav, head, html)
+registerComponentsFromDir("layouts/content", ...)     // Content type layouts (pages, news, etc.)
 ```
 
 **Component Naming**:
@@ -460,10 +461,12 @@ function increment() { count++ }
 | Variable | Type | Description | Opt-In? |
 |----------|------|-------------|---------|
 | `content` | Object | Current page/component data | ✅ Always |
-| `allContent` | Object | All site content (by page name) | ⚠️ Via `export let` |
-| `allLayouts` | Array | All registered component names | ⚠️ Via `export let` |
+| `allContent` | Object | All site content (keyed by path, includes `type` field) | ⚠️ Via `export let` |
+| `components` | Array | Page's component array (from JSON) | ⚠️ Via `export let` |
 | `env` | Object | Environment config | ✅ Always |
 | `buildTime` | String | Build/render timestamp | ✅ Always |
+
+> **Note on `allLayouts`**: This was a Plenti/Svelte hack required because Svelte couldn't do top-level await for SSR. Dynamic components like `<svelte:component this={allLayouts["..."]}/>` required passing ALL component constructors to the client. **We don't need this** - our build-time component resolution handles `<Component:dynamic>` at compile time, eliminating this overhead.
 
 ### content Object Structure
 
@@ -517,6 +520,159 @@ export let allContent  ← Request allContent
     <a href="/{pageName}">{pageData.title}</a>
   {/for}
 </nav>
+```
+
+---
+
+## Content Types & Aggregate Pages
+
+### Content Type System
+
+Content is organized in folders under `content/`, where each folder represents a content type:
+
+```
+content/
+├── pages/           # Component-based pages (type: "pages")
+│   ├── about.json
+│   └── contact.json
+├── news/            # News articles (type: "news")
+│   ├── product-launch.json
+│   └── quarterly-results.json
+├── committee/       # Committee meetings (type: "committee")
+│   └── october-2025.json
+├── news_page.json   # Single content type (aggregate page)
+└── committee_page.json
+```
+
+**Content Type Rules**:
+- Folder name becomes the `type` field in allContent
+- Each JSON file gets a `path` auto-generated from its location
+- Corresponding layout in `layouts/content/{type}.html`
+
+### allContent Structure with Types
+
+```javascript
+{
+  "news/product-launch": {
+    type: "news",
+    path: "/news/product-launch",
+    fields: {
+      title: "New Product Launch",
+      description: "...",
+      date: "2025-10-15"
+    }
+  },
+  "committee/october-2025": {
+    type: "committee",
+    path: "/committee/october-2025",
+    fields: {
+      title: "October 2025 Meeting",
+      description: "..."
+    }
+  }
+}
+```
+
+### Creating Aggregate/Listing Pages
+
+**Aggregate pages** list all content of a specific type (like a news index or blog archive).
+
+**Step 1: Create Single Content Type JSON**
+```json
+// content/news_page.json
+{}
+```
+*Empty JSON is fine - the template uses allContent*
+
+**Step 2: Create Layout Template**
+```html
+<!-- layouts/content/news_page.html -->
+---
+export let allContent
+---
+
+<section id="blog-listing">
+  <h1>News</h1>
+
+  {for post in allContent}
+    {if post.type === "news"}
+      <article class="cs-item">
+        <a href={post.path}>
+          <h3>{post.fields.title}</h3>
+          <p>{post.fields.description}</p>
+        </a>
+      </article>
+    {/if}
+  {/for}
+</section>
+
+<style>
+  /* Scoped styles for this aggregate page */
+  #blog-listing { max-width: 1200px; margin: 0 auto; }
+  .cs-item { margin-bottom: 2rem; }
+</style>
+```
+
+**Key Pattern Elements**:
+1. `export let allContent` - Opt-in to receive all site content
+2. `{for post in allContent}` - Loop through all content
+3. `{if post.type === "news"}` - Filter by content type
+4. `{post.fields.*}` - Access content fields
+5. `{post.path}` - Link to individual page
+
+### Single Content Type Routes
+
+**Plenti Pattern**: Files directly in `content/` root (not in subfolders) are "single content types" - they don't need an `_index.json` and represent standalone pages.
+
+**Route Registration**:
+- `content/news_page.json` → `/news_page`
+- `content/committee_page.json` → `/committee_page`
+- Uses `layouts/content/{name}.html` template
+
+**Implementation** (`cmd/server/main.go`):
+```go
+func registerSingleContentTypeRoutes(r *chi.Mux) {
+    // Scan content/ root for JSON files
+    // Register route for each (excluding _defaults, _schema)
+    // Use corresponding layout from layouts/content/
+}
+```
+
+### Content Type Template Examples
+
+**News Listing** (`layouts/content/news_page.html`):
+```html
+---
+export let allContent
+---
+
+{for post in allContent}
+  {if post.type === "news"}
+    <article>
+      <h2>{post.fields.title}</h2>
+      <time>{post.fields.date}</time>
+      <p>{post.fields.description}</p>
+      <a href={post.path}>Read more →</a>
+    </article>
+  {/if}
+{/for}
+```
+
+**Committee Listing** (`layouts/content/committee_page.html`):
+```html
+---
+export let allContent
+---
+
+{for post in allContent}
+  {if post.type === "committee"}
+    <div class="meeting-card">
+      <h3>{post.fields.title}</h3>
+      <p>{post.fields.description}</p>
+      <a href={post.path}>View Details</a>
+    </div>
+  {/if}
+{/for}
 ```
 
 ---
@@ -879,13 +1035,74 @@ import store from './stores/auth.js'
 {/if}
 ```
 
+### Content Type Aggregate Page
+
+```html
+---
+export let allContent
+---
+
+<section class="blog-listing">
+  <h1>All News Articles</h1>
+
+  {for post in allContent}
+    {if post.type === "news"}
+      <article class="post-card">
+        {if post.fields.image}
+          <img src={post.fields.image.src} alt={post.fields.image.alt} />
+        {/if}
+        <div class="content">
+          <h2><a href={post.path}>{post.fields.title}</a></h2>
+          <p class="date">{post.fields.date}</p>
+          <p>{post.fields.description}</p>
+        </div>
+      </article>
+    {/if}
+  {/for}
+</section>
+
+<style>
+  .blog-listing {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .post-card {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+</style>
+```
+
+### Navigation with Dropdowns
+
+```html
+<!-- layouts/global/nav.html -->
+<nav>
+  <ul class="nav-list">
+    <li class="dropdown">
+      <a href="/news_page">News ▼</a>
+      <ul class="dropdown-menu">
+        <li><a href="/news_page">All News</a></li>
+        <li><a href="/news/product-launch">Product Launch</a></li>
+        <li><a href="/news/quarterly-results">Q3 Results</a></li>
+      </ul>
+    </li>
+    <li><a href="/about">About</a></li>
+    <li><a href="/store-demo">Store</a></li>
+  </ul>
+</nav>
+```
+
 ---
 
 ## Alignment with Plenti & Jim's Vision
 
 ### Plenti Compatibility
 
-✅ **Magic Variables**: `content`, `allContent`, `allLayouts`, `env`
+✅ **Magic Variables**: `content`, `allContent`, `env`, `buildTime` (note: `allLayouts` not needed - build-time resolution)
 ✅ **Content Model**: JSON files with components array
 ✅ **Opt-In Pattern**: `export let` for expensive data
 ✅ **Layout System**: Global wrapper with dynamic layout injection
@@ -944,14 +1161,36 @@ go build ./...
 ├── scoping/           # CSS/JS scoping utilities
 ├── cmd/server/        # Development server
 ├── layouts/           # Template files
-│   ├── global/        # Global wrappers (html.html, head.html)
-│   ├── content/       # Page layouts (pages.html, _index.html)
-│   └── components/    # Reusable components
+│   ├── global/        # Global wrappers (html.html, head.html, nav.html)
+│   ├── content/       # Page layouts by content type
+│   │   ├── pages.html       # Component-based pages
+│   │   ├── news.html        # Individual news article
+│   │   ├── news_page.html   # News aggregate/listing
+│   │   ├── committee.html   # Individual committee meeting
+│   │   └── committee_page.html  # Committee aggregate/listing
+│   └── components/    # Reusable components (65+)
 ├── content/           # JSON content files
-│   └── pages/         # Page-specific JSON
+│   ├── pages/         # Component-based pages
+│   ├── news/          # News articles (type: "news")
+│   ├── committee/     # Committee meetings (type: "committee")
+│   ├── news_page.json      # Single content type (aggregate)
+│   └── committee_page.json # Single content type (aggregate)
+├── stores/            # Global store definitions
+│   ├── auth.js        # Authentication store
+│   ├── cart.js        # Shopping cart store
+│   └── theme.js       # Theme/UI store
+├── media/             # Media assets
+│   └── images/        # Image files
 ├── static/            # Static assets
-│   └── js/            # Alpine.js, runtime components, component registry
+│   ├── css/           # Global stylesheets
+│   └── js/            # Alpine.js, runtime components
+├── generated/         # Auto-generated files
+│   └── layouts.js     # Component registry (generated on startup)
+├── core/              # Core runtime scripts
+│   └── runtime-components.js  # Dynamic component resolution
 └── docs/              # Documentation
+    ├── Guides/        # Developer guides
+    └── plenti/        # Plenti analysis and comparisons
 ```
 
 ### Debugging Tips
