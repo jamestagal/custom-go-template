@@ -44,12 +44,6 @@ var (
 	allContentCached  bool
 )
 
-// Bundle manifest cache for tree-shaking
-// Loaded at startup and used to look up bundle paths for routes
-var (
-	bundleManifest   *builder.BundleManifest
-	bundleManifestMu sync.RWMutex
-)
 
 func main() {
 	log.Println("Starting server...")
@@ -82,11 +76,6 @@ func main() {
 		log.Printf("WARNING: Failed to generate content.js: %v", err)
 	}
 
-	// Generate tree-shaken bundles for optimized loading
-	if err := generateTreeShakenBundles(); err != nil {
-		log.Printf("WARNING: Failed to generate tree-shaken bundles: %v", err)
-		log.Printf("Falling back to full component registry")
-	}
 
 	// Register static file handlers (must be registered first to avoid conflicts)
 	http.HandleFunc("/scripts/", func(w http.ResponseWriter, r *http.Request) {
@@ -707,18 +696,6 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 		headEndRegex := regexp.MustCompile(`(?i)</head>`)
 		finalHTML = headEndRegex.ReplaceAllString(finalHTML,
 			`<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script></head>`)
-	}
-
-	// Add tree-shaking bundle data attributes to <html> tag
-	bundlePath, commonPath, fallbackPath := getBundlePathsForRoute(r.URL.Path)
-	if bundlePath != "" {
-		finalHTML = renderer.AddPlentiAttributes(finalHTML, renderer.PlentiRenderOptions{
-			BundlePath:      bundlePath,
-			CommonChunkPath: commonPath,
-			FallbackPath:    fallbackPath,
-		})
-		log.Printf("[TRACE-SERVER] Added bundle data attributes: bundle=%s, common=%s, fallback=%s",
-			bundlePath, commonPath, fallbackPath)
 	}
 
 	// Add build time comment
@@ -1498,134 +1475,6 @@ func generateContentJS() error {
 
 	log.Printf("✓ Content generated: %s", outputPath)
 	return nil
-}
-
-// generateTreeShakenBundles generates tree-shaken JavaScript bundles for each page.
-// This analyzes component usage and creates optimized bundles with shared chunks.
-//
-// Pattern: Tree-Shaking Generator [Load: 10]
-func generateTreeShakenBundles() error {
-	log.Println("Generating tree-shaken bundles...")
-
-	// Get all registered component keys from transformer
-	componentKeys := transformer.GetAllRegisteredKeys()
-	log.Printf("Found %d registered component keys for tree-shaking", len(componentKeys))
-
-	// Build registry map for TreeShaker (deduplicating by signature)
-	seenSignatures := make(map[string]bool)
-	registry := make(map[string]*types.ComponentTemplate)
-
-	for _, key := range componentKeys {
-		tmpl, exists := transformer.GetComponentTemplate(key)
-		if !exists {
-			continue
-		}
-
-		// Deduplicate by signature to avoid generating the same component multiple times
-		if seenSignatures[tmpl.Signature] {
-			continue
-		}
-		seenSignatures[tmpl.Signature] = true
-
-		// Register by signature for TreeShaker lookup
-		registry[tmpl.Signature] = tmpl
-	}
-	log.Printf("Deduplicated to %d unique components for tree-shaking", len(registry))
-
-	// Skip tree-shaking if no components
-	if len(registry) == 0 {
-		log.Println("No components found, skipping tree-shaking")
-		return nil
-	}
-
-	// Configure TreeShaker
-	config := &builder.TreeShakingConfig{
-		ContentDir:      "content",
-		LayoutsDir:      "layouts",
-		OutputDir:       "generated/bundles",
-		Fingerprint:     "", // TODO: Add Plenti fingerprint support
-		CommonThreshold: 2,
-		FallbackPath:    "/generated/layouts.js",
-	}
-
-	// Create TreeShaker and generate bundles
-	shaker := builder.NewTreeShaker(config, registry)
-	result, err := shaker.Generate()
-	if err != nil {
-		return fmt.Errorf("generateTreeShakenBundles: %w", err)
-	}
-
-	// Write bundles to disk
-	if err := shaker.WriteBundles(result); err != nil {
-		return fmt.Errorf("generateTreeShakenBundles: writing bundles: %w", err)
-	}
-
-	// Store manifest in global cache for route lookup
-	bundleManifestMu.Lock()
-	bundleManifest = result.Manifest
-	bundleManifestMu.Unlock()
-
-	// Log summary
-	log.Printf("✓ Tree-shaking complete:")
-	log.Printf("  - Total components: %d", result.TotalComponents)
-	log.Printf("  - Common chunk: %d components", len(result.CommonChunk.Components))
-	log.Printf("  - Page bundles: %d", len(result.PageBundles))
-	log.Printf("  - Orphan components: %d", len(result.OrphanComponents))
-
-	if result.Manifest.Stats != nil {
-		log.Printf("  - Average savings: %.1f%%", result.Manifest.Stats.AverageSavingsPercent)
-	}
-
-	return nil
-}
-
-// getBundlePathsForRoute returns the bundle paths for a given route.
-// Returns (bundlePath, commonPath, fallbackPath) for use in HTML data attributes.
-//
-// Pattern: Lookup Function [Load: 4]
-func getBundlePathsForRoute(routePath string) (string, string, string) {
-	bundleManifestMu.RLock()
-	defer bundleManifestMu.RUnlock()
-
-	if bundleManifest == nil {
-		return "", "", "/generated/layouts.js"
-	}
-
-	// Convert route path to page key (e.g., "/" -> "_index", "/about" -> "about")
-	pageKey := routeToPageKey(routePath)
-
-	// Look up bundle for this page
-	bundlePath := bundleManifest.GetBundlePath(pageKey)
-	commonPath := bundleManifest.GetCommonPath()
-	fallbackPath := bundleManifest.Fallback.Path
-
-	return bundlePath, commonPath, fallbackPath
-}
-
-// routeToPageKey converts a route path to a page key for manifest lookup.
-// Examples:
-//   - "/" -> "pages/_index"
-//   - "/about" -> "pages/about"
-//   - "/news/article" -> "news/article"
-//
-// Pattern: Converter Function [Load: 3]
-func routeToPageKey(routePath string) string {
-	// Handle root route
-	if routePath == "/" {
-		return "pages/_index"
-	}
-
-	// Remove leading slash
-	key := strings.TrimPrefix(routePath, "/")
-
-	// Check if this is a content/pages route
-	if !strings.Contains(key, "/") {
-		// Simple route like "/about" -> "pages/about"
-		return "pages/" + key
-	}
-
-	// Return as-is for nested routes like "/news/article"
-	return key
 }
 
 func extractComponentProps(template *ast.Template) []string {
