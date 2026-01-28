@@ -9,9 +9,11 @@
     background-color: #f4f4f4;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
     transition: left 0.3s ease-in-out;
-    padding: 20px;
+    padding: 60px 20px 20px 20px;
+    /* Extra top padding to clear build time label */
     box-sizing: border-box;
-    z-index: 1000;
+    z-index: 10001;
+    overflow-y: auto;
 }
 
 /* Style for the menu when it's visible */
@@ -23,9 +25,9 @@
 /* Style for the toggle button */
 #toggle_plenti_cms {
     position: fixed;
-    top: 95px;
+    top: 180px;
     right: 20px;
-    z-index: 1001;
+    z-index: 10002;
     padding: 10px 20px;
     background-color: #007bff;
     color: white;

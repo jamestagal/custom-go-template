@@ -77,7 +77,7 @@ func TestNestedComponentsWithAlpine(t *testing.T) {
 					},
 					// Child component 2 with loop
 					&ast.Element{
-						TagName: "ul",
+						TagName:    "ul",
 						Attributes: []ast.Attribute{},
 						Children: []ast.Node{
 							&ast.Element{
@@ -124,14 +124,14 @@ func TestNestedComponentsWithAlpine(t *testing.T) {
 		// Transform the template
 		props := map[string]any{}
 		transformed := transformer.TransformAST(parentComponent, props)
-		
+
 		// Render the transformed template
 		var sb strings.Builder
 		for _, node := range transformed.RootNodes {
 			renderNode(&sb, node)
 		}
 		result := sb.String()
-		
+
 		// Check for expected Alpine.js directives
 		expectedDirectives := []string{
 			`x-data="{ parentState: 'active', items: ['item1', 'item2', 'item3'] }"`,
@@ -143,7 +143,7 @@ func TestNestedComponentsWithAlpine(t *testing.T) {
 			`x-text="item"`,
 			`x-bind:class="{ highlight: parentState === 'active' }"`,
 		}
-		
+
 		for _, directive := range expectedDirectives {
 			if !strings.Contains(result, directive) {
 				t.Errorf("Rendered output missing expected directive: %s", directive)
@@ -275,14 +275,14 @@ func TestComplexDataStructures(t *testing.T) {
 						},
 						Children: []ast.Node{
 							&ast.Element{
-								TagName: "h3",
+								TagName:    "h3",
 								Attributes: []ast.Attribute{},
 								Children: []ast.Node{
 									&ast.TextNode{Content: "Items"},
 								},
 							},
 							&ast.Element{
-								TagName: "ul",
+								TagName:    "ul",
 								Attributes: []ast.Attribute{},
 								Children: []ast.Node{
 									&ast.Element{
@@ -370,19 +370,19 @@ func TestComplexDataStructures(t *testing.T) {
 		// Transform the template
 		props := map[string]any{}
 		transformed := transformer.TransformAST(complexDataTemplate, props)
-		
+
 		// Render the transformed template
 		var sb strings.Builder
 		for _, node := range transformed.RootNodes {
 			renderNode(&sb, node)
 		}
 		result := sb.String()
-		
+
 		// Check that the complex x-data attribute is preserved
 		if !strings.Contains(result, "x-data=") {
 			t.Errorf("Rendered output missing x-data attribute")
 		}
-		
+
 		// Check for nested object properties
 		complexProperties := []string{
 			"user.profile.name",
@@ -391,13 +391,13 @@ func TestComplexDataStructures(t *testing.T) {
 			"item in items",
 			"selectedItem.name",
 		}
-		
+
 		for _, prop := range complexProperties {
 			if !strings.Contains(result, prop) {
 				t.Errorf("Rendered output missing complex property reference: %s", prop)
 			}
 		}
-		
+
 		// Check for Alpine.js magic properties
 		if !strings.Contains(result, "$refs") || !strings.Contains(result, "$nextTick") {
 			t.Errorf("Rendered output missing Alpine.js magic properties")
@@ -467,16 +467,16 @@ func TestEdgeCaseScenarios(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test EvalJS with edge case
 			result := EvalJS(tt.jsCode, "")
-			
+
 			// For complex objects, we expect them to be returned as strings
 			resultStr, ok := result.(string)
 			if !ok && isComplexJSObject(tt.jsCode) {
 				t.Errorf("Expected complex object to be returned as string, got %T", result)
 			}
-			
+
 			// For simple objects that can be evaluated, we don't check the exact result
 			// but just make sure it doesn't cause errors
-			
+
 			// For string results, check they contain expected substrings
 			if ok && !strings.Contains(resultStr, tt.expected) {
 				t.Errorf("EvalJS() result doesn't contain expected substring %q in %q", tt.expected, resultStr)

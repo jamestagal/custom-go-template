@@ -2,8 +2,8 @@ package builder
 
 import (
 	"fmt"
-	"strings"
 	"github.com/jimafisk/custom_go_template/ast"
+	"strings"
 )
 
 func TestCSSBugManual() {
@@ -24,7 +24,7 @@ func TestCSSBugManual() {
 
 	result := GenerateComponentRegistry([]ComponentTemplate{component})
 	fmt.Println("Result:", result)
-	
+
 	if strings.Contains(result, "${props.") {
 		fmt.Println("BUG: ExpressionNode in style tag converted to props")
 	} else {

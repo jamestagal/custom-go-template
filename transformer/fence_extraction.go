@@ -302,7 +302,7 @@ func extractCompleteFunction(content string, start int) string {
 		}
 
 		// Handle strings
-		if (ch == '"' || ch == '\'') {
+		if ch == '"' || ch == '\'' {
 			if !inString {
 				inString = true
 				stringChar = ch
@@ -396,10 +396,10 @@ func extractCompleteFunction(content string, start int) string {
 				prev := remaining[prevNonSpace]
 				// Regex can follow: =, (, [, {, :, ;, !, &, |, ?, +, -, *, /, %, <, >, ^, ~, ,, return
 				if prev == '=' || prev == '(' || prev == '[' || prev == '{' ||
-				   prev == ':' || prev == ';' || prev == '!' || prev == '&' ||
-				   prev == '|' || prev == '?' || prev == '+' || prev == '-' ||
-				   prev == '*' || prev == '/' || prev == '%' || prev == '<' ||
-				   prev == '>' || prev == '^' || prev == '~' || prev == ',' {
+					prev == ':' || prev == ';' || prev == '!' || prev == '&' ||
+					prev == '|' || prev == '?' || prev == '+' || prev == '-' ||
+					prev == '*' || prev == '/' || prev == '%' || prev == '<' ||
+					prev == '>' || prev == '^' || prev == '~' || prev == ',' {
 					inRegex = true
 					continue
 				}

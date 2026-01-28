@@ -16,9 +16,9 @@ type Position struct {
 type ParseError struct {
 	Message    string
 	Position   Position
-	Input      string   // Full input for context extraction
-	Suggestion string   // Helpful suggestion for fixing the error
-	Context    string   // Snippet of code showing the problem
+	Input      string // Full input for context extraction
+	Suggestion string // Helpful suggestion for fixing the error
+	Context    string // Snippet of code showing the problem
 }
 
 // Error implements the error interface

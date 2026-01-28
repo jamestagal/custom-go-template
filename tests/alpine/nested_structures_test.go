@@ -10,10 +10,10 @@ import (
 
 func TestNestedStructuresTransformation(t *testing.T) {
 	tests := []struct {
-		name      string
-		template  *ast.Template
-		props     map[string]any
-		contains  []string
+		name        string
+		template    *ast.Template
+		props       map[string]any
+		contains    []string
 		notContains []string
 	}{
 		{
@@ -347,7 +347,7 @@ func TestNestedStructuresTransformation(t *testing.T) {
 			},
 			contains: []string{
 				`<div>`,
-								`<div>`,
+				`<div>`,
 				`Outer: <span x-text="item.name"></span>`,
 				`<div>`,
 				`<template x-for="(, item) in item.children">`,
@@ -367,21 +367,21 @@ func TestNestedStructuresTransformation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Transform the template
 			transformed := transformer.TransformAST(tt.template, tt.props)
-			
+
 			// Render the transformed template
 			var sb strings.Builder
 			for _, node := range transformed.RootNodes {
 				renderNestedStructuresNode(&sb, node)
 			}
 			result := sb.String()
-			
+
 			// Check that output contains expected strings
 			for _, s := range tt.contains {
 				if !strings.Contains(result, s) {
 					t.Errorf("Expected output to contain %q, but it doesn't.\nOutput: %s", s, result)
 				}
 			}
-			
+
 			// Check that output doesn't contain unwanted strings
 			for _, s := range tt.notContains {
 				if strings.Contains(result, s) {
@@ -401,7 +401,7 @@ func renderNestedStructuresNode(sb *strings.Builder, node ast.Node) {
 			// Check for Alpine directives
 			var isAlpineDirective bool
 			var directiveName, directiveValue string
-			
+
 			for _, attr := range n.Attributes {
 				if attr.IsAlpine {
 					isAlpineDirective = true
@@ -410,26 +410,26 @@ func renderNestedStructuresNode(sb *strings.Builder, node ast.Node) {
 					break
 				}
 			}
-			
+
 			// Handle x-if with negated conditions as x-else
 			if isAlpineDirective && directiveName == "x-if" && strings.HasPrefix(directiveValue, "!(") {
 				// This is an else condition
 				sb.WriteString("<template x-else>")
-				
+
 				// Render children
 				for _, child := range n.Children {
 					renderNestedStructuresNode(sb, child)
 				}
-				
+
 				sb.WriteString("</template>")
 				return
 			}
 		}
-		
+
 		// Default element rendering
 		sb.WriteString("<")
 		sb.WriteString(n.TagName)
-		
+
 		// Render attributes
 		for _, attr := range n.Attributes {
 			sb.WriteString(" ")
@@ -440,26 +440,26 @@ func renderNestedStructuresNode(sb *strings.Builder, node ast.Node) {
 				sb.WriteString("\"")
 			}
 		}
-		
+
 		if n.SelfClosing {
 			sb.WriteString(" />")
 			return
 		}
-		
+
 		sb.WriteString(">")
-		
+
 		// Render children
 		for _, child := range n.Children {
 			renderNestedStructuresNode(sb, child)
 		}
-		
+
 		sb.WriteString("</")
 		sb.WriteString(n.TagName)
 		sb.WriteString(">")
-		
+
 	case *ast.TextNode:
 		sb.WriteString(n.Content)
-		
+
 	case *ast.ExpressionNode:
 		sb.WriteString("<span x-text=\"")
 		sb.WriteString(n.Expression)

@@ -467,52 +467,52 @@ func TestSignatureToShortName(t *testing.T) {
 // TestSignatureInfoMethods tests the category checking methods on SignatureInfo.
 func TestSignatureInfoMethods(t *testing.T) {
 	tests := []struct {
-		name             string
-		signature        string
-		isComponent      bool
-		isGlobal         bool
+		name              string
+		signature         string
+		isComponent       bool
+		isGlobal          bool
 		isContentTemplate bool
-		isScript         bool
+		isScript          bool
 	}{
 		{
-			name:             "component",
-			signature:        "layouts_components_Hero2436_html",
-			isComponent:      true,
-			isGlobal:         false,
+			name:              "component",
+			signature:         "layouts_components_Hero2436_html",
+			isComponent:       true,
+			isGlobal:          false,
 			isContentTemplate: false,
-			isScript:         false,
+			isScript:          false,
 		},
 		{
-			name:             "global",
-			signature:        "layouts_global_nav_html",
-			isComponent:      false,
-			isGlobal:         true,
+			name:              "global",
+			signature:         "layouts_global_nav_html",
+			isComponent:       false,
+			isGlobal:          true,
 			isContentTemplate: false,
-			isScript:         false,
+			isScript:          false,
 		},
 		{
-			name:             "content",
-			signature:        "layouts_content_blog_html",
-			isComponent:      false,
-			isGlobal:         false,
+			name:              "content",
+			signature:         "layouts_content_blog_html",
+			isComponent:       false,
+			isGlobal:          false,
 			isContentTemplate: true,
-			isScript:         false,
+			isScript:          false,
 		},
 		{
-			name:             "scripts",
-			signature:        "layouts_scripts_helpers_js",
-			isComponent:      false,
-			isGlobal:         false,
+			name:              "scripts",
+			signature:         "layouts_scripts_helpers_js",
+			isComponent:       false,
+			isGlobal:          false,
 			isContentTemplate: false,
-			isScript:         true,
+			isScript:          true,
 		},
 		{
-			name:             "invalid",
-			signature:        "invalid",
-			isComponent:      false,
-			isGlobal:         false,
+			name:              "invalid",
+			signature:         "invalid",
+			isComponent:       false,
+			isGlobal:          false,
 			isContentTemplate: false,
-			isScript:         false,
+			isScript:          false,
 		},
 	}
 

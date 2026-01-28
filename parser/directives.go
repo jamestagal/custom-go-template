@@ -226,7 +226,7 @@ func ForStartParser() Parser {
 			log.Printf("[ForStartParser] Closing brace at position %d", closeBracePos)
 
 			// Extract the for expression
-			forExpr := trimmedInput[forStart+len("{for"):closeBracePos]
+			forExpr := trimmedInput[forStart+len("{for") : closeBracePos]
 			forExpr = strings.TrimSpace(forExpr)
 			log.Printf("[ForStartParser] Extracted expression: %q", forExpr)
 
@@ -322,7 +322,7 @@ func ForStartParser() Parser {
 			}
 
 			// Extract the each expression
-			eachExpr := trimmedInput[eachStart+len("{#each"):closeBracePos]
+			eachExpr := trimmedInput[eachStart+len("{#each") : closeBracePos]
 			eachExpr = strings.TrimSpace(eachExpr)
 			log.Printf("[ForStartParser] Extracted each expression: %q", eachExpr)
 

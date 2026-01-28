@@ -315,8 +315,8 @@ func TestLoadContentJSON_RealFiles(t *testing.T) {
 // TestIsCollectionType tests detection of collection vs single type
 func TestIsCollectionType(t *testing.T) {
 	tests := []struct {
-		name       string
-		data       map[string]interface{}
+		name         string
+		data         map[string]interface{}
 		isCollection bool
 	}{
 		{

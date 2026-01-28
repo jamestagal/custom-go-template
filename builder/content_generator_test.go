@@ -328,8 +328,8 @@ func TestExtractContentType(t *testing.T) {
 		{"news/article.json", "news"},
 		{"blog/2024/post.json", "blog"},
 		{"portfolio/projects/web/site.json", "portfolio"},
-		{"index.json", ""},          // Root level
-		{"single.json", ""},         // Root level
+		{"index.json", ""},  // Root level
+		{"single.json", ""}, // Root level
 	}
 
 	for _, tt := range tests {
@@ -350,10 +350,10 @@ func TestExtractURLPath(t *testing.T) {
 		expected    string
 	}{
 		{"pages/about.json", "pages", "about"},
-		{"pages/_index.json", "pages", ""},              // _index becomes empty
+		{"pages/_index.json", "pages", ""}, // _index becomes empty
 		{"news/2024/article.json", "news", "2024/article"},
-		{"blog/_defaults.json", "blog", "_defaults"},    // _defaults preserved
-		{"index.json", "", "index"},                      // Root level
+		{"blog/_defaults.json", "blog", "_defaults"}, // _defaults preserved
+		{"index.json", "", "index"},                  // Root level
 	}
 
 	for _, tt := range tests {

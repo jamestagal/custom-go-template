@@ -2,15 +2,15 @@ package renderer
 
 import (
 	"fmt"
-	"path/filepath"
-	"log"
-	"os"
-	"regexp"
-	"strings"
-	"reflect"
 	"github.com/jimafisk/custom_go_template/ast" // Import AST package
 	"github.com/jimafisk/custom_go_template/parser"
 	"github.com/jimafisk/custom_go_template/transformer"
+	"log"
+	"os"
+	"path/filepath"
+	"reflect"
+	"regexp"
+	"strings"
 )
 
 // Render renders a template file with optional content injection.
@@ -171,6 +171,7 @@ func extractComponentName(templatePath string) string {
 	name := strings.TrimSuffix(base, filepath.Ext(base))
 	return name
 }
+
 // --- Alpine.js Attribute Generation ---
 
 func escapeAttrValue(value string, escapeSingleQuotes bool) string {
@@ -583,7 +584,7 @@ func FormatJSValue(value any) string {
 			}
 			return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
 		}
-		
+
 		// For other types, use the default string representation
 		return fmt.Sprintf("%v", value)
 	}

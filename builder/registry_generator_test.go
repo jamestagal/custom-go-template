@@ -7,7 +7,6 @@ import (
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
-
 // TestGenerateComponentRegistry_SingleComponent tests converting a single component to JS template
 // Cognitive Load: 8 (Table-driven test with simple component)
 func TestGenerateComponentRegistry_SingleComponent(t *testing.T) {
@@ -202,33 +201,33 @@ func TestGenerateComponentRegistry_MultipleComponents(t *testing.T) {
 // Cognitive Load: 7 (Multiple expression types)
 func TestGenerateComponentRegistry_ExpressionConversion(t *testing.T) {
 	tests := []struct {
-		name          string
-		expression    string
-		expectedInJS  string
+		name           string
+		expression     string
+		expectedInJS   string
 		unexpectedInJS string
 	}{
 		{
-			name:          "simple variable",
-			expression:    "title",
-			expectedInJS:  "${props.title}",
+			name:           "simple variable",
+			expression:     "title",
+			expectedInJS:   "${props.title}",
 			unexpectedInJS: "{title}",
 		},
 		{
-			name:          "nested property",
-			expression:    "user.name",
-			expectedInJS:  "${props.user.name}",
+			name:           "nested property",
+			expression:     "user.name",
+			expectedInJS:   "${props.user.name}",
 			unexpectedInJS: "{user.name}",
 		},
 		{
-			name:          "array index",
-			expression:    "items[0]",
-			expectedInJS:  "${props.items[0]}",
+			name:           "array index",
+			expression:     "items[0]",
+			expectedInJS:   "${props.items[0]}",
 			unexpectedInJS: "{items[0]}",
 		},
 		{
-			name:          "method call",
-			expression:    "getName()",
-			expectedInJS:  "${props.getName()}",
+			name:           "method call",
+			expression:     "getName()",
+			expectedInJS:   "${props.getName()}",
 			unexpectedInJS: "{getName()}",
 		},
 	}
@@ -541,7 +540,7 @@ func TestGenerateComponentRegistry_SelfClosingElements(t *testing.T) {
 							SelfClosing: true,
 						},
 						&ast.Element{
-							TagName: "br",
+							TagName:     "br",
 							SelfClosing: true,
 						},
 						&ast.Element{
@@ -703,10 +702,10 @@ func TestGenerateComponentRegistry_ValidJSOutput(t *testing.T) {
 // Cognitive Load: 9 (Testing literal context tracking)
 func TestGenerateComponentRegistry_LiteralContentElements(t *testing.T) {
 	tests := []struct {
-		name              string
-		component         ComponentTemplate
-		expectContains    []string
-		mustNotContain    []string
+		name           string
+		component      ComponentTemplate
+		expectContains []string
+		mustNotContain []string
 	}{
 		{
 			name: "style tag with expression should NOT convert to props",
@@ -732,7 +731,7 @@ func TestGenerateComponentRegistry_LiteralContentElements(t *testing.T) {
 				"</style>",
 			},
 			mustNotContain: []string{
-				"${props.color}",  // Should NOT convert expression in style
+				"${props.color}", // Should NOT convert expression in style
 			},
 		},
 		{
@@ -758,7 +757,7 @@ func TestGenerateComponentRegistry_LiteralContentElements(t *testing.T) {
 				"</script>",
 			},
 			mustNotContain: []string{
-				"${props.value}",  // Should NOT convert expression in script
+				"${props.value}", // Should NOT convert expression in script
 			},
 		},
 		{
@@ -778,7 +777,7 @@ func TestGenerateComponentRegistry_LiteralContentElements(t *testing.T) {
 			},
 			expectContains: []string{
 				"<div>",
-				"${props.title}",  // SHOULD convert in normal elements
+				"${props.title}", // SHOULD convert in normal elements
 				"</div>",
 			},
 			mustNotContain: []string{},
@@ -848,21 +847,21 @@ func TestGenerateComponentRegistry_MixedLiteralAndNormalContent(t *testing.T) {
 						&ast.Element{
 							TagName: "h1",
 							Children: []ast.Node{
-								&ast.ExpressionNode{Expression: "title"},  // Should convert
+								&ast.ExpressionNode{Expression: "title"}, // Should convert
 							},
 						},
 						&ast.Element{
 							TagName: "style",
 							Children: []ast.Node{
 								&ast.TextNode{Content: ".heading { color: "},
-								&ast.ExpressionNode{Expression: "blue"},  // Should NOT convert
+								&ast.ExpressionNode{Expression: "blue"}, // Should NOT convert
 								&ast.TextNode{Content: "; }"},
 							},
 						},
 						&ast.Element{
 							TagName: "p",
 							Children: []ast.Node{
-								&ast.ExpressionNode{Expression: "description"},  // Should convert
+								&ast.ExpressionNode{Expression: "description"}, // Should convert
 							},
 						},
 					},
@@ -1030,11 +1029,11 @@ func TestSkipIdentifiers(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"{index}", "${index}"},                    // Loop var
-		{"{item.name}", "${item.name}"},            // Loop var with property
-		{"{$store.cart}", "${$store.cart}"},        // Alpine built-in
+		{"{index}", "${index}"},                       // Loop var
+		{"{item.name}", "${item.name}"},               // Loop var with property
+		{"{$store.cart}", "${$store.cart}"},           // Alpine built-in
 		{"{Math.floor(x)}", "${Math.floor(props.x)}"}, // IMPROVED: Arguments inside method calls ARE now prefixed (x is a prop)
-		{"{window.location}", "${window.location}"}, // JS built-in
+		{"{window.location}", "${window.location}"},   // JS built-in
 	}
 
 	for _, tt := range tests {
@@ -1316,7 +1315,7 @@ func TestArrowFunctionBugFix(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		len(s) > len(substr)+1 && strings.Contains(s, substr)))
+			len(s) > len(substr)+1 && strings.Contains(s, substr)))
 }
 
 // TestStringLiteralHandling tests the string literal fix (NEW)
@@ -1455,7 +1454,7 @@ func TestStringLiteralInComponentRegistry(t *testing.T) {
 
 // TestMethodChainingBugFix tests the Bug #2: Method chaining after method calls
 // Cognitive Load: 8 (Method chain preservation)
-// BUG: .split('').reverse().join('') was producing invalid syntax
+// BUG: .split(”).reverse().join(”) was producing invalid syntax
 func TestMethodChainingBugFix(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1618,9 +1617,9 @@ func TestMethodChainingInComponentRegistry(t *testing.T) {
 
 	// Should NOT contain broken syntax
 	broken := []string{
-		"props..reverse()",       // Double dot
-		"split('')props.",        // props. in wrong place
-		"props.reverse()",        // Missing chain
+		"props..reverse()", // Double dot
+		"split('')props.",  // props. in wrong place
+		"props.reverse()",  // Missing chain
 	}
 
 	for _, bad := range broken {

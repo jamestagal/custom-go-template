@@ -107,33 +107,33 @@ func TestEvalJS_ComplexExpressions(t *testing.T) {
 
 func TestEvalJS_AlpineJSPatterns(t *testing.T) {
 	tests := []struct {
-		name      string
-		jsCode    string
-		propsDecl string
+		name          string
+		jsCode        string
+		propsDecl     string
 		shouldContain string // Check if result contains expected substring
 	}{
 		{
-			name:         "x-data object",
-			jsCode:       "{ count: 0, increment() { this.count++ } }",
-			propsDecl:    "",
+			name:          "x-data object",
+			jsCode:        "{ count: 0, increment() { this.count++ } }",
+			propsDecl:     "",
 			shouldContain: "increment",
 		},
 		{
-			name:         "complex nested object",
-			jsCode:       "{ user: { name: 'John', profile: { age: 30 } } }",
-			propsDecl:    "",
+			name:          "complex nested object",
+			jsCode:        "{ user: { name: 'John', profile: { age: 30 } } }",
+			propsDecl:     "",
 			shouldContain: "profile",
 		},
 		{
-			name:         "alpine refs",
-			jsCode:       "{ init() { this.$refs.button.focus() } }",
-			propsDecl:    "",
+			name:          "alpine refs",
+			jsCode:        "{ init() { this.$refs.button.focus() } }",
+			propsDecl:     "",
 			shouldContain: "$refs",
 		},
 		{
-			name:         "alpine events",
-			jsCode:       "{ handleClick(event) { console.log(event) } }",
-			propsDecl:    "",
+			name:          "alpine events",
+			jsCode:        "{ handleClick(event) { console.log(event) } }",
+			propsDecl:     "",
 			shouldContain: "handleClick",
 		},
 	}
@@ -146,7 +146,7 @@ func TestEvalJS_AlpineJSPatterns(t *testing.T) {
 				t.Errorf("EvalJS() returned type %T, want string", got)
 				return
 			}
-			
+
 			if !contains(gotStr, tt.shouldContain) {
 				t.Errorf("EvalJS() = %v, should contain %v", gotStr, tt.shouldContain)
 			}

@@ -36,7 +36,7 @@ store cart = {
 			},
 			shouldNotContain: []string{
 				`x-text="$store.cart.total.toFixed"`, // Missing (2) and '$' +
-				`x-text="$store.cart.total"`,          // Too truncated
+				`x-text="$store.cart.total"`,         // Too truncated
 			},
 		},
 		{

@@ -184,7 +184,6 @@ func TestDynamicComponentTransformation(t *testing.T) {
 	}
 }
 
-
 // TestDynamicComponentBuildTimeOptimization tests build-time path resolution
 func TestDynamicComponentBuildTimeOptimization(t *testing.T) {
 	// Register component with resolved path

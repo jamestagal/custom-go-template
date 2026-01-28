@@ -69,8 +69,8 @@ store theme = {
 			shouldExist: true,
 		},
 		{
-			name: "store import with quotes variations",
-			input: `import store from "./stores/auth.js"`,
+			name:        "store import with quotes variations",
+			input:       `import store from "./stores/auth.js"`,
 			wantStores:  1,
 			storeName:   "auth",
 			shouldExist: true,

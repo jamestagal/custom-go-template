@@ -11,7 +11,9 @@ import (
 
 // TestDynamicComponentIteration tests the Plenti-style component iteration pattern:
 // {for component in components}
-//   <Component:dynamic name={component.name} {...component.fields} />
+//
+//	<Component:dynamic name={component.name} {...component.fields} />
+//
 // {/for}
 func TestDynamicComponentIteration(t *testing.T) {
 	// Register test components

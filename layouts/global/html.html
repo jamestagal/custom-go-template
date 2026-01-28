@@ -24,6 +24,10 @@ prop description = "A Go template engine powered by Alpine.js"
 <Head title={title} description={description} />
 
 <body>
+	<!-- CMS Panel -->
+	<div id="plenti_cms"></div>
+	<button id="toggle_plenti_cms">Toggle CMS</button>
+
 	<!-- User Menu (conditional - if authenticated) -->
 	<!-- {#if user && $user.isAuthenticated}
 		<UserMenu user={user} content={content} shadowContent={shadowContent} />

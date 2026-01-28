@@ -25,8 +25,8 @@ func isJSArrayLiteral(s string) bool {
 func isJSFunctionLiteral(s string) bool {
 	s = strings.TrimSpace(s)
 	return strings.Contains(s, "=>") ||
-	       strings.HasPrefix(s, "function") ||
-	       (strings.Contains(s, "(") && strings.Contains(s, ")") && strings.Contains(s, "{") && strings.Contains(s, "}"))
+		strings.HasPrefix(s, "function") ||
+		(strings.Contains(s, "(") && strings.Contains(s, ")") && strings.Contains(s, "{") && strings.Contains(s, "}"))
 }
 
 // parseValue parses JavaScript literal values from fence section strings into
@@ -74,7 +74,7 @@ func parseValue(value string) interface{} {
 	// Handle quoted strings (both double and single quotes)
 	if len(value) >= 2 {
 		if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
-		   (strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
+			(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
 			// Check if quotes are properly closed (not unclosed strings)
 			quote := value[0]
 			if value[len(value)-1] == quote {
@@ -86,7 +86,7 @@ func parseValue(value string) interface{} {
 
 				// Check if this is a quoted JavaScript literal (array or object)
 				if (strings.HasPrefix(unquotedTrimmed, "[") && strings.HasSuffix(unquotedTrimmed, "]")) ||
-				   (strings.HasPrefix(unquotedTrimmed, "{") && strings.HasSuffix(unquotedTrimmed, "}")) {
+					(strings.HasPrefix(unquotedTrimmed, "{") && strings.HasSuffix(unquotedTrimmed, "}")) {
 					// This is a quoted JavaScript literal - unwrap it!
 					log.Printf("[parseValue] UNWRAPPING quoted JS literal: %q", unquotedTrimmed)
 					return unquotedTrimmed

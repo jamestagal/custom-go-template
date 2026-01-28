@@ -46,12 +46,12 @@ func TestTransformAlreadyTransformedStoreExpressions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := transformStoreExpressionsInCondition(tt.input)
-			
+
 			if result != tt.expected {
-				t.Errorf("transformStoreExpressionsInCondition() failed\nInput:    %q\nExpected: %q\nGot:      %q", 
+				t.Errorf("transformStoreExpressionsInCondition() failed\nInput:    %q\nExpected: %q\nGot:      %q",
 					tt.input, tt.expected, result)
 			}
-			
+
 			// Extra validation: ensure we never create $store.store.* patterns
 			if strings.Contains(result, "$store.store.") {
 				t.Errorf("BUG: Created double prefix $store.store.* in result: %q", result)
@@ -88,12 +88,12 @@ func TestTransformAlreadyTransformedCollections(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := transformStoreExpressionInCollection(tt.input)
-			
+
 			if result != tt.expected {
-				t.Errorf("transformStoreExpressionInCollection() failed\nInput:    %q\nExpected: %q\nGot:      %q", 
+				t.Errorf("transformStoreExpressionInCollection() failed\nInput:    %q\nExpected: %q\nGot:      %q",
 					tt.input, tt.expected, result)
 			}
-			
+
 			// Extra validation: ensure we never create $store.store.* patterns
 			if strings.Contains(result, "$store.store.") {
 				t.Errorf("BUG: Created double prefix $store.store.* in result: %q", result)
@@ -151,18 +151,18 @@ func TestAlpineAttributeWithStoreReference(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dataScope := make(map[string]any)
 			attributes := []ast.Attribute{tt.attr}
-			
+
 			result := transformAttributeExpressions(attributes, dataScope)
-			
+
 			if len(result) != 1 {
 				t.Fatalf("Expected 1 attribute, got %d", len(result))
 			}
-			
+
 			if result[0].Value != tt.expected {
 				t.Errorf("Attribute value changed unexpectedly\nOriginal: %q\nExpected: %q\nGot:      %q",
 					tt.attr.Value, tt.expected, result[0].Value)
 			}
-			
+
 			// Extra validation: ensure we never create $store.store.* patterns
 			if strings.Contains(result[0].Value, "$store.store.") {
 				t.Errorf("BUG: Created double prefix $store.store.* in attribute value: %q", result[0].Value)

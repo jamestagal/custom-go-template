@@ -243,7 +243,7 @@ func TestRenderElementWithAlpine(t *testing.T) {
 			var sb strings.Builder
 			renderElement(&sb, tt.element)
 			result := sb.String()
-			
+
 			for _, substr := range tt.contains {
 				if !strings.Contains(result, substr) {
 					t.Errorf("renderElement() result does not contain %q\nGot: %s", substr, result)
@@ -256,10 +256,10 @@ func TestRenderElementWithAlpine(t *testing.T) {
 func TestTransformAndRenderAlpine(t *testing.T) {
 	// Test the full pipeline: AST -> Transform -> Render
 	tests := []struct {
-		name      string
-		template  *ast.Template
-		props     map[string]any
-		contains  []string
+		name     string
+		template *ast.Template
+		props    map[string]any
+		contains []string
 	}{
 		{
 			name: "simple counter component",
@@ -346,14 +346,14 @@ func TestTransformAndRenderAlpine(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Transform the template
 			transformed := transformer.TransformAST(tt.template, tt.props)
-			
+
 			// Render the transformed template
 			var sb strings.Builder
 			for _, node := range transformed.RootNodes {
 				renderNode(&sb, node)
 			}
 			result := sb.String()
-			
+
 			for _, substr := range tt.contains {
 				if !strings.Contains(result, substr) {
 					t.Errorf("Transform and render result does not contain %q\nGot: %s", substr, result)

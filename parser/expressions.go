@@ -290,7 +290,7 @@ func FenceParser() Parser {
 //   - '"text"' → "text" (already quoted string - keep as-is)
 //   - 'text' → text (unquoted string)
 //
-// This fixes the bug where notifications appears as 'notifications:'[...]'' with outer quotes
+// This fixes the bug where notifications appears as 'notifications:'[...]” with outer quotes
 func unwrapQuotedLiteral(value string) string {
 	trimmed := strings.TrimSpace(value)
 
@@ -331,20 +331,19 @@ func unwrapQuotedLiteral(value string) string {
 	return value
 }
 
-
 // parseFenceContent extracts props, variables, functions, stores, and imports from fence section content
 // Now handles multi-line values for arrays, objects, and ternary expressions
 // Pattern: Fence Content Parser [Load: 12]
 // Cognitive Load: 12 (multiple regex patterns, line-by-line parsing, multi-line support)
 func parseFenceContent(content string) *ast.FenceSection {
 	fence := &ast.FenceSection{
-		RawContent: content,
-		Props:      []ast.PropNode{},
+		RawContent:    content,
+		Props:         []ast.PropNode{},
 		ExportedProps: []string{},
-		Variables:  []ast.VariableNode{},
-		Functions:  []ast.FunctionNode{},
-		Imports:    []ast.ImportNode{},
-		Stores:     make(map[string]string),
+		Variables:     []ast.VariableNode{},
+		Functions:     []ast.FunctionNode{},
+		Imports:       []ast.ImportNode{},
+		Stores:        make(map[string]string),
 	}
 
 	lines := strings.Split(content, "\n")
@@ -423,7 +422,7 @@ func parseFenceContent(content string) *ast.FenceSection {
 				log.Printf("[parseFenceContent] Found getter: get %s()", getterName)
 				fence.Functions = append(fence.Functions, ast.FunctionNode{
 					Name:     getterName,
-					Params:   "",  // Getters have no params
+					Params:   "", // Getters have no params
 					Body:     getterBody,
 					IsGetter: true,
 				})
@@ -743,7 +742,7 @@ func parseMultiLineValue(lines []string, startIndex int, firstLineValue string) 
 
 // ternaryMatcher tracks ternary operator (? :) nesting
 type ternaryMatcher struct {
-	depth      int  // Number of ? without matching :
+	depth      int // Number of ? without matching :
 	inString   bool
 	stringChar rune
 	escaped    bool

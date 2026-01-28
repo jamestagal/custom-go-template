@@ -12,7 +12,8 @@ import (
 // It exists for debugging scenarios when transformation fails or is incomplete.
 //
 // Output format:
-//   <!-- Component:dynamic (not resolved): name={expr}, spreads=[...], props=[...] -->
+//
+//	<!-- Component:dynamic (not resolved): name={expr}, spreads=[...], props=[...] -->
 //
 // Cognitive Load: 8
 // - Build name part: 2

@@ -15,8 +15,9 @@ import (
 // Alpine.store() calls in the rendered output.
 //
 // Example:
-//   Input:  "export default {\n  isLoggedIn: false\n}"
-//   Output: "{\n  isLoggedIn: false\n}"
+//
+//	Input:  "export default {\n  isLoggedIn: false\n}"
+//	Output: "{\n  isLoggedIn: false\n}"
 //
 // Pattern: String Transformation [Load: 3]
 // Cognitive Load: 3 (prefix checking: 2, trimming: 1)
@@ -47,7 +48,8 @@ func StripExportDefault(content string) string {
 //  3. Optionally use ES module syntax (export default { ... })
 //
 // Example:
-//   stores/auth.js → map["auth"] = "{ isLoggedIn: false, ... }"
+//
+//	stores/auth.js → map["auth"] = "{ isLoggedIn: false, ... }"
 //
 // Pattern: File Discovery Pattern [Load: 8]
 // Cognitive Load: 8 (read dir: 2, filter: 2, read files: 2, map building: 2)

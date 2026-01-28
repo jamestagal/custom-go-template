@@ -10,13 +10,14 @@ import (
 // Output: <script> tag with Alpine.store() calls wrapped in alpine:init listener
 //
 // Example:
-//   Input:  {"auth": "{ isLoggedIn: false }", "cart": "{ items: [] }"}
-//   Output: <script>
-//           document.addEventListener('alpine:init', () => {
-//               Alpine.store('auth', { isLoggedIn: false });
-//               Alpine.store('cart', { items: [] });
-//           });
-//           </script>
+//
+//	Input:  {"auth": "{ isLoggedIn: false }", "cart": "{ items: [] }"}
+//	Output: <script>
+//	        document.addEventListener('alpine:init', () => {
+//	            Alpine.store('auth', { isLoggedIn: false });
+//	            Alpine.store('cart', { items: [] });
+//	        });
+//	        </script>
 //
 // Cognitive Load: 8
 // - Empty check: 1

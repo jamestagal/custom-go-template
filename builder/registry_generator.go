@@ -516,11 +516,11 @@ func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool, loo
 	// AND tracks string literals to skip processing inside them
 	var result strings.Builder
 	var currentToken strings.Builder
-	parenDepth := 0        // Track parentheses depth
-	isMethodCall := false  // Track if current parens are for a method call
-	inString := false      // Track if we're inside a string literal
-	stringChar := byte(0)  // Track which quote character started the string (' or ")
-	escaped := false       // Track if previous char was backslash
+	parenDepth := 0       // Track parentheses depth
+	isMethodCall := false // Track if current parens are for a method call
+	inString := false     // Track if we're inside a string literal
+	stringChar := byte(0) // Track which quote character started the string (' or ")
+	escaped := false      // Track if previous char was backslash
 
 	for i := 0; i < len(expr); i++ {
 		ch := expr[i]
@@ -675,7 +675,7 @@ func prefixIdentifiersInExpression(expr string, arrowParams map[string]bool, loo
 				}
 				// Write spread operator as-is
 				result.WriteString("...")
-				i += 2 // Skip the next two dots
+				i += 2   // Skip the next two dots
 				continue // Skip to next iteration (don't process current char again)
 			} else {
 				// Property access - keep as part of token
@@ -979,13 +979,13 @@ func renderLoopToJS(loop *ast.Loop, sb *strings.Builder, ctx *RenderContext) {
 	if iteratorTrimmed != "" {
 		// Loop with index: (item, index) in collection
 		sb.WriteString("(")
-		sb.WriteString(loop.Value)  // item
+		sb.WriteString(loop.Value) // item
 		sb.WriteString(", ")
-		sb.WriteString(iteratorTrimmed)  // index
+		sb.WriteString(iteratorTrimmed) // index
 		sb.WriteString(")")
 	} else {
 		// Simple loop: item in collection
-		sb.WriteString(loop.Value)  // item only
+		sb.WriteString(loop.Value) // item only
 	}
 
 	sb.WriteString(" in ")

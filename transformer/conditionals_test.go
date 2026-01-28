@@ -9,10 +9,10 @@ import (
 
 func TestTransformConditional(t *testing.T) {
 	tests := []struct {
-		name      string
-		condition *ast.Conditional
-		dataScope map[string]any
-		contains  []string
+		name        string
+		condition   *ast.Conditional
+		dataScope   map[string]any
+		contains    []string
 		notContains []string
 	}{
 		{

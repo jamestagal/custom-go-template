@@ -126,30 +126,30 @@ func EvalJS(jsCode string, propsDecl string) any {
 	if jsCode == "" {
 		return ""
 	}
-	
+
 	// Special case for the simple_object test
 	if jsCode == "({a: 1, b: 2})" {
 		return map[string]any{"a": float64(1), "b": float64(2)}
 	}
-	
+
 	// Check if this is a complex JS object that should be preserved as a string
 	if isComplexJSObjectInternal(jsCode) {
 		log.Printf("Detected complex JS object, preserving as-is: %s", jsCode)
 		return jsCode
 	}
-	
+
 	// Special case for object with methods - always preserve as string
 	if strings.Contains(jsCode, "method(") || strings.Contains(jsCode, "handleClick(") {
 		return jsCode
 	}
-	
+
 	// Special case for simple array literal [1, 2, 3]
 	if strings.HasPrefix(jsCode, "[") && strings.HasSuffix(jsCode, "]") {
 		// Check if it contains any complex objects
 		if strings.Contains(jsCode, "{") || strings.Contains(jsCode, "function") || strings.Contains(jsCode, "=>") {
 			return jsCode
 		}
-		
+
 		// This is a simple array, try to evaluate it
 		vm := goja.New()
 		result, err := vm.RunString(jsCode)
@@ -157,16 +157,16 @@ func EvalJS(jsCode string, propsDecl string) any {
 			return convertToFloat64(result.Export())
 		}
 	}
-	
+
 	// Special case for simple object literal with parentheses ({a: 1, b: 2})
 	if strings.HasPrefix(jsCode, "({") && strings.HasSuffix(jsCode, "})") {
 		// Check if it contains any methods or complex structures
-		if strings.Contains(jsCode, "function") || strings.Contains(jsCode, "=>") || 
-		   strings.Contains(jsCode, "get ") || strings.Contains(jsCode, "set ") ||
-		   strings.Contains(jsCode, "method") {
+		if strings.Contains(jsCode, "function") || strings.Contains(jsCode, "=>") ||
+			strings.Contains(jsCode, "get ") || strings.Contains(jsCode, "set ") ||
+			strings.Contains(jsCode, "method") {
 			return jsCode
 		}
-		
+
 		// This is a simple object literal with parentheses, try to evaluate it
 		vm := goja.New()
 		result, err := vm.RunString(jsCode)
@@ -174,10 +174,10 @@ func EvalJS(jsCode string, propsDecl string) any {
 			return convertToFloat64(result.Export())
 		}
 	}
-	
+
 	// Try evaluating as a simple expression
 	vm := goja.New()
-	
+
 	// Set up the runtime with any provided props declarations
 	if propsDecl != "" {
 		_, err := vm.RunString(propsDecl)
@@ -186,14 +186,14 @@ func EvalJS(jsCode string, propsDecl string) any {
 			return jsCode
 		}
 	}
-	
+
 	// Evaluate the expression
 	result, err := vm.RunString(jsCode)
 	if err != nil {
 		// If evaluation fails, return the original code
 		return jsCode
 	}
-	
+
 	// Return the result, ensuring numeric values are float64
 	return convertToFloat64(result.Export())
 }
@@ -232,13 +232,13 @@ func isComplexResult(result any) bool {
 	if result == nil {
 		return false
 	}
-	
+
 	// Check result type
 	switch v := result.(type) {
 	case func(goja.FunctionCall) goja.Value:
 		// Functions should be preserved as strings
 		return true
-		
+
 	case map[string]interface{}:
 		// Check if the map contains any methods or complex values
 		for _, val := range v {
@@ -249,7 +249,7 @@ func isComplexResult(result any) bool {
 		}
 		// Simple maps with primitive values can be returned as evaluated
 		return false
-		
+
 	case []interface{}:
 		// Check if the array contains any complex elements
 		for _, item := range v {
@@ -261,7 +261,7 @@ func isComplexResult(result any) bool {
 		// Simple arrays with primitive values can be returned as evaluated
 		return false
 	}
-	
+
 	// Primitive types can be returned as evaluated
 	return false
 }

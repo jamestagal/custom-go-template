@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	
 	"github.com/jimafisk/custom_go_template/parser"
 	"github.com/jimafisk/custom_go_template/renderer"
 	"github.com/jimafisk/custom_go_template/transformer"
@@ -24,12 +23,12 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 		name             string
 		template         string
 		dataScope        map[string]any
-		expectedContains []string       // Strings that MUST be in output
-		shouldNotContain []string       // Strings that MUST NOT be in output
-		description      string         // What this test validates
+		expectedContains []string // Strings that MUST be in output
+		shouldNotContain []string // Strings that MUST NOT be in output
+		description      string   // What this test validates
 	}{
 		{
-			name: "simple_component_loop",
+			name:     "simple_component_loop",
 			template: `{for item in items}<div class="item">{item.name}</div>{/for}`,
 			dataScope: map[string]any{
 				"items": []interface{}{
@@ -39,20 +38,20 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 				},
 			},
 			expectedContains: []string{
-				`<div class="item">`,  // Component structure
+				`<div class="item">`, // Component structure
 				// Build-time expression resolution: values resolved at build-time
 				"First",
 				"Second",
 				"Third",
 			},
 			shouldNotContain: []string{
-				`<template x-for`,  // No runtime loops
-				`x-for="`,          // No x-for attributes
+				`<template x-for`, // No runtime loops
+				`x-for="`,         // No x-for attributes
 			},
 			description: "Simple loop should expand to separate divs with resolved values",
 		},
 		{
-			name: "component_loop_with_fields",
+			name:     "component_loop_with_fields",
 			template: `{for comp in components}<div>{comp.fields.title}</div>{/for}`,
 			dataScope: map[string]any{
 				"components": []interface{}{
@@ -82,16 +81,16 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 			description: "Loop with nested field access should expand at build time with resolved values",
 		},
 		{
-			name: "nested_loops",
+			name:     "nested_loops",
 			template: `{for category in categories}{for item in category.items}<span>{item}</span>{/for}{/for}`,
 			dataScope: map[string]any{
 				"categories": []interface{}{
 					map[string]any{
-						"name": "Cat A",
+						"name":  "Cat A",
 						"items": []interface{}{"A1", "A2"},
 					},
 					map[string]any{
-						"name": "Cat B",
+						"name":  "Cat B",
 						"items": []interface{}{"B1"},
 					},
 				},
@@ -104,12 +103,12 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 				"B1",
 			},
 			shouldNotContain: []string{
-				`<template x-for`,  // Both loops should expand at build time
+				`<template x-for`, // Both loops should expand at build time
 			},
 			description: "Nested loops should both expand at build time with resolved values",
 		},
 		{
-			name: "loop_with_conditionals",
+			name:     "loop_with_conditionals",
 			template: `{for item in items}{if item.active}<div>{item.name}</div>{/if}{/for}`,
 			dataScope: map[string]any{
 				"items": []interface{}{
@@ -126,13 +125,13 @@ func TestOutputValidation_ComponentLoop(t *testing.T) {
 				"Another Active",
 			},
 			shouldNotContain: []string{
-				`x-for="item in items"`,  // Loop itself should be build-time expanded
-				"Inactive Item",          // This item should be excluded by conditional
+				`x-for="item in items"`, // Loop itself should be build-time expanded
+				"Inactive Item",         // This item should be excluded by conditional
 			},
 			description: "Loop and conditionals both resolve at build time",
 		},
 		{
-			name: "component_loop_with_text_expressions",
+			name:     "component_loop_with_text_expressions",
 			template: `{for item in items}<h1>{item.title}</h1><p>{item.description}</p>{/for}`,
 			dataScope: map[string]any{
 				"items": []interface{}{
@@ -338,11 +337,11 @@ func TestOutputValidation_RealComponentData(t *testing.T) {
 // NOT a single x-for template wrapping one item.
 func TestOutputValidation_SeparateHTMLBlocks(t *testing.T) {
 	tests := []struct {
-		name          string
-		template      string
-		arraySize     int
-		elementType   string  // e.g., "div", "span"
-		dataScope     map[string]any
+		name        string
+		template    string
+		arraySize   int
+		elementType string // e.g., "div", "span"
+		dataScope   map[string]any
 	}{
 		{
 			name:        "three_items",
@@ -398,37 +397,37 @@ func TestOutputValidation_SeparateHTMLBlocks(t *testing.T) {
 				t.Fatalf("Failed to parse template: %v", err)
 			}
 
-		transformedAST := transformer.TransformAST(templateAST, tt.dataScope)
-		markup := renderer.GenerateMarkupForTest(transformedAST)
+			transformedAST := transformer.TransformAST(templateAST, tt.dataScope)
+			markup := renderer.GenerateMarkupForTest(transformedAST)
 
-		// VERIFICATION 1: Count element tags (loop-generated elements)
-		// Count opening tags that are NOT the wrapper div with x-data
-		// The pattern: count all opening tags, then subtract 1 for the wrapper
-		allOpenTags := strings.Count(markup, fmt.Sprintf("<%s", tt.elementType))
-		wrapperDivCount := 0
-		if tt.elementType == "div" && strings.Contains(markup, `<div x-data=`) {
-			wrapperDivCount = 1
-		}
-		loopGeneratedTags := allOpenTags - wrapperDivCount
+			// VERIFICATION 1: Count element tags (loop-generated elements)
+			// Count opening tags that are NOT the wrapper div with x-data
+			// The pattern: count all opening tags, then subtract 1 for the wrapper
+			allOpenTags := strings.Count(markup, fmt.Sprintf("<%s", tt.elementType))
+			wrapperDivCount := 0
+			if tt.elementType == "div" && strings.Contains(markup, `<div x-data=`) {
+				wrapperDivCount = 1
+			}
+			loopGeneratedTags := allOpenTags - wrapperDivCount
 
-		if loopGeneratedTags != tt.arraySize {
-			t.Errorf("Expected %d <%s> tags from loop expansion, got %d (total: %d, wrapper: %d).\nOutput: %s",
-				tt.arraySize, tt.elementType, loopGeneratedTags, allOpenTags, wrapperDivCount, markup)
-		}
+			if loopGeneratedTags != tt.arraySize {
+				t.Errorf("Expected %d <%s> tags from loop expansion, got %d (total: %d, wrapper: %d).\nOutput: %s",
+					tt.arraySize, tt.elementType, loopGeneratedTags, allOpenTags, wrapperDivCount, markup)
+			}
 
-		// VERIFICATION 2: Verify all closing tags match
-		closeCount := strings.Count(markup, fmt.Sprintf("</%s>", tt.elementType))
-		if closeCount != allOpenTags {
-			t.Errorf("Mismatched tags: %d opening <%s>, %d closing </%s>", 
-				allOpenTags, tt.elementType, closeCount, tt.elementType)
-		}
+			// VERIFICATION 2: Verify all closing tags match
+			closeCount := strings.Count(markup, fmt.Sprintf("</%s>", tt.elementType))
+			if closeCount != allOpenTags {
+				t.Errorf("Mismatched tags: %d opening <%s>, %d closing </%s>",
+					allOpenTags, tt.elementType, closeCount, tt.elementType)
+			}
 
-		// VERIFICATION 3: No x-for template
-		if strings.Contains(markup, "x-for") {
-			t.Errorf("Build-time expansion should not contain x-for, but found it in:\n%s", markup)
-		}
+			// VERIFICATION 3: No x-for template
+			if strings.Contains(markup, "x-for") {
+				t.Errorf("Build-time expansion should not contain x-for, but found it in:\n%s", markup)
+			}
 
-		t.Logf("✓ Verified %d separate %s elements in output (plus wrapper if div)", tt.arraySize, tt.elementType)
+			t.Logf("✓ Verified %d separate %s elements in output (plus wrapper if div)", tt.arraySize, tt.elementType)
 		})
 	}
 }
@@ -525,8 +524,8 @@ func TestOutputValidation_SvelteComparison(t *testing.T) {
 		name           string
 		template       string
 		dataScope      map[string]any
-		svelteOutput   string  // What Svelte would produce (reference)
-		ourExpectation string  // What we expect (with Alpine directives)
+		svelteOutput   string // What Svelte would produce (reference)
+		ourExpectation string // What we expect (with Alpine directives)
 	}{
 		{
 			name:     "simple_loop",
@@ -534,7 +533,7 @@ func TestOutputValidation_SvelteComparison(t *testing.T) {
 			dataScope: map[string]any{
 				"items": []interface{}{"A", "B", "C"},
 			},
-			svelteOutput: `<div>A</div><div>B</div><div>C</div>`,
+			svelteOutput:   `<div>A</div><div>B</div><div>C</div>`,
 			ourExpectation: "Should produce 3 separate divs with x-text directives (no x-for template)",
 		},
 		{
@@ -546,7 +545,7 @@ func TestOutputValidation_SvelteComparison(t *testing.T) {
 					map[string]any{"name": "footer", "title": "Copyright"},
 				},
 			},
-			svelteOutput: `<section class="hero">Welcome</section><section class="footer">Copyright</section>`,
+			svelteOutput:   `<section class="hero">Welcome</section><section class="footer">Copyright</section>`,
 			ourExpectation: "Should produce 2 separate sections with Alpine directives for dynamic values",
 		},
 	}

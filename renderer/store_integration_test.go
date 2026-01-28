@@ -12,11 +12,11 @@ import (
 // with store initialization included in HTML output
 func TestRenderWithStoresIntegration(t *testing.T) {
 	tests := []struct {
-		name           string
-		template       string
-		props          map[string]any
+		name            string
+		template        string
+		props           map[string]any
 		wantStoreScript bool
-		wantStores     []string // Store names that should be in the script
+		wantStores      []string // Store names that should be in the script
 	}{
 		{
 			name: "Template with inline store definition and store expression",
@@ -24,9 +24,9 @@ func TestRenderWithStoresIntegration(t *testing.T) {
 store auth = { isLoggedIn: false }
 ---
 <div>{$auth.isLoggedIn}</div>`,
-			props:          map[string]any{},
+			props:           map[string]any{},
 			wantStoreScript: true,
-			wantStores:     []string{"auth"},
+			wantStores:      []string{"auth"},
 		},
 		{
 			name: "Template with multiple stores",
@@ -36,9 +36,9 @@ store cart = { items: [], total: 0 }
 ---
 <div>{$auth.isLoggedIn}</div>
 <div>{$cart.total}</div>`,
-			props:          map[string]any{},
+			props:           map[string]any{},
 			wantStoreScript: true,
-			wantStores:     []string{"auth", "cart"},
+			wantStores:      []string{"auth", "cart"},
 		},
 		{
 			name: "Template without stores",
@@ -46,9 +46,9 @@ store cart = { items: [], total: 0 }
 let count = 0
 ---
 <div>{count}</div>`,
-			props:          map[string]any{},
+			props:           map[string]any{},
 			wantStoreScript: false,
-			wantStores:     []string{},
+			wantStores:      []string{},
 		},
 		{
 			name: "Template with store definition but no usage",
@@ -56,9 +56,9 @@ let count = 0
 store auth = { isLoggedIn: false }
 ---
 <div>Hello</div>`,
-			props:          map[string]any{},
+			props:           map[string]any{},
 			wantStoreScript: false, // No store script if stores not referenced
-			wantStores:     []string{},
+			wantStores:      []string{},
 		},
 	}
 

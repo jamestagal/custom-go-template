@@ -55,23 +55,23 @@ func TestDynamicComponentByNameNode_NodeType(t *testing.T) {
 // TestDynamicComponentByNameNode_Creation tests creating various node configurations
 func TestDynamicComponentByNameNode_Creation(t *testing.T) {
 	tests := []struct {
-		name             string
-		nameExpression   string
-		props            []ComponentProp
-		spreadProps      []string
-		selfClosing      bool
-		expectedNameExpr string
-		expectedPropsLen int
+		name              string
+		nameExpression    string
+		props             []ComponentProp
+		spreadProps       []string
+		selfClosing       bool
+		expectedNameExpr  string
+		expectedPropsLen  int
 		expectedSpreadLen int
 	}{
 		{
-			name:             "name expression only",
-			nameExpression:   "component.name",
-			props:            []ComponentProp{},
-			spreadProps:      []string{},
-			selfClosing:      true,
-			expectedNameExpr: "component.name",
-			expectedPropsLen: 0,
+			name:              "name expression only",
+			nameExpression:    "component.name",
+			props:             []ComponentProp{},
+			spreadProps:       []string{},
+			selfClosing:       true,
+			expectedNameExpr:  "component.name",
+			expectedPropsLen:  0,
 			expectedSpreadLen: 0,
 		},
 		{
@@ -81,20 +81,20 @@ func TestDynamicComponentByNameNode_Creation(t *testing.T) {
 				{Name: "title", Value: "Welcome", IsDynamic: false},
 				{Name: "link", Value: "/about", IsDynamic: false},
 			},
-			spreadProps:      []string{},
-			selfClosing:      true,
-			expectedNameExpr: "compName",
-			expectedPropsLen: 2,
+			spreadProps:       []string{},
+			selfClosing:       true,
+			expectedNameExpr:  "compName",
+			expectedPropsLen:  2,
 			expectedSpreadLen: 0,
 		},
 		{
-			name:           "with spread props",
-			nameExpression: "component.name",
-			props:          []ComponentProp{},
-			spreadProps:    []string{"component.fields", "extraProps"},
-			selfClosing:    true,
-			expectedNameExpr: "component.name",
-			expectedPropsLen: 0,
+			name:              "with spread props",
+			nameExpression:    "component.name",
+			props:             []ComponentProp{},
+			spreadProps:       []string{"component.fields", "extraProps"},
+			selfClosing:       true,
+			expectedNameExpr:  "component.name",
+			expectedPropsLen:  0,
 			expectedSpreadLen: 2,
 		},
 		{
@@ -104,20 +104,20 @@ func TestDynamicComponentByNameNode_Creation(t *testing.T) {
 				{Name: "allContent", Value: "allContent", IsDynamic: true},
 				{Name: "theme", Value: "dark", IsDynamic: false},
 			},
-			spreadProps:      []string{"component.fields"},
-			selfClosing:      true,
-			expectedNameExpr: "component.name",
-			expectedPropsLen: 2,
+			spreadProps:       []string{"component.fields"},
+			selfClosing:       true,
+			expectedNameExpr:  "component.name",
+			expectedPropsLen:  2,
 			expectedSpreadLen: 1,
 		},
 		{
-			name:           "non-self-closing",
-			nameExpression: "MyComponent",
-			props:          []ComponentProp{},
-			spreadProps:    []string{},
-			selfClosing:    false,
-			expectedNameExpr: "MyComponent",
-			expectedPropsLen: 0,
+			name:              "non-self-closing",
+			nameExpression:    "MyComponent",
+			props:             []ComponentProp{},
+			spreadProps:       []string{},
+			selfClosing:       false,
+			expectedNameExpr:  "MyComponent",
+			expectedPropsLen:  0,
 			expectedSpreadLen: 0,
 		},
 	}
@@ -150,9 +150,9 @@ func TestDynamicComponentByNameNode_Creation(t *testing.T) {
 // TestDynamicComponentByNameNode_WithDynamicProps tests nodes with dynamic prop values
 func TestDynamicComponentByNameNode_WithDynamicProps(t *testing.T) {
 	tests := []struct {
-		name        string
-		node        *DynamicComponentByNameNode
-		expectFunc  func(t *testing.T, node *DynamicComponentByNameNode)
+		name       string
+		node       *DynamicComponentByNameNode
+		expectFunc func(t *testing.T, node *DynamicComponentByNameNode)
 	}{
 		{
 			name: "dynamic prop expression",
@@ -207,9 +207,9 @@ func TestDynamicComponentByNameNode_WithDynamicProps(t *testing.T) {
 // TestDynamicComponentByNameNode_WithSpreadProps tests spread prop variations
 func TestDynamicComponentByNameNode_WithSpreadProps(t *testing.T) {
 	tests := []struct {
-		name        string
-		node        *DynamicComponentByNameNode
-		expectedLen int
+		name          string
+		node          *DynamicComponentByNameNode
+		expectedLen   int
 		expectedFirst string
 	}{
 		{
@@ -259,11 +259,11 @@ func TestDynamicComponentByNameNode_WithSpreadProps(t *testing.T) {
 // TestDynamicComponentByNameNode_MixedPropsAndSpread tests combinations
 func TestDynamicComponentByNameNode_MixedPropsAndSpread(t *testing.T) {
 	tests := []struct {
-		name               string
-		node               *DynamicComponentByNameNode
-		expectedPropsCount int
+		name                string
+		node                *DynamicComponentByNameNode
+		expectedPropsCount  int
 		expectedSpreadCount int
-		description        string
+		description         string
 	}{
 		{
 			name: "spread before regular props",
@@ -278,7 +278,7 @@ func TestDynamicComponentByNameNode_MixedPropsAndSpread(t *testing.T) {
 			},
 			expectedPropsCount:  2,
 			expectedSpreadCount: 1,
-			description:        "Spread props should be processed before regular props",
+			description:         "Spread props should be processed before regular props",
 		},
 		{
 			name: "multiple spreads with regular props",
@@ -293,7 +293,7 @@ func TestDynamicComponentByNameNode_MixedPropsAndSpread(t *testing.T) {
 			},
 			expectedPropsCount:  2,
 			expectedSpreadCount: 2,
-			description:        "Multiple spreads with override props",
+			description:         "Multiple spreads with override props",
 		},
 		{
 			name: "interleaved ordering test",
@@ -309,7 +309,7 @@ func TestDynamicComponentByNameNode_MixedPropsAndSpread(t *testing.T) {
 			},
 			expectedPropsCount:  3,
 			expectedSpreadCount: 3,
-			description:        "Mix of multiple spreads and multiple props",
+			description:         "Mix of multiple spreads and multiple props",
 		},
 	}
 

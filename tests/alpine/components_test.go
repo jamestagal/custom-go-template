@@ -13,12 +13,12 @@ func TestStaticComponentTransformation(t *testing.T) {
 	registerTestComponents()
 
 	tests := []struct {
-		name           string
-		input          ast.Node
-		props          map[string]any
-		expectedProps  []string // Order-independent property checks
-		expectedText   string
-		allowNoXData   bool // Allow missing x-data for empty scopes
+		name          string
+		input         ast.Node
+		props         map[string]any
+		expectedProps []string // Order-independent property checks
+		expectedText  string
+		allowNoXData  bool // Allow missing x-data for empty scopes
 	}{
 		{
 			name: "basic_component_no_props",
@@ -27,10 +27,10 @@ func TestStaticComponentTransformation(t *testing.T) {
 				Props:   []ast.ComponentProp{},
 				Dynamic: false,
 			},
-			props:          map[string]any{},
-			expectedProps:  []string{}, // No props expected
-			expectedText:   "Button Component",
-			allowNoXData:   true, // Empty scope optimization
+			props:         map[string]any{},
+			expectedProps: []string{}, // No props expected
+			expectedText:  "Button Component",
+			allowNoXData:  true, // Empty scope optimization
 		},
 		{
 			name: "component_with_static_props",
@@ -88,8 +88,8 @@ func TestStaticComponentTransformation(t *testing.T) {
 				"isAdmin": true,
 			},
 			expectedProps: []string{
-				"showDetails:",  // Can be 'true' or boolean
-				"user:",         // Object value
+				"showDetails:", // Can be 'true' or boolean
+				"user:",        // Object value
 			},
 			expectedText: "UserProfile Component",
 			allowNoXData: false,

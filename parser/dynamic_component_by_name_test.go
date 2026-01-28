@@ -109,49 +109,49 @@ func TestDynamicComponentByNameParser_Basic(t *testing.T) {
 // TestDynamicComponentByNameParser_WithSpread tests spread operator parsing
 func TestDynamicComponentByNameParser_WithSpread(t *testing.T) {
 	tests := []struct {
-		name              string
-		input             string
-		wantName          string
-		wantSpreadCount   int
-		wantSpreadExprs   []string
-		wantRegularProps  int
-		wantSuccess       bool
+		name             string
+		input            string
+		wantName         string
+		wantSpreadCount  int
+		wantSpreadExprs  []string
+		wantRegularProps int
+		wantSuccess      bool
 	}{
 		{
-			name:            "single spread",
-			input:           `<Component:dynamic name={component.name} {...component.fields} />`,
-			wantName:        "component.name",
-			wantSpreadCount: 1,
-			wantSpreadExprs: []string{"component.fields"},
+			name:             "single spread",
+			input:            `<Component:dynamic name={component.name} {...component.fields} />`,
+			wantName:         "component.name",
+			wantSpreadCount:  1,
+			wantSpreadExprs:  []string{"component.fields"},
 			wantRegularProps: 0,
-			wantSuccess:     true,
+			wantSuccess:      true,
 		},
 		{
-			name:            "multiple spreads",
-			input:           `<Component:dynamic name={comp.name} {...defaults} {...overrides} />`,
-			wantName:        "comp.name",
-			wantSpreadCount: 2,
-			wantSpreadExprs: []string{"defaults", "overrides"},
+			name:             "multiple spreads",
+			input:            `<Component:dynamic name={comp.name} {...defaults} {...overrides} />`,
+			wantName:         "comp.name",
+			wantSpreadCount:  2,
+			wantSpreadExprs:  []string{"defaults", "overrides"},
 			wantRegularProps: 0,
-			wantSuccess:     true,
+			wantSuccess:      true,
 		},
 		{
-			name:            "spread with nested property",
-			input:           `<Component:dynamic name={x} {...component.fields.main} />`,
-			wantName:        "x",
-			wantSpreadCount: 1,
-			wantSpreadExprs: []string{"component.fields.main"},
+			name:             "spread with nested property",
+			input:            `<Component:dynamic name={x} {...component.fields.main} />`,
+			wantName:         "x",
+			wantSpreadCount:  1,
+			wantSpreadExprs:  []string{"component.fields.main"},
 			wantRegularProps: 0,
-			wantSuccess:     true,
+			wantSuccess:      true,
 		},
 		{
-			name:            "spread with complex expression",
-			input:           `<Component:dynamic name="Hero" {...$store.settings.theme} />`,
-			wantName:        "Hero",
-			wantSpreadCount: 1,
-			wantSpreadExprs: []string{"$store.settings.theme"},
+			name:             "spread with complex expression",
+			input:            `<Component:dynamic name="Hero" {...$store.settings.theme} />`,
+			wantName:         "Hero",
+			wantSpreadCount:  1,
+			wantSpreadExprs:  []string{"$store.settings.theme"},
 			wantRegularProps: 0,
-			wantSuccess:     true,
+			wantSuccess:      true,
 		},
 	}
 
@@ -741,9 +741,9 @@ func TestDynamicComponentByNameParser_ErrorCases(t *testing.T) {
 // TestDynamicComponentByNameParser_Whitespace tests whitespace handling
 func TestDynamicComponentByNameParser_Whitespace(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		wantOk  bool
+		name   string
+		input  string
+		wantOk bool
 	}{
 		{
 			name:   "extra whitespace around attributes",

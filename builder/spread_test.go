@@ -31,7 +31,7 @@ func TestSpreadOperatorBugFix(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			skipList := make(map[string]bool)
 			result := prefixIdentifiersInExpression(tt.input, skipList, nil)
-			
+
 			if result != tt.expected {
 				t.Errorf("\nInput:    %s\nExpected: %s\nGot:      %s", tt.input, tt.expected, result)
 			}

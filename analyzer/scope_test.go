@@ -8,11 +8,11 @@ import (
 // Pattern: Table-Driven Test [Load: 6]
 func TestScopeAnalyzer_TrackLoopVariable(t *testing.T) {
 	tests := []struct {
-		name         string
-		loopVars     []string
-		testExpr     string
-		wantRuntime  bool
-		description  string
+		name        string
+		loopVars    []string
+		testExpr    string
+		wantRuntime bool
+		description string
 	}{
 		{
 			name:        "simple loop variable",
@@ -192,11 +192,11 @@ func TestScopeAnalyzer_StringLiterals(t *testing.T) {
 // Pattern: Table-Driven Test [Load: 8]
 func TestScopeAnalyzer_MixedExpressions(t *testing.T) {
 	tests := []struct {
-		name         string
-		setup        func(*ScopeAnalyzer)
-		expr         string
-		wantRuntime  bool
-		description  string
+		name        string
+		setup       func(*ScopeAnalyzer)
+		expr        string
+		wantRuntime bool
+		description string
 	}{
 		{
 			name: "runtime var with build-time prop",
@@ -383,8 +383,8 @@ func TestScopeAnalyzer_DataScopeIntegration(t *testing.T) {
 func TestIsRuntimeExpression_LoopVariablesInDataScope(t *testing.T) {
 	// Setup: dataScope with loop variable (nil value)
 	dataScope := map[string]any{
-		"component": nil,  // Loop variable marker (set in transformer/loops.go:47)
-		"item":      nil,  // Another loop variable
+		"component": nil,            // Loop variable marker (set in transformer/loops.go:47)
+		"item":      nil,            // Another loop variable
 		"title":     "Static Value", // Build-time value (non-nil)
 	}
 
@@ -440,9 +440,9 @@ func TestIsRuntimeExpression_LoopVariablesInDataScope(t *testing.T) {
 func TestIsRuntimeExpression_NilValueMarkerPriority(t *testing.T) {
 	// Setup: Mix of nil-valued (loop vars) and build-time props
 	dataScope := map[string]any{
-		"component": nil,         // Loop variable (nil marker)
-		"title":     "Welcome",   // Build-time content prop
-		"count":     42,          // Build-time variable
+		"component": nil,       // Loop variable (nil marker)
+		"title":     "Welcome", // Build-time content prop
+		"count":     42,        // Build-time variable
 	}
 
 	analyzer := NewScopeAnalyzer(dataScope)
@@ -454,10 +454,10 @@ func TestIsRuntimeExpression_NilValueMarkerPriority(t *testing.T) {
 		expr     string
 		expected bool
 	}{
-		{"component.name", true},  // Nil marker → runtime
-		{"title", false},          // Non-nil value + tracked → build-time
-		{"count", false},          // Non-nil value, not tracked → build-time (default)
-		{"component", true},       // Nil marker → runtime
+		{"component.name", true}, // Nil marker → runtime
+		{"title", false},         // Non-nil value + tracked → build-time
+		{"count", false},         // Non-nil value, not tracked → build-time (default)
+		{"component", true},      // Nil marker → runtime
 	}
 
 	for _, tt := range tests {

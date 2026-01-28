@@ -106,10 +106,10 @@ func fingerprintAssetPaths(html, fingerprint string) string {
 			return match
 		}
 
-		prefix := parts[1]       // `<script ... src="`
-		slash := parts[2]        // "/" or ""
-		path := parts[3]         // path after optional /
-		suffix := parts[4]       // closing "
+		prefix := parts[1] // `<script ... src="`
+		slash := parts[2]  // "/" or ""
+		path := parts[3]   // path after optional /
+		suffix := parts[4] // closing "
 
 		// Only fingerprint certain paths (js/, core/, generated/)
 		if shouldFingerprintPath(path) {
@@ -134,10 +134,10 @@ func fingerprintAssetPaths(html, fingerprint string) string {
 			return match
 		}
 
-		prefix := parts[1]       // `<link ... href="`
-		slash := parts[2]        // "/" or ""
-		path := parts[3]         // path after optional /
-		suffix := parts[4]       // closing "
+		prefix := parts[1] // `<link ... href="`
+		slash := parts[2]  // "/" or ""
+		path := parts[3]   // path after optional /
+		suffix := parts[4] // closing "
 
 		// Only fingerprint certain paths (css/, core/, generated/)
 		if shouldFingerprintPath(path) {

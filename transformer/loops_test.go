@@ -18,8 +18,8 @@ func TestTransformLoop(t *testing.T) {
 		{
 			name: "simple array loop",
 			loop: &ast.Loop{
-				Value:      "item",  // FIXED: item variable goes in Value field
-				Iterator:   "",      // FIXED: no index variable
+				Value:      "item", // FIXED: item variable goes in Value field
+				Iterator:   "",     // FIXED: no index variable
 				Collection: "items",
 				Content: []ast.Node{
 					&ast.ExpressionNode{Expression: "item"}, // Use ExpressionNode, not TextNode with {item}
@@ -37,8 +37,8 @@ func TestTransformLoop(t *testing.T) {
 		{
 			name: "array loop with index",
 			loop: &ast.Loop{
-				Value:      "item",   // FIXED: item variable is in Value
-				Iterator:   "index",  // FIXED: index variable is in Iterator
+				Value:      "item",  // FIXED: item variable is in Value
+				Iterator:   "index", // FIXED: index variable is in Iterator
 				Collection: "items",
 				Content: []ast.Node{
 					&ast.ExpressionNode{Expression: "index"},
@@ -58,8 +58,8 @@ func TestTransformLoop(t *testing.T) {
 		{
 			name: "object loop",
 			loop: &ast.Loop{
-				Value:      "value",  // FIXED: value variable
-				Iterator:   "key",    // FIXED: key (iterator) for object loops
+				Value:      "value", // FIXED: value variable
+				Iterator:   "key",   // FIXED: key (iterator) for object loops
 				Collection: "user",
 				Content: []ast.Node{
 					&ast.ExpressionNode{Expression: "key"},
@@ -79,8 +79,8 @@ func TestTransformLoop(t *testing.T) {
 		{
 			name: "nested element in loop",
 			loop: &ast.Loop{
-				Value:      "item",  // FIXED
-				Iterator:   "",      // FIXED: no index
+				Value:      "item", // FIXED
+				Iterator:   "",     // FIXED: no index
 				Collection: "items",
 				Content: []ast.Node{
 					&ast.Element{
@@ -109,8 +109,8 @@ func TestTransformLoop(t *testing.T) {
 		{
 			name: "loop with conditional",
 			loop: &ast.Loop{
-				Value:      "item",  // FIXED
-				Iterator:   "",      // FIXED: no index
+				Value:      "item", // FIXED
+				Iterator:   "",     // FIXED: no index
 				Collection: "items",
 				Content: []ast.Node{
 					&ast.Conditional{
@@ -145,8 +145,8 @@ func TestTransformLoop(t *testing.T) {
 		{
 			name: "loop with complex expression",
 			loop: &ast.Loop{
-				Value:      "i",     // FIXED
-				Iterator:   "",      // FIXED: no index
+				Value:      "i", // FIXED
+				Iterator:   "",  // FIXED: no index
 				Collection: "Array(count)",
 				Content: []ast.Node{
 					&ast.TextNode{Content: "Item "},

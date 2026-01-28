@@ -38,12 +38,12 @@ func resetComponentTemplateRegistry() {
 func RegisterComponent(name string, template *ast.Template, props []string) {
 	// Create the component template using the shared type
 	ct := &types.ComponentTemplate{
-		Name:     types.ExtractNameFromPath(name),
+		Name:      types.ExtractNameFromPath(name),
 		Signature: types.GenerateSignature(name),
-		FilePath: name,
-		Category: types.CategoryFromPath(name),
-		AST:      template,
-		Props:    props,
+		FilePath:  name,
+		Category:  types.CategoryFromPath(name),
+		AST:       template,
+		Props:     props,
 	}
 
 	// Always register by the provided name (for backward compatibility)
@@ -183,7 +183,6 @@ func GetAllRegisteredKeys() []string {
 	return keys
 }
 
-
 // GetAllComponentNames returns a map of all component names for magic variables
 // TASK 5.4: Support allLayouts magic variable
 //
@@ -196,6 +195,7 @@ func GetAllComponentNames() map[string]bool {
 	}
 	return result
 }
+
 // isStructuralTag checks if a tag should skip x-data wrapping
 //
 // Pattern: Helper Function [Load: 3]
@@ -213,9 +213,10 @@ func GetAllComponentNames() map[string]bool {
 //   - template: Alpine.js template element (x-for, x-if containers - should not have x-data)
 //
 // Example:
-//   isStructuralTag("head")    // Returns: true
-//   isStructuralTag("div")     // Returns: false
-//   isStructuralTag("header")  // Returns: false (this is a regular component)
+//
+//	isStructuralTag("head")    // Returns: true
+//	isStructuralTag("div")     // Returns: false
+//	isStructuralTag("header")  // Returns: false (this is a regular component)
 func isStructuralTag(tagName string) bool {
 	structural := map[string]bool{
 		"html":     true,
@@ -236,11 +237,12 @@ func isStructuralTag(tagName string) bool {
 // registered with different path variants (e.g., "./components/Header.html" vs "Header")
 //
 // Example:
-//   normalizeComponentPath("./components/UserProfile.html")
-//   Returns: ["./components/UserProfile.html", "UserProfile.html", "UserProfile", "./components/UserProfile"]
 //
-//   normalizeComponentPath("Header")
-//   Returns: ["Header"]
+//	normalizeComponentPath("./components/UserProfile.html")
+//	Returns: ["./components/UserProfile.html", "UserProfile.html", "UserProfile", "./components/UserProfile"]
+//
+//	normalizeComponentPath("Header")
+//	Returns: ["Header"]
 func normalizeComponentPath(path string) []string {
 	keys := []string{path} // Always include the original path
 
@@ -281,9 +283,9 @@ func normalizeComponentPath(path string) []string {
 	} else {
 		// FIXED: Bare component name (e.g., "UserProfile")
 		// Generate common path variations for all registration formats
-		keys = append(keys, "layouts/components/"+path+".html")  // Plenti format
-		keys = append(keys, "./components/"+path+".html")        // Legacy format
-		keys = append(keys, "../components/"+path+".html")       // Relative from content
+		keys = append(keys, "layouts/components/"+path+".html") // Plenti format
+		keys = append(keys, "./components/"+path+".html")       // Legacy format
+		keys = append(keys, "../components/"+path+".html")      // Relative from content
 		keys = append(keys, path+".html")
 	}
 
@@ -302,16 +304,17 @@ func normalizeComponentPath(path string) []string {
 // 3. Static props (prop="value") - return as string literal
 //
 // Example:
-//   parentScope := map[string]any{"user": "Alice", "count": 42}
 //
-//   resolvePropValue(ComponentProp{Name: "name", Value: "{user}", IsDynamic: true}, parentScope)
-//   // Returns: "Alice"
+//	parentScope := map[string]any{"user": "Alice", "count": 42}
 //
-//   resolvePropValue(ComponentProp{Name: "total", Value: "{count}", IsDynamic: true}, parentScope)
-//   // Returns: 42
+//	resolvePropValue(ComponentProp{Name: "name", Value: "{user}", IsDynamic: true}, parentScope)
+//	// Returns: "Alice"
 //
-//   resolvePropValue(ComponentProp{Name: "label", Value: "Submit", IsDynamic: false}, parentScope)
-//   // Returns: "Submit"
+//	resolvePropValue(ComponentProp{Name: "total", Value: "{count}", IsDynamic: true}, parentScope)
+//	// Returns: 42
+//
+//	resolvePropValue(ComponentProp{Name: "label", Value: "Submit", IsDynamic: false}, parentScope)
+//	// Returns: "Submit"
 func resolvePropValue(prop ast.ComponentProp, parentDataScope map[string]any) any {
 	return extractPropValue(prop, parentDataScope)
 }
@@ -369,11 +372,12 @@ func isSimpleVariableReference(s string) bool {
 // 3. Wrap multiple nodes in div with x-data
 //
 // Example:
-//   Single element: <div class="card">content</div>
-//     → <div x-data='{ count: 0 }' class="card">content</div>
 //
-//   Multiple nodes: [<h1>Title</h1>, <p>Content</p>]
-//     → <div x-data='{ count: 0 }'><h1>Title</h1><p>Content</p></div>
+//	Single element: <div class="card">content</div>
+//	  → <div x-data='{ count: 0 }' class="card">content</div>
+//
+//	Multiple nodes: [<h1>Title</h1>, <p>Content</p>]
+//	  → <div x-data='{ count: 0 }'><h1>Title</h1><p>Content</p></div>
 func addComponentDataWrapper(nodes []ast.Node, dataScope map[string]any) []ast.Node {
 	return wrapWithXData(nodes, dataScope)
 }
@@ -776,7 +780,7 @@ func isDynamicExpression(value string, dataScope map[string]any) bool {
 	// STEP 2: Check if it's a valid variable name AND exists in scope
 	if isValidVariableName(trimmed) {
 		if _, exists := dataScope[trimmed]; exists {
-			return true  // It's a variable reference
+			return true // It's a variable reference
 		}
 	}
 
@@ -794,11 +798,12 @@ func isDynamicExpression(value string, dataScope map[string]any) bool {
 // actual array is available in the component's dataScope.
 //
 // Example:
-//   Parent has: content = {components: [{name: "Hero"}, {name: "Footer"}]}
-//   Template: <Component:dynamic ... content={content} />
 //
-//   componentDataScope["content"] = the actual map with components array
-//   → Loop can resolve content.components → build-time expansion works!
+//	Parent has: content = {components: [{name: "Hero"}, {name: "Footer"}]}
+//	Template: <Component:dynamic ... content={content} />
+//
+//	componentDataScope["content"] = the actual map with components array
+//	→ Loop can resolve content.components → build-time expansion works!
 //
 // Note: For Alpine.js reactivity, the body x-data already contains the data.
 // Components inherit from parent Alpine scope, so reactivity is preserved.
@@ -866,9 +871,10 @@ func extractPropValue(prop ast.ComponentProp, parentDataScope map[string]any) an
 // Cognitive Load: 15 (tokenization: 5, variable resolution: 5, arithmetic: 5)
 //
 // Examples:
-//   tryEvaluateArithmeticExpression("age + 50", {"age": 55}) → (105, true)
-//   tryEvaluateArithmeticExpression("count * 2", {"count": 10}) → (20, true)
-//   tryEvaluateArithmeticExpression("unknown + 5", {}) → (nil, false)
+//
+//	tryEvaluateArithmeticExpression("age + 50", {"age": 55}) → (105, true)
+//	tryEvaluateArithmeticExpression("count * 2", {"count": 10}) → (20, true)
+//	tryEvaluateArithmeticExpression("unknown + 5", {}) → (nil, false)
 func tryEvaluateArithmeticExpression(expr string, dataScope map[string]any) (any, bool) {
 	expr = strings.TrimSpace(expr)
 
@@ -974,7 +980,6 @@ func transformComponentProps(props []ast.ComponentProp, parentDataScope map[stri
 	return propScope
 }
 
-
 // TransformComponent is the main entry point for component transformation
 // It's called by the main transformer for ComponentNode AST nodes
 func TransformComponent(node *ast.ComponentNode, parentDataScope map[string]any) []ast.Node {
@@ -989,11 +994,12 @@ func TransformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 // Cognitive Load: 20 (component lookup: 5, scope creation: 5, transformation: 10)
 //
 // Example:
-//   resolvedProps := map[string]any{
-//     "content": map[string]any{"components": [...]},  // Actual map, not JSON string
-//     "name": "Benjamin",
-//   }
-//   TransformComponentWithResolvedProps("pages", resolvedProps, parentScope)
+//
+//	resolvedProps := map[string]any{
+//	  "content": map[string]any{"components": [...]},  // Actual map, not JSON string
+//	  "name": "Benjamin",
+//	}
+//	TransformComponentWithResolvedProps("pages", resolvedProps, parentScope)
 func TransformComponentWithResolvedProps(componentName string, resolvedProps map[string]any, parentDataScope map[string]any) []ast.Node {
 	log.Printf("[TRANSFORM-COMP] ===== TransformComponentWithResolvedProps START =====")
 	log.Printf("[TRANSFORM-COMP] component=%s, resolvedProps keys=%v", componentName, getMapKeys(resolvedProps))
@@ -1142,8 +1148,9 @@ func createComponentPlaceholder(componentName string, props map[string]any) []as
 //   - Format data scope as Alpine.js object
 //
 // Example transformation:
-//   Input:  <UserCard name={user.name} age={user.age} />
-//   Output: <div x-data='{name:"John",age:30}' class="card">...</div>
+//
+//	Input:  <UserCard name={user.name} age={user.age} />
+//	Output: <div x-data='{name:"John",age:30}' class="card">...</div>
 func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any) []ast.Node {
 	componentName := node.Name
 	log.Printf("Recursively transforming component: %s", componentName)
@@ -1366,14 +1373,15 @@ func transformComponent(node *ast.ComponentNode, parentDataScope map[string]any)
 // 4. Skip wrapping for structural tags (html, head, body)
 //
 // Example:
-//   Single element: <div class="card">content</div>
-//     → <div x-data='{...}' class="card">content</div>
 //
-//   Structural tag: <head>metadata</head>
-//     → <head>metadata</head> (NO x-data added)
+//	Single element: <div class="card">content</div>
+//	  → <div x-data='{...}' class="card">content</div>
 //
-//   Multiple nodes: [<h1>Title</h1>, <p>Content</p>]
-//     → <div x-data='{...}'><h1>Title</h1><p>Content</p></div>
+//	Structural tag: <head>metadata</head>
+//	  → <head>metadata</head> (NO x-data added)
+//
+//	Multiple nodes: [<h1>Title</h1>, <p>Content</p>]
+//	  → <div x-data='{...}'><h1>Title</h1><p>Content</p></div>
 func wrapWithXData(nodes []ast.Node, dataScope map[string]any) []ast.Node {
 	// REQUIREMENT 1: Format data scope (COGNITIVE LOAD: 2)
 	xDataValue := formatComponentData(dataScope)
@@ -1443,20 +1451,25 @@ func TransformDynamicComponent(node *ast.DynamicComponentNode, parentDataScope m
 // This function implements Jim's innovative dynamic component feature (<= syntax):
 //
 // PHASE 1: Extract variables from path expression (COGNITIVE LOAD: 5)
-//   Example: "./views/{comp}.html" → extract "comp" variable
+//
+//	Example: "./views/{comp}.html" → extract "comp" variable
 //
 // PHASE 2: Try to resolve path at transformation time (COGNITIVE LOAD: 8)
-//   If path is static or variables have known values, resolve now for build-time optimization
+//
+//	If path is static or variables have known values, resolve now for build-time optimization
 //
 // PHASE 3: Look up component template (COGNITIVE LOAD: 7)
-//   If found, proceed with transformation. If not, create placeholder.
+//
+//	If found, proceed with transformation. If not, create placeholder.
 //
 // PHASE 4: Transform like regular component (COGNITIVE LOAD: 5)
-//   Reuse transformComponent logic with resolved path
+//
+//	Reuse transformComponent logic with resolved path
 //
 // Example transformation:
-//   Input:  <='./components/UserProfile.html' name={user.name} age={30} />
-//   Output: <div x-data='{name:"John",age:30}' class="profile">...</div>
+//
+//	Input:  <='./components/UserProfile.html' name={user.name} age={30} />
+//	Output: <div x-data='{name:"John",age:30}' class="profile">...</div>
 func transformDynamicComponent(node *ast.DynamicComponentNode, parentDataScope map[string]any) []ast.Node {
 	log.Printf("transformDynamicComponent: path=%s, props=%d", node.PathExpression, len(node.Props))
 
@@ -1512,11 +1525,12 @@ func transformDynamicComponent(node *ast.DynamicComponentNode, parentDataScope m
 // Cognitive Load: 6 (regex matching: 3, loop: 2, scope update: 1)
 //
 // Example:
-//   extractVariablesFromPath("./views/{comp}.html", dataScope)
-//   // Adds "comp" to dataScope if not present
 //
-//   extractVariablesFromPath("./views/{section}/{page}.html", dataScope)
-//   // Adds "section" and "page" to dataScope
+//	extractVariablesFromPath("./views/{comp}.html", dataScope)
+//	// Adds "comp" to dataScope if not present
+//
+//	extractVariablesFromPath("./views/{section}/{page}.html", dataScope)
+//	// Adds "section" and "page" to dataScope
 func extractVariablesFromPath(pathExpr string, dataScope map[string]any) {
 	// Use regex to find all {variable} patterns (COGNITIVE LOAD: 3)
 	varPattern := regexp.MustCompile(`\{([a-zA-Z_$][a-zA-Z0-9_$]*)\}`)
@@ -1543,13 +1557,14 @@ func extractVariablesFromPath(pathExpr string, dataScope map[string]any) {
 // If any variable is unknown (nil), the path is returned partially resolved.
 //
 // Example:
-//   dataScope := map[string]any{"comp": "Header"}
-//   resolveDynamicPath("./views/{comp}.html", dataScope)
-//   // Returns: "./views/Header.html"
 //
-//   dataScope := map[string]any{"comp": nil}
-//   resolveDynamicPath("./views/{comp}.html", dataScope)
-//   // Returns: "./views/{comp}.html" (unchanged - variable not resolved)
+//	dataScope := map[string]any{"comp": "Header"}
+//	resolveDynamicPath("./views/{comp}.html", dataScope)
+//	// Returns: "./views/Header.html"
+//
+//	dataScope := map[string]any{"comp": nil}
+//	resolveDynamicPath("./views/{comp}.html", dataScope)
+//	// Returns: "./views/{comp}.html" (unchanged - variable not resolved)
 func resolveDynamicPath(pathExpr string, dataScope map[string]any) string {
 	// QUICK FIX: Strip surrounding backticks, single quotes, and double quotes
 	resolved := strings.Trim(pathExpr, "`'\"")
@@ -1598,12 +1613,13 @@ func resolveDynamicPath(pathExpr string, dataScope map[string]any) string {
 // Format: <div x-component-dynamic="path" data-prop-*="value"></div>
 //
 // Example:
-//   node := &DynamicComponentNode{
-//     PathExpression: "./views/{comp}.html",
-//     Props: []ComponentProp{{Name: "title", Value: "Hello"}},
-//   }
-//   createDynamicComponentPlaceholder(node, "./views/{comp}.html", dataScope)
-//   // Returns: <div x-component-dynamic="./views/{comp}.html" data-prop-title="Hello"></div>
+//
+//	node := &DynamicComponentNode{
+//	  PathExpression: "./views/{comp}.html",
+//	  Props: []ComponentProp{{Name: "title", Value: "Hello"}},
+//	}
+//	createDynamicComponentPlaceholder(node, "./views/{comp}.html", dataScope)
+//	// Returns: <div x-component-dynamic="./views/{comp}.html" data-prop-title="Hello"></div>
 func createDynamicComponentPlaceholder(node *ast.DynamicComponentNode, path string, dataScope map[string]any) []ast.Node {
 	// Create base attributes (COGNITIVE LOAD: 2)
 	attrs := []ast.Attribute{

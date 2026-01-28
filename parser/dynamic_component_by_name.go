@@ -16,7 +16,8 @@ import (
 // Cognitive Load: 18 (tag matching: 3, name parsing: 5, spread parsing: 4, prop parsing: 4, validation: 2)
 //
 // Syntax:
-//   <Component:dynamic name={component.name} {...component.fields} allContent={allContent} />
+//
+//	<Component:dynamic name={component.name} {...component.fields} allContent={allContent} />
 //
 // Key features:
 //   - MUST detect colon in tag name: Component:dynamic
@@ -180,9 +181,10 @@ func parseNameAttribute(attrContent string) (string, string, error) {
 // Returns: spreadProps, regularProps, error
 //
 // Handles mixed attributes like:
-//   {...component.fields} title="Hello" {...overrides} debug={true}
-//   {allContent} {allLayouts} - shorthand props (Svelte-style)
-//   bind:propName={value} - skipped (Svelte-specific, not supported)
+//
+//	{...component.fields} title="Hello" {...overrides} debug={true}
+//	{allContent} {allLayouts} - shorthand props (Svelte-style)
+//	bind:propName={value} - skipped (Svelte-specific, not supported)
 //
 // Order is preserved (important for override logic in transformer)
 func parseComponentAttributes(attrContent string) ([]string, []ast.ComponentProp, error) {
@@ -310,8 +312,9 @@ func findAttributeEnd(input string) int {
 // Returns: expression (without braces and dots), remaining input, error
 //
 // Examples:
-//   {...component.fields} → "component.fields"
-//   {...$store.settings.theme} → "$store.settings.theme"
+//
+//	{...component.fields} → "component.fields"
+//	{...$store.settings.theme} → "$store.settings.theme"
 func parseSpreadProp(input string) (string, string, error) {
 	if !strings.HasPrefix(input, "{...") {
 		return "", input, fmt.Errorf("not a spread prop")

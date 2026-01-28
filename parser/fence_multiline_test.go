@@ -121,7 +121,7 @@ prop count = 42`
 	}{
 		{"companyName", `"Custom Template Co."`},
 		{"year", "new Date().getFullYear()"},
-		{"links", "["},  // Should start with [
+		{"links", "["}, // Should start with [
 		{"count", "42"},
 	}
 
@@ -704,9 +704,9 @@ func TestParseFenceContent_StoreNameValidation(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 &&
 		(s == substr || len(s) > len(substr) &&
-		(s[0:len(substr)] == substr ||
-		 s[len(s)-len(substr):] == substr ||
-		 containsInner(s, substr)))
+			(s[0:len(substr)] == substr ||
+				s[len(s)-len(substr):] == substr ||
+				containsInner(s, substr)))
 }
 
 func containsInner(s, substr string) bool {

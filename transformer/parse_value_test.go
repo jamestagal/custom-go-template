@@ -550,8 +550,8 @@ func TestParseValueQuoteStripping(t *testing.T) {
 // TestParseValueNumberParsing validates correct number type detection
 func TestParseValueNumberParsing(t *testing.T) {
 	tests := []struct {
-		name       string
-		input      string
+		name        string
+		input       string
 		shouldBeInt bool
 		description string
 	}{

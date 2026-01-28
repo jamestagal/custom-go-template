@@ -8,7 +8,6 @@ import (
 	"github.com/jimafisk/custom_go_template/ast"
 )
 
-
 // transformLoop transforms a Loop node into an Alpine.js compatible structure
 // BUILD-TIME EXPANSION: This function now expands loops at build time instead of
 // generating x-for templates, allowing component.name resolution in loops.
@@ -19,33 +18,35 @@ import (
 // Cognitive Load: 22 (collection resolution: 6, iteration: 8, fallback: 4, edge cases: 4)
 //
 // Behavior:
-//   1. Attempt to resolve collection from dataScope
-//   2. Check if loop body needs runtime evaluation (Alpine directives, reactive expressions)
-//   3. IF resolvable at build-time AND body is static:
-//      → Expand loop in Go (no x-for template)
-//   4. ELSE (runtime-only collection OR reactive content):
-//      → Fallback to Alpine.js x-for template (runtime)
+//  1. Attempt to resolve collection from dataScope
+//  2. Check if loop body needs runtime evaluation (Alpine directives, reactive expressions)
+//  3. IF resolvable at build-time AND body is static:
+//     → Expand loop in Go (no x-for template)
+//  4. ELSE (runtime-only collection OR reactive content):
+//     → Fallback to Alpine.js x-for template (runtime)
 //
 // Example BUILD-TIME:
-//   Input:  {for component in components}
-//             <div>{component.name}</div>
-//           {/for}
 //
-//   With dataScope: {"components": [{"name": "Hero"}, {"name": "Footer"}]}
+//	Input:  {for component in components}
+//	          <div>{component.name}</div>
+//	        {/for}
 //
-//   Output: <div><span x-text="component.name"></span></div>
-//           <div><span x-text="component.name"></span></div>
-//           (2 expanded divs, NO x-for template)
+//	With dataScope: {"components": [{"name": "Hero"}, {"name": "Footer"}]}
+//
+//	Output: <div><span x-text="component.name"></span></div>
+//	        <div><span x-text="component.name"></span></div>
+//	        (2 expanded divs, NO x-for template)
 //
 // Example RUNTIME (fallback):
-//   Input:  {for item in $store.cart.items}
-//             <div>{item.name}</div>
-//           {/for}
 //
-//   Output: <template x-for="item in $store.cart.items">
-//             <div><span x-text="item.name"></span></div>
-//           </template>
-//           (Alpine x-for template for runtime evaluation)
+//	Input:  {for item in $store.cart.items}
+//	          <div>{item.name}</div>
+//	        {/for}
+//
+//	Output: <template x-for="item in $store.cart.items">
+//	          <div><span x-text="item.name"></span></div>
+//	        </template>
+//	        (Alpine x-for template for runtime evaluation)
 func transformLoop(node *ast.Loop, dataScope map[string]any) []ast.Node {
 	log.Printf("========== transformLoop START ==========")
 	log.Printf("transformLoop: iterator=%s, value=%s, collection=%s, isOf=%v",
@@ -178,8 +179,8 @@ func loopBodyNeedsRuntime(content []ast.Node, itemVar, indexVar string) bool {
 
 				// Alpine directives that need runtime evaluation
 				if strings.HasPrefix(attrName, "@") ||
-				   strings.HasPrefix(attrName, ":") ||
-				   strings.HasPrefix(attrName, "x-") {
+					strings.HasPrefix(attrName, ":") ||
+					strings.HasPrefix(attrName, "x-") {
 					log.Printf("  >> loopBodyNeedsRuntime: ✓ FOUND Alpine directive %s, needs runtime", attrName)
 					return true
 				}

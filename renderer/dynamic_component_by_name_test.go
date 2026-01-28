@@ -11,8 +11,8 @@ import (
 // This renderer should only be called when transformation fails to resolve the component
 func TestRenderDynamicComponentByName(t *testing.T) {
 	tests := []struct {
-		name     string
-		node     *ast.DynamicComponentByNameNode
+		name      string
+		node      *ast.DynamicComponentByNameNode
 		wantParts []string // Parts that should be in the output comment
 	}{
 		{
@@ -218,8 +218,8 @@ func TestRenderDynamicComponentByName_Integration(t *testing.T) {
 // TestRenderDynamicComponentByName_EdgeCases tests edge cases
 func TestRenderDynamicComponentByName_EdgeCases(t *testing.T) {
 	tests := []struct {
-		name     string
-		node     *ast.DynamicComponentByNameNode
+		name      string
+		node      *ast.DynamicComponentByNameNode
 		wantParts []string
 	}{
 		{

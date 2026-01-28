@@ -182,11 +182,11 @@ func TestGenerateComponentRegistryWithSignatures(t *testing.T) {
 // TestComponentTemplateFieldsPopulated ensures all fields are correctly populated
 func TestComponentTemplateFieldsPopulated(t *testing.T) {
 	tests := []struct {
-		name        string
-		filePath    string
-		wantName    string
-		wantSig     string
-		wantCat     string
+		name     string
+		filePath string
+		wantName string
+		wantSig  string
+		wantCat  string
 	}{
 		{
 			name:     "standard component",

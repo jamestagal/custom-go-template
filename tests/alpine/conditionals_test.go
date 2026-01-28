@@ -12,10 +12,10 @@ import (
 
 func TestConditionalTransformation(t *testing.T) {
 	tests := []struct {
-		name      string
-		template  *ast.Template
-		props     map[string]any
-		contains  []string
+		name        string
+		template    *ast.Template
+		props       map[string]any
+		contains    []string
 		notContains []string
 	}{
 		{
@@ -326,16 +326,16 @@ func TestConditionalTransformation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Transform the template
 			transformed := transformer.TransformAST(tt.template, tt.props)
-			
+
 			// Render the transformed template
 			var result string
 			for _, node := range transformed.RootNodes {
 				result += testutils.RenderNode(node)
 			}
-			
+
 			// Normalize and compare
 			resultNormalized := testutils.NormalizeWhitespace(result)
-			
+
 			// Check that output contains expected strings
 			for _, s := range tt.contains {
 				normalizedSubstr := testutils.NormalizeWhitespace(s)
@@ -343,7 +343,7 @@ func TestConditionalTransformation(t *testing.T) {
 					t.Errorf("Expected output to contain (normalized):\n%s\n\nBut it doesn't. Full output (normalized):\n%s", normalizedSubstr, resultNormalized)
 				}
 			}
-			
+
 			// Check that output doesn't contain unwanted strings
 			for _, s := range tt.notContains {
 				normalizedSubstr := testutils.NormalizeWhitespace(s)
@@ -582,7 +582,7 @@ func TestNestedConditionalsInLoops(t *testing.T) {
 				},
 				Children: []ast.Node{
 					&ast.Loop{
-						Iterator: "item",
+						Iterator:   "item",
 						Collection: "items",
 						Content: []ast.Node{
 							&ast.Element{
@@ -707,11 +707,11 @@ func TestLoopsInConditionals(t *testing.T) {
 						IfContent: []ast.Node{
 							&ast.TextNode{Content: "Items:"},
 							&ast.Loop{
-								Iterator: "item",
+								Iterator:   "item",
 								Collection: "items",
 								Content: []ast.Node{
 									&ast.Element{
-										TagName: "span",
+										TagName:    "span",
 										Attributes: []ast.Attribute{},
 										Children: []ast.Node{
 											&ast.TextNode{Content: "{item}"},
@@ -818,7 +818,7 @@ func TestMixedNesting(t *testing.T) {
 						IfCondition: "showUsers",
 						IfContent: []ast.Node{
 							&ast.Loop{
-								Iterator: "user",
+								Iterator:   "user",
 								Collection: "users",
 								Content: []ast.Node{
 									&ast.Element{

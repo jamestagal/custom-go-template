@@ -17,16 +17,16 @@ func TestCollectComponentFenceData(t *testing.T) {
 		description   string
 	}{
 		{
-			name:  "empty fence section",
-			fence: &ast.FenceSection{},
+			name:          "empty fence section",
+			fence:         &ast.FenceSection{},
 			expectedScope: map[string]any{},
-			description: "Empty fence should result in empty scope",
+			description:   "Empty fence should result in empty scope",
 		},
 		{
-			name: "nil fence section",
-			fence: nil,
+			name:          "nil fence section",
+			fence:         nil,
 			expectedScope: map[string]any{},
-			description: "Nil fence should be handled gracefully with empty scope",
+			description:   "Nil fence should be handled gracefully with empty scope",
 		},
 		{
 			name: "variables only - simple types",
@@ -593,7 +593,7 @@ applyDiscount(code) {
 import Footer from './components/Footer.html'`,
 			},
 			expectedScope: map[string]any{},
-			description: "Fence with only imports should result in empty scope (imports don't add to scope)",
+			description:   "Fence with only imports should result in empty scope (imports don't add to scope)",
 		},
 		{
 			name: "fence with comments only",
@@ -604,7 +604,7 @@ import Footer from './components/Footer.html'`,
 // Another comment`,
 			},
 			expectedScope: map[string]any{},
-			description: "Fence with only comments should result in empty scope",
+			description:   "Fence with only comments should result in empty scope",
 		},
 		{
 			name: "function with trailing semicolon",
@@ -909,8 +909,8 @@ func TestCollectComponentFenceData_FunctionExtractionPatterns(t *testing.T) {
 			description: "Immediately Invoked Function Expression (IIFE) handling",
 		},
 		{
-			name: "function with template literal",
-			rawContent: "const greet = name => `Hello ${name}!`",
+			name:         "function with template literal",
+			rawContent:   "const greet = name => `Hello ${name}!`",
 			expectedFunc: "const greet = name => `Hello ${name}!`",
 			expectedName: "greet",
 			description:  "Arrow function with template literal return should be extracted",

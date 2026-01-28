@@ -73,9 +73,9 @@ function greet() {
 
 	// 3. Check that HTML structure is present (DOCTYPE might be stripped by parser, which is OK)
 	requiredElements := []string{
-		"<html>",
+		"<html", // Note: html may have data-content-filepath attribute added
 		"<head>",
-		"<body",    // Note: body will have x-data attribute added
+		"<body", // Note: body will have x-data attribute added
 		"</body>",
 		"</html>",
 	}
@@ -270,7 +270,8 @@ let test = "value"
 	}
 
 	// Just verify that we got some HTML output
-	if !strings.Contains(body, "<html>") {
+	// Note: html may have data-content-filepath attribute
+	if !strings.Contains(body, "<html") {
 		t.Error("Expected HTML output even with unclosed tags")
 	}
 }
@@ -352,10 +353,10 @@ let showList = true
 // Phase 3: Only inject runtime-components.js when HasRuntimeComponents() is true
 func TestInjectRuntimeScripts(t *testing.T) {
 	tests := []struct {
-		name           string
-		hasRuntime     bool
-		expectScript   bool
-		inputHTML      string
+		name         string
+		hasRuntime   bool
+		expectScript bool
+		inputHTML    string
 	}{
 		{
 			name:         "Static page - no runtime components",

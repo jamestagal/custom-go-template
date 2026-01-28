@@ -11,10 +11,10 @@ import (
 
 func TestLoopTransformation(t *testing.T) {
 	tests := []struct {
-		name      string
-		template  *ast.Template
-		props     map[string]any
-		contains  []string
+		name        string
+		template    *ast.Template
+		props       map[string]any
+		contains    []string
 		notContains []string
 	}{
 		{
@@ -135,8 +135,8 @@ func TestLoopTransformation(t *testing.T) {
 				`<table class="data-table">`,
 				`<thead><tr><th>Name</th><th>Age</th></tr></thead>`,
 				`<tbody>`,
-								`<tr><td><span x-text="user.name"></span></td><td><span x-text="user.age"></span></td></tr>`,
-								`</tbody>`,
+				`<tr><td><span x-text="user.name"></span></td><td><span x-text="user.age"></span></td></tr>`,
+				`</tbody>`,
 				`</table>`,
 			},
 		},
@@ -265,9 +265,9 @@ func TestLoopTransformation(t *testing.T) {
 			},
 			contains: []string{
 				`<dl class="properties">`,
-								`<dt><span x-text="key"></span></dt>`,
+				`<dt><span x-text="key"></span></dt>`,
 				`<dd><span x-text="value"></span></dd>`,
-								`</dl>`,
+				`</dl>`,
 			},
 		},
 		{
@@ -343,13 +343,13 @@ func TestLoopTransformation(t *testing.T) {
 			},
 			contains: []string{
 				`<div class="categories">`,
-								`<div class="category">`,
+				`<div class="category">`,
 				`<h3><span x-text="category.name"></span></h3>`,
 				`<ul>`,
-								`<li><span x-text="item"></span></li>`,
-								`</ul>`,
+				`<li><span x-text="item"></span></li>`,
+				`</ul>`,
 				`</div>`,
-								`</div>`,
+				`</div>`,
 			},
 		},
 	}
@@ -358,20 +358,20 @@ func TestLoopTransformation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Transform the template
 			transformed := transformer.TransformAST(tt.template, tt.props)
-			
+
 			// Render the transformed template
 			var result string
 			for _, node := range transformed.RootNodes {
 				result += testutils.RenderNode(node)
 			}
-			
+
 			// Check that output contains expected strings
 			for _, s := range tt.contains {
 				if !strings.Contains(result, s) {
 					t.Errorf("Expected output to contain %q, but it doesn't.\nOutput: %s", s, result)
 				}
 			}
-			
+
 			// Check that output doesn't contain unwanted strings
 			for _, s := range tt.notContains {
 				if strings.Contains(result, s) {

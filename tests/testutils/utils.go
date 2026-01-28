@@ -19,7 +19,7 @@ func RenderNodeToBuilder(sb *strings.Builder, node ast.Node) {
 	case *ast.Element:
 		sb.WriteString("<")
 		sb.WriteString(n.TagName)
-		
+
 		// Render attributes
 		for _, attr := range n.Attributes {
 			sb.WriteString(" ")
@@ -32,38 +32,38 @@ func RenderNodeToBuilder(sb *strings.Builder, node ast.Node) {
 				sb.WriteString("\"")
 			}
 		}
-		
+
 		if n.SelfClosing {
 			sb.WriteString(" />")
 			return
 		}
-		
+
 		sb.WriteString(">")
-		
+
 		// Render children
 		for _, child := range n.Children {
 			RenderNodeToBuilder(sb, child)
 		}
-		
+
 		sb.WriteString("</")
 		sb.WriteString(n.TagName)
 		sb.WriteString(">")
-		
+
 	case *ast.TextNode:
 		// Render the content directly without trimming
 		// Let NormalizeWhitespace handle differences during comparison
 		sb.WriteString(n.Content)
-		
+
 	case *ast.ExpressionNode:
 		sb.WriteString("<span x-text=\"")
 		sb.WriteString(n.Expression)
 		sb.WriteString("\"></span>")
-		
+
 	case *ast.CommentNode:
 		sb.WriteString("<!--")
 		sb.WriteString(n.Content)
 		sb.WriteString("-->")
-		
+
 	case *ast.Loop:
 		sb.WriteString("<template x-for=\"")
 		sb.WriteString(n.Iterator)
@@ -80,18 +80,18 @@ func RenderNodeToBuilder(sb *strings.Builder, node ast.Node) {
 			sb.WriteString(n.Collection)
 		}
 		sb.WriteString("\">")
-		
+
 		// Render loop content
 		for _, child := range n.Content {
 			RenderNodeToBuilder(sb, child)
 		}
-		
+
 		sb.WriteString("</template>")
-		
+
 	case *ast.Conditional:
 		// Always use modern Alpine.js directives for conditionals
 		renderAlpineConditional(sb, n)
-		
+
 	default:
 		// Skip other node types like FenceSection
 	}
@@ -103,36 +103,36 @@ func renderAlpineConditional(sb *strings.Builder, cond *ast.Conditional) {
 	sb.WriteString("<template x-if=\"")
 	sb.WriteString(cond.IfCondition)
 	sb.WriteString("\">")
-	
+
 	for _, child := range cond.IfContent {
 		RenderNodeToBuilder(sb, child)
 	}
-	
+
 	sb.WriteString("</template>")
-	
+
 	// Render else-if branches
 	for i, condition := range cond.ElseIfConditions {
 		sb.WriteString("<template x-else-if=\"")
 		sb.WriteString(condition)
 		sb.WriteString("\">")
-		
+
 		if i < len(cond.ElseIfContent) {
 			for _, child := range cond.ElseIfContent[i] {
 				RenderNodeToBuilder(sb, child)
 			}
 		}
-		
+
 		sb.WriteString("</template>")
 	}
-	
+
 	// Render else branch
 	if len(cond.ElseContent) > 0 {
 		sb.WriteString("<template x-else>")
-		
+
 		for _, child := range cond.ElseContent {
 			RenderNodeToBuilder(sb, child)
 		}
-		
+
 		sb.WriteString("</template>")
 	}
 }
@@ -145,11 +145,11 @@ func NormalizeWhitespace(s string) string {
 		"\t", " ",
 	)
 	s = re.Replace(s)
-	
+
 	// Replace multiple spaces with a single space
 	for strings.Contains(s, "  ") {
 		s = strings.ReplaceAll(s, "  ", " ")
 	}
-	
+
 	return strings.TrimSpace(s)
 }

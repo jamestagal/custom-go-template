@@ -14,10 +14,11 @@ import (
 //
 // Process:
 // 1. For each prop name in fence.ExportedProps:
-//    - Look up value in contentData
-//    - If found: create a variable with the JSON value
-//    - If not found and prop has default: use default value
-//    - If not found and no default: return error
+//   - Look up value in contentData
+//   - If found: create a variable with the JSON value
+//   - If not found and prop has default: use default value
+//   - If not found and no default: return error
+//
 // 2. Return a modified fence section with injected variables
 //
 // Cognitive Load: 14

@@ -74,7 +74,7 @@ export let content
 	// Build props with content magic variable
 	props := map[string]interface{}{
 		"content": map[string]interface{}{
-			"title": "Test Page",
+			"title":       "Test Page",
 			"description": "Description",
 		},
 	}
@@ -156,7 +156,7 @@ export let allLayouts
 	props := map[string]interface{}{
 		"allLayouts": map[string]bool{
 			"Hero2436": true,
-			"Footer": true,
+			"Footer":   true,
 		},
 	}
 
@@ -419,11 +419,11 @@ export let components, content
 			map[string]interface{}{
 				"name": "Hero2436",
 				"fields": map[string]interface{}{
-					"topper": "Welcome",
-					"title": "Test Title",
+					"topper":      "Welcome",
+					"title":       "Test Title",
 					"description": "Test description",
-					"buttonText": "Click",
-					"buttonLink": "/test",
+					"buttonText":  "Click",
+					"buttonLink":  "/test",
 				},
 			},
 		},

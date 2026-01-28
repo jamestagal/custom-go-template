@@ -84,9 +84,9 @@ func TestComponentPropsTransformation(t *testing.T) {
 				},
 			},
 			expectedProps: []string{
-				"username:",    // Resolved at build-time to actual value (was: currentUser.name)
-				"isAdmin:",     // Value present
-				"avatar:",      // Value present
+				"username:", // Resolved at build-time to actual value (was: currentUser.name)
+				"isAdmin:",  // Value present
+				"avatar:",   // Value present
 			},
 			expectedTag:  "div",
 			expectedText: "UserProfile Component",
@@ -153,8 +153,8 @@ func TestComponentPropsTransformation(t *testing.T) {
 				},
 			},
 			expectedProps: []string{
-				"formData:",    // Object value, just check key exists
-				"errors:",      // Object value - now resolved at build-time (was: errors: validationErrors)
+				"formData:", // Object value, just check key exists
+				"errors:",   // Object value - now resolved at build-time (was: errors: validationErrors)
 			},
 			expectedTag:  "div",
 			expectedText: "Form Component",

@@ -132,11 +132,12 @@ func findComponentNodes(nodes []ast.Node) []string {
 // Cognitive Load: 24 (traverse original: 5, traverse transformed: 5, dynamic layout: 4, json components: 3, merge: 3, dedupe: 4)
 //
 // Example:
-//   html.html (original) imports: Nav, Head, Footer
-//   html.html (transformed) has: Nav, Head, Footer, + resolved _index component
-//   dynamicLayoutName: "_index"
-//   jsonComponentNames: ["hero2436", "services2437", "whyChoose2425"]
-//   Result: Styles from Nav, Head, Footer, Hero2436, Services2437, WhyChoose2425, _index
+//
+//	html.html (original) imports: Nav, Head, Footer
+//	html.html (transformed) has: Nav, Head, Footer, + resolved _index component
+//	dynamicLayoutName: "_index"
+//	jsonComponentNames: ["hero2436", "services2437", "whyChoose2425"]
+//	Result: Styles from Nav, Head, Footer, Hero2436, Services2437, WhyChoose2425, _index
 func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transformedAST *ast.Template, componentName string, dynamicLayoutName string, jsonComponentNames []string) string {
 	// Handle nil template gracefully
 	if originalAST == nil && transformedAST == nil {
@@ -326,15 +327,16 @@ func AggregateComponentStylesWithTransformed(originalAST *ast.Template, transfor
 // 4. Return aggregated CSS string with source comments
 //
 // Example:
-//   template := &ast.Template{
-//     RootNodes: []ast.Node{
-//       &ast.StyleSection{Content: ".header { color: blue; }"},
-//     },
-//   }
-//   result := AggregateComponentStyles(template, "Header")
-//   // Returns:
-//   // /* Styles from: Header */
-//   // .header { color: blue; }
+//
+//	template := &ast.Template{
+//	  RootNodes: []ast.Node{
+//	    &ast.StyleSection{Content: ".header { color: blue; }"},
+//	  },
+//	}
+//	result := AggregateComponentStyles(template, "Header")
+//	// Returns:
+//	// /* Styles from: Header */
+//	// .header { color: blue; }
 func AggregateComponentStyles(rootTemplate *ast.Template, componentName string) string {
 	// Handle nil template gracefully
 	if rootTemplate == nil {
@@ -458,10 +460,11 @@ func AggregateComponentStyles(rootTemplate *ast.Template, componentName string) 
 // Thread-safe for concurrent access.
 //
 // Example:
-//   styles := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index", []string{"hero2436", "services2437"})
-//   // First call: cache miss, performs aggregation including _index layout and JSON component imports
-//   styles2 := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index", []string{"hero2436", "services2437"})
-//   // Second call: cache hit, returns cached result instantly
+//
+//	styles := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index", []string{"hero2436", "services2437"})
+//	// First call: cache miss, performs aggregation including _index layout and JSON component imports
+//	styles2 := GetAggregatedStyles(originalAST, transformedAST, "Header", "_index", []string{"hero2436", "services2437"})
+//	// Second call: cache hit, returns cached result instantly
 func GetAggregatedStyles(originalAST *ast.Template, transformedAST *ast.Template, componentName string, dynamicLayoutName string, jsonComponentNames []string) string {
 	// Build cache key that includes dynamic layout name and JSON component names
 	cacheKey := componentName
@@ -510,8 +513,9 @@ func GetAggregatedStyles(originalAST *ast.Template, transformedAST *ast.Template
 // Thread-safe for concurrent access.
 //
 // Example:
-//   ClearStyleCache()
-//   log.Println("Cache cleared - next render will re-aggregate styles")
+//
+//	ClearStyleCache()
+//	log.Println("Cache cleared - next render will re-aggregate styles")
 func ClearStyleCache() {
 	styleCacheMutex.Lock()
 	defer styleCacheMutex.Unlock()
@@ -529,8 +533,9 @@ func ClearStyleCache() {
 //   - component_names: list of cached component names
 //
 // Example:
-//   stats := GetCacheStats()
-//   fmt.Printf("Cache contains %d components\n", stats["cached_components"])
+//
+//	stats := GetCacheStats()
+//	fmt.Printf("Cache contains %d components\n", stats["cached_components"])
 func GetCacheStats() map[string]interface{} {
 	styleCacheMutex.RLock()
 	defer styleCacheMutex.RUnlock()

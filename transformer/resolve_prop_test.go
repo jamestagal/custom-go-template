@@ -34,14 +34,14 @@ func TestResolvePropValue(t *testing.T) {
 			map[string]any{"id": 1, "name": "Widget", "price": 29.99},
 			map[string]any{"id": 2, "name": "Gadget", "price": 49.99},
 		},
-		"formatPrice":     "function(p) { return '$' + p; }",
-		"isLoggedIn":      true,
-		"count":           42,
-		"discount":        15.5,
-		"title":           "Welcome",
-		"user":            "Alice",
+		"formatPrice":      "function(p) { return '$' + p; }",
+		"isLoggedIn":       true,
+		"count":            42,
+		"discount":         15.5,
+		"title":            "Welcome",
+		"user":             "Alice",
 		"validationErrors": []any{"error1", "error2"},
-		"items":           []any{1, 2, 3},
+		"items":            []any{1, 2, 3},
 		"config": map[string]any{
 			"debug": true,
 			"port":  8080,
@@ -741,12 +741,12 @@ func TestResolvePropValueLogging(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name         string
-		prop         ast.ComponentProp
-		parentScope  map[string]any
-		shouldLog    bool
+		name                 string
+		prop                 ast.ComponentProp
+		parentScope          map[string]any
+		shouldLog            bool
 		expectedLogSubstring string
-		description  string
+		description          string
 	}{
 		{
 			name: "shorthand prop not found - should log",
@@ -756,10 +756,10 @@ func TestResolvePropValueLogging(t *testing.T) {
 				IsShorthand: true,
 				IsDynamic:   true,
 			},
-			parentScope:  map[string]any{"otherVar": "value"},
-			shouldLog:    true,
+			parentScope:          map[string]any{"otherVar": "value"},
+			shouldLog:            true,
 			expectedLogSubstring: "not in parent scope",
-			description:  "Should log when shorthand prop variable not found",
+			description:          "Should log when shorthand prop variable not found",
 		},
 		{
 			name: "dynamic prop not found - should log",
@@ -768,10 +768,10 @@ func TestResolvePropValueLogging(t *testing.T) {
 				Value:     "{nonExistent}",
 				IsDynamic: true,
 			},
-			parentScope:  map[string]any{"other": "value"},
-			shouldLog:    true,
+			parentScope:          map[string]any{"other": "value"},
+			shouldLog:            true,
 			expectedLogSubstring: "not in parent scope",
-			description:  "Should log about variable not found",
+			description:          "Should log about variable not found",
 		},
 		{
 			name: "shorthand prop found - should log resolved",
@@ -781,10 +781,10 @@ func TestResolvePropValueLogging(t *testing.T) {
 				IsShorthand: true,
 				IsDynamic:   true,
 			},
-			parentScope:  map[string]any{"user": "Alice"},
-			shouldLog:    true,
+			parentScope:          map[string]any{"user": "Alice"},
+			shouldLog:            true,
 			expectedLogSubstring: "Resolved variable",
-			description:  "Should log that variable was resolved to actual value",
+			description:          "Should log that variable was resolved to actual value",
 		},
 		{
 			name: "static prop - no logging",
@@ -792,10 +792,10 @@ func TestResolvePropValueLogging(t *testing.T) {
 				Name:  "label",
 				Value: `"Static"`,
 			},
-			parentScope:  map[string]any{},
-			shouldLog:    false,
+			parentScope:          map[string]any{},
+			shouldLog:            false,
 			expectedLogSubstring: "extractPropValue",
-			description:  "Should not log for static props",
+			description:          "Should not log for static props",
 		},
 	}
 
@@ -839,11 +839,11 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		prop         ast.ComponentProp
-		expectedType string
+		name          string
+		prop          ast.ComponentProp
+		expectedType  string
 		expectedValue any
-		description  string
+		description   string
 	}{
 		{
 			name: "preserve string type",
@@ -852,9 +852,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{strVal}",
 				IsDynamic: true,
 			},
-			expectedType: "string",
+			expectedType:  "string",
 			expectedValue: "text",
-			description:  "Simple variable should return actual string value",
+			description:   "Simple variable should return actual string value",
 		},
 		{
 			name: "preserve int type",
@@ -863,9 +863,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{intVal}",
 				IsDynamic: true,
 			},
-			expectedType: "int",
+			expectedType:  "int",
 			expectedValue: 42,
-			description:  "Simple variable should return actual int value",
+			description:   "Simple variable should return actual int value",
 		},
 		{
 			name: "preserve float type",
@@ -874,9 +874,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{floatVal}",
 				IsDynamic: true,
 			},
-			expectedType: "float64",
+			expectedType:  "float64",
 			expectedValue: 3.14,
-			description:  "Simple variable should return actual float value",
+			description:   "Simple variable should return actual float value",
 		},
 		{
 			name: "preserve bool type",
@@ -885,9 +885,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{boolVal}",
 				IsDynamic: true,
 			},
-			expectedType: "bool",
+			expectedType:  "bool",
 			expectedValue: true,
-			description:  "Simple variable should return actual bool value",
+			description:   "Simple variable should return actual bool value",
 		},
 		{
 			name: "preserve nil type",
@@ -896,9 +896,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{nilVal}",
 				IsDynamic: true,
 			},
-			expectedType: "string",
+			expectedType:  "string",
 			expectedValue: "__VAR_REF__nilVal", // nil values return reference marker
-			description:  "Nil variable should return __VAR_REF__ marker (not in scope effectively)",
+			description:   "Nil variable should return __VAR_REF__ marker (not in scope effectively)",
 		},
 		{
 			name: "preserve array type",
@@ -907,9 +907,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{arrayVal}",
 				IsDynamic: true,
 			},
-			expectedType: "[]interface {}",
+			expectedType:  "[]interface {}",
 			expectedValue: []any{1, 2, 3},
-			description:  "Simple variable should return actual array value",
+			description:   "Simple variable should return actual array value",
 		},
 		{
 			name: "preserve object type",
@@ -918,9 +918,9 @@ func TestResolvePropValueTypePreservation(t *testing.T) {
 				Value:     "{objVal}",
 				IsDynamic: true,
 			},
-			expectedType: "map[string]interface {}",
+			expectedType:  "map[string]interface {}",
 			expectedValue: map[string]any{"key": "value"},
-			description:  "Simple variable should return actual object value",
+			description:   "Simple variable should return actual object value",
 		},
 	}
 

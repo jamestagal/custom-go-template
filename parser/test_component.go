@@ -14,7 +14,7 @@ func TestComponentParser() {
 		"<AdminPanel user={currentUser} />",
 		"<UserProfile user={currentUser} />",
 	}
-	
+
 	for _, tc := range testCases {
 		log.Printf("=== Testing Component Parser on: %s ===", tc)
 		result := ComponentParser()(tc)

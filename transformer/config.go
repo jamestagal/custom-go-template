@@ -15,8 +15,9 @@ var OptimizeXData = true
 // This function provides a clean API for toggling the optimization flag
 //
 // Example:
-//   SetOptimization(false) // Revert to legacy behavior
-//   SetOptimization(true)  // Enable optimization
+//
+//	SetOptimization(false) // Revert to legacy behavior
+//	SetOptimization(true)  // Enable optimization
 func SetOptimization(enabled bool) {
 	OptimizeXData = enabled
 	status := "DISABLED"

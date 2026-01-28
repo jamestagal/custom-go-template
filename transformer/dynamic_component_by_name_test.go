@@ -40,7 +40,7 @@ func TestTransformDynamicComponentByName_BasicTransformation(t *testing.T) {
 				Props:          []ast.ComponentProp{},
 				SpreadProps:    []string{},
 			},
-			dataScope: map[string]any{},
+			dataScope:   map[string]any{},
 			expectError: false,
 			description: "Should resolve string literal component name",
 		},
@@ -51,7 +51,7 @@ func TestTransformDynamicComponentByName_BasicTransformation(t *testing.T) {
 				Props:          []ast.ComponentProp{},
 				SpreadProps:    []string{},
 			},
-			dataScope: map[string]any{},
+			dataScope:   map[string]any{},
 			expectError: false,
 			description: "Should handle quoted string literal",
 		},
@@ -144,12 +144,12 @@ func TestTransformDynamicComponentByName_SimplePropSubstitution(t *testing.T) {
 	defer UnregisterComponent("store-demo")
 
 	tests := []struct {
-		name             string
-		node             *ast.DynamicComponentByNameNode
-		dataScope        map[string]any
-		expectError      bool
-		expectedClass    string // Expected class in rendered output
-		description      string
+		name          string
+		node          *ast.DynamicComponentByNameNode
+		dataScope     map[string]any
+		expectError   bool
+		expectedClass string // Expected class in rendered output
+		description   string
 	}{
 		{
 			name: "simple prop reference - _index",
@@ -851,7 +851,7 @@ func TestEvaluateNameExpression(t *testing.T) {
 			name:        "missing variable",
 			nameExpr:    "missing",
 			dataScope:   map[string]any{},
-			expected:    "missing",  // Treated as literal string when not found
+			expected:    "missing", // Treated as literal string when not found
 			expectError: false,
 			description: "Should treat missing variable as literal string",
 		},
@@ -909,10 +909,11 @@ func TestEvaluateNameExpression(t *testing.T) {
 // and emits a runtime wrapper instead of attempting build-time resolution.
 //
 // Runtime wrapper structure:
-//   <div class="dyn-comp-runtime"
-//        x-data="{compName: component.name, compProps: {...}}"
-//        x-init="$renderDynamicComponent($el, compName, compProps)">
-//   </div>
+//
+//	<div class="dyn-comp-runtime"
+//	     x-data="{compName: component.name, compProps: {...}}"
+//	     x-init="$renderDynamicComponent($el, compName, compProps)">
+//	</div>
 func TestTransformDynamicComponentByName_RuntimePath(t *testing.T) {
 	// Note: This test is CURRENTLY EXPECTED TO FAIL until Task 2.2-2.5 are implemented
 	// It validates the runtime path behavior once ScopeAnalyzer integration is complete
@@ -1312,12 +1313,12 @@ func TestSerializePropsForRuntime(t *testing.T) {
 		{
 			name: "mixed types",
 			props: map[string]interface{}{
-				"title":   "Test",
-				"count":   42,
-				"active":  true,
-				"ratio":   3.14,
-				"tags":    []string{"go", "test"},
-				"meta":    map[string]interface{}{"version": "1.0"},
+				"title":  "Test",
+				"count":  42,
+				"active": true,
+				"ratio":  3.14,
+				"tags":   []string{"go", "test"},
+				"meta":   map[string]interface{}{"version": "1.0"},
 			},
 			contains: []string{"title", "Test", "count", "42", "active", "true", "ratio", "3.14", "tags", "go", "test", "meta", "version", "1.0"},
 		},
@@ -1331,7 +1332,6 @@ func TestSerializePropsForRuntime(t *testing.T) {
 			if result == "" {
 				t.Error("serializePropsForRuntime returned empty string")
 			}
-
 
 			// Check for expected substrings
 			for _, expected := range tt.contains {

@@ -21,14 +21,15 @@ import (
 //   - Expressions with operators (+, -, *, etc.) → RUNTIME-ONLY (for safety)
 //
 // Example Usage:
-//   analyzer := NewScopeAnalyzer(dataScope)
-//   analyzer.TrackLoopVariable("component")
-//   analyzer.TrackContentProp("title")
 //
-//   analyzer.IsRuntimeExpression("component.name") // → true (loop variable)
-//   analyzer.IsRuntimeExpression("title")          // → false (content prop)
-//   analyzer.IsRuntimeExpression("$auth.user")     // → true (Alpine store)
-//   analyzer.IsRuntimeExpression(`"Hero2436"`)     // → false (string literal)
+//	analyzer := NewScopeAnalyzer(dataScope)
+//	analyzer.TrackLoopVariable("component")
+//	analyzer.TrackContentProp("title")
+//
+//	analyzer.IsRuntimeExpression("component.name") // → true (loop variable)
+//	analyzer.IsRuntimeExpression("title")          // → false (content prop)
+//	analyzer.IsRuntimeExpression("$auth.user")     // → true (Alpine store)
+//	analyzer.IsRuntimeExpression(`"Hero2436"`)     // → false (string literal)
 type ScopeAnalyzer struct {
 	buildVars   map[string]bool // Variables resolvable at build time
 	runtimeVars map[string]bool // Variables only available at runtime
@@ -55,8 +56,9 @@ func NewScopeAnalyzer(dataScope map[string]any) *ScopeAnalyzer {
 // Cognitive Load: 2 (map write: 2)
 //
 // Example:
-//   analyzer.TrackLoopVariable("component")
-//   analyzer.IsRuntimeExpression("component.name") // → true
+//
+//	analyzer.TrackLoopVariable("component")
+//	analyzer.IsRuntimeExpression("component.name") // → true
 func (s *ScopeAnalyzer) TrackLoopVariable(name string) {
 	s.runtimeVars[name] = true
 }
@@ -67,8 +69,9 @@ func (s *ScopeAnalyzer) TrackLoopVariable(name string) {
 // Cognitive Load: 2 (map write: 2)
 //
 // Example:
-//   analyzer.TrackContentProp("title")
-//   analyzer.IsRuntimeExpression("title") // → false
+//
+//	analyzer.TrackContentProp("title")
+//	analyzer.IsRuntimeExpression("title") // → false
 func (s *ScopeAnalyzer) TrackContentProp(name string) {
 	s.buildVars[name] = true
 }
@@ -79,8 +82,9 @@ func (s *ScopeAnalyzer) TrackContentProp(name string) {
 // Cognitive Load: 2 (map write: 2)
 //
 // Example:
-//   analyzer.TrackExportedProp("title")
-//   analyzer.IsRuntimeExpression("title") // → false
+//
+//	analyzer.TrackExportedProp("title")
+//	analyzer.IsRuntimeExpression("title") // → false
 func (s *ScopeAnalyzer) TrackExportedProp(name string) {
 	s.buildVars[name] = true
 }
@@ -103,11 +107,12 @@ func (s *ScopeAnalyzer) TrackExportedProp(name string) {
 //   - Simple identifier in buildVars
 //
 // Example:
-//   analyzer.IsRuntimeExpression("component.name")    // → true (loop var)
-//   analyzer.IsRuntimeExpression(`"Hero2436"`)        // → false (string literal)
-//   analyzer.IsRuntimeExpression("$store.auth.user")  // → true (Alpine store)
-//   analyzer.IsRuntimeExpression("title")             // → false (content prop)
-//   analyzer.IsRuntimeExpression("count + 1")         // → true (has operator)
+//
+//	analyzer.IsRuntimeExpression("component.name")    // → true (loop var)
+//	analyzer.IsRuntimeExpression(`"Hero2436"`)        // → false (string literal)
+//	analyzer.IsRuntimeExpression("$store.auth.user")  // → true (Alpine store)
+//	analyzer.IsRuntimeExpression("title")             // → false (content prop)
+//	analyzer.IsRuntimeExpression("count + 1")         // → true (has operator)
 func (s *ScopeAnalyzer) IsRuntimeExpression(expr string) bool {
 	expr = strings.TrimSpace(expr)
 
@@ -164,8 +169,9 @@ func (s *ScopeAnalyzer) IsRuntimeExpression(expr string) bool {
 //   - Nested properties: "data.component.name" → ["data"]
 //
 // Example:
-//   extractVariablesFromExpression("component.name") // → ["component"]
-//   extractVariablesFromExpression("item.value")     // → ["item"]
+//
+//	extractVariablesFromExpression("component.name") // → ["component"]
+//	extractVariablesFromExpression("item.value")     // → ["item"]
 func extractVariablesFromExpression(expr string) []string {
 	// For property access, get the root variable
 	// Example: "component.name" → "component"
@@ -194,9 +200,10 @@ func extractVariablesFromExpression(expr string) []string {
 // Cognitive Load: 3 (string prefix/suffix checks: 3)
 //
 // Example:
-//   isStringLiteral(`"Hero2436"`)  // → true
-//   isStringLiteral(`'Hero2436'`)  // → true
-//   isStringLiteral(`Hero2436`)    // → false
+//
+//	isStringLiteral(`"Hero2436"`)  // → true
+//	isStringLiteral(`'Hero2436'`)  // → true
+//	isStringLiteral(`Hero2436`)    // → false
 func isStringLiteral(expr string) bool {
 	expr = strings.TrimSpace(expr)
 
@@ -224,9 +231,10 @@ func isStringLiteral(expr string) bool {
 //   - $cart.items
 //
 // Example:
-//   isAlpineStoreReference("$store.auth")  // → true
-//   isAlpineStoreReference("$auth.user")   // → true
-//   isAlpineStoreReference("auth.user")    // → false
+//
+//	isAlpineStoreReference("$store.auth")  // → true
+//	isAlpineStoreReference("$auth.user")   // → true
+//	isAlpineStoreReference("auth.user")    // → false
 func isAlpineStoreReference(expr string) bool {
 	expr = strings.TrimSpace(expr)
 	return strings.HasPrefix(expr, "$")
@@ -243,9 +251,10 @@ func isAlpineStoreReference(expr string) bool {
 //   - Logical: &&, ||
 //
 // Example:
-//   hasOperators("count + 1")     // → true
-//   hasOperators("value > 10")    // → true
-//   hasOperators("component.name") // → false
+//
+//	hasOperators("count + 1")     // → true
+//	hasOperators("value > 10")    // → true
+//	hasOperators("component.name") // → false
 func hasOperators(expr string) bool {
 	operators := []string{
 		"+", "-", "*", "/",

@@ -2,9 +2,9 @@ package transformer
 
 import (
 	"fmt"
+	"github.com/jimafisk/custom_go_template/ast"
 	"log"
 	"strings"
-	"github.com/jimafisk/custom_go_template/ast"
 )
 
 // getNodeDesc returns a brief description of a node for logging

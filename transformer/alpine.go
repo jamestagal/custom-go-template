@@ -914,31 +914,33 @@ func hasSelfReferences(dataScope map[string]any) bool {
 // suitable for Alpine.js x-data attributes.
 //
 // This function:
-//   1. Filters out loop iterator variables (item, index, etc.) that shouldn't be in root scope
-//   2. Ensures critical variables exist in the scope
-//   3. Detects self-referencing properties
-//   4. Wraps in function syntax if self-referencing detected
-//   5. Sorts keys using topological sort (dependencies first)
-//   6. Formats values using formatGoValueToJS which preserves JavaScript literals
+//  1. Filters out loop iterator variables (item, index, etc.) that shouldn't be in root scope
+//  2. Ensures critical variables exist in the scope
+//  3. Detects self-referencing properties
+//  4. Wraps in function syntax if self-referencing detected
+//  5. Sorts keys using topological sort (dependencies first)
+//  6. Formats values using formatGoValueToJS which preserves JavaScript literals
 //
 // Pattern: Service Implementation Pattern [Load: 18]
 // Cognitive Load: 18 (filtering: 3, self-ref detection: 4, sorting: 2, formatting: 6, string building: 3)
 //
 // Example without self-reference:
-//   dataScope := map[string]any{
-//     "name": "John",
-//     "age": 30,
-//   }
-//   alpineDataFormatter(dataScope)
-//   // Returns: {age:30,name:'John'}
+//
+//	dataScope := map[string]any{
+//	  "name": "John",
+//	  "age": 30,
+//	}
+//	alpineDataFormatter(dataScope)
+//	// Returns: {age:30,name:'John'}
 //
 // Example with self-reference:
-//   dataScope := map[string]any{
-//     "isLoggedIn": false,
-//     "navItems": "isLoggedIn ? [...] : [...]",
-//   }
-//   alpineDataFormatter(dataScope)
-//   // Returns: () => { const isLoggedIn = false; const navItems = isLoggedIn ? [...] : [...]; return {isLoggedIn,navItems}; }
+//
+//	dataScope := map[string]any{
+//	  "isLoggedIn": false,
+//	  "navItems": "isLoggedIn ? [...] : [...]",
+//	}
+//	alpineDataFormatter(dataScope)
+//	// Returns: () => { const isLoggedIn = false; const navItems = isLoggedIn ? [...] : [...]; return {isLoggedIn,navItems}; }
 func alpineDataFormatter(dataScope map[string]any) string {
 	// Clean up any loop iterator variables that might have leaked
 	// Common iterator names that should never be in root scope
@@ -1025,7 +1027,7 @@ func alpineDataFormatter(dataScope map[string]any) string {
 				// dynamic expressions (array access like items[0]) and output without quotes
 				trimmed := strings.TrimSpace(strVal)
 				if (strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) ||
-				   (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) {
+					(strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) {
 					// Looks like JSON - try to parse it
 					var parsedValue interface{}
 					if err := json.Unmarshal([]byte(trimmed), &parsedValue); err == nil {

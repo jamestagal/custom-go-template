@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/jimafisk/custom_go_template/ast"
 	"github.com/jimafisk/custom_go_template/analyzer"
+	"github.com/jimafisk/custom_go_template/ast"
 )
 
 // TransformDynamicComponentByName transforms <Component:dynamic> nodes into rendered components
@@ -19,33 +19,40 @@ import (
 // This function implements the dynamic component rendering feature for Plenti-style iteration:
 //
 // PHASE 1: Scope Analysis (COGNITIVE LOAD: 4) - NEW in Phase 2
-//   Initialize ScopeAnalyzer to distinguish build-time vs runtime expressions
+//
+//	Initialize ScopeAnalyzer to distinguish build-time vs runtime expressions
 //
 // PHASE 2: Evaluate name expression (COGNITIVE LOAD: 6)
-//   Example: "component.name" → resolve from dataScope → "Hero2436"
+//
+//	Example: "component.name" → resolve from dataScope → "Hero2436"
 //
 // PHASE 3: Build-time vs Runtime Decision (COGNITIVE LOAD: 5) - NEW in Phase 2
-//   if analyzer.IsRuntimeExpression(node.NameExpression):
-//     → emit runtime wrapper (Task 2.3)
-//   else:
-//     → proceed with build-time resolution
+//
+//	if analyzer.IsRuntimeExpression(node.NameExpression):
+//	  → emit runtime wrapper (Task 2.3)
+//	else:
+//	  → proceed with build-time resolution
 //
 // PHASE 4: Look up component template (COGNITIVE LOAD: 5)
-//   componentTemplate := GetComponentTemplate(resolvedName)
-//   If not found: return placeholder with warning
+//
+//	componentTemplate := GetComponentTemplate(resolvedName)
+//	If not found: return placeholder with warning
 //
 // PHASE 5: Build component props (COGNITIVE LOAD: 8)
-//   a. Start with empty props map
-//   b. Process spread props (left to right)
-//   c. Process regular props (left to right)
-//   d. Later props override earlier
+//
+//	a. Start with empty props map
+//	b. Process spread props (left to right)
+//	c. Process regular props (left to right)
+//	d. Later props override earlier
 //
 // PHASE 6: Transform component (COGNITIVE LOAD: 6)
-//   return transformComponent(componentTemplate, mergedProps, dataScope)
+//
+//	return transformComponent(componentTemplate, mergedProps, dataScope)
 //
 // Example transformation:
-//   Input:  <Component:dynamic name={component.name} {...component.fields} theme="dark" />
-//   Output: <div x-data='{...}' class="hero">...</div> (rendered component)
+//
+//	Input:  <Component:dynamic name={component.name} {...component.fields} theme="dark" />
+//	Output: <div x-data='{...}' class="hero">...</div> (rendered component)
 func TransformDynamicComponentByName(node *ast.DynamicComponentByNameNode, dataScope map[string]any) []ast.Node {
 	log.Printf("TransformDynamicComponentByName: nameExpr=%q, spreadProps=%d, regularProps=%d",
 		node.NameExpression, len(node.SpreadProps), len(node.Props))
@@ -106,18 +113,20 @@ func TransformDynamicComponentByName(node *ast.DynamicComponentByNameNode, dataS
 // at runtime by the $renderDynamicComponent magic function.
 //
 // Runtime Wrapper Structure:
-//   <div class="dyn-comp-runtime"
-//        x-data="{compName: component.name, compProps: {...component.fields}}"
-//        x-init="$renderDynamicComponent($el, compName, compProps)">
-//   </div>
+//
+//	<div class="dyn-comp-runtime"
+//	     x-data="{compName: component.name, compProps: {...component.fields}}"
+//	     x-init="$renderDynamicComponent($el, compName, compProps)">
+//	</div>
 //
 // IMPORTANT: This function does NOT auto-inject content/allContent.
 // Components access these via Alpine.js scope inheritance from parent x-data.
 // If explicit passing is needed, add content={content} to the template.
 //
 // Example:
-//   Input:  nameExpression="component.name", spread=["component.fields"], props=[]
-//   Output: <div x-data="{compName: component.name, compProps: {...component.fields}}" ...>
+//
+//	Input:  nameExpression="component.name", spread=["component.fields"], props=[]
+//	Output: <div x-data="{compName: component.name, compProps: {...component.fields}}" ...>
 //
 // IMPORTANT: The wrapper has NO children - Alpine.js will populate it at runtime
 func emitRuntimeWrapper(node *ast.DynamicComponentByNameNode, dataScope map[string]any) []ast.Node {
@@ -224,8 +233,9 @@ func emitRuntimeWrapper(node *ast.DynamicComponentByNameNode, dataScope map[stri
 // in the x-data attribute, not as quoted strings.
 //
 // Example:
-//   AlpineExpression{Expr: "content"} → serializes to: content (no quotes)
-//   String "content"                  → serializes to: 'content' (quoted)
+//
+//	AlpineExpression{Expr: "content"} → serializes to: content (no quotes)
+//	String "content"                  → serializes to: 'content' (quoted)
 type AlpineExpression struct {
 	Expr string // The JavaScript expression (e.g., "content", "component.name", "$store.user")
 }
@@ -256,16 +266,17 @@ func isComplexObject(value any) bool {
 // for embedding in an HTML attribute (x-data). It handles:
 //   - Regular values: Serialize as JSON (strings, numbers, bools, objects, arrays)
 //   - AlpineExpression values: Check if they reference complex objects in dataScope
-//     - If yes: JSON-serialize the actual value (fixes Go map syntax bug)
-//     - If no: Output as unquoted JavaScript identifiers
+//   - If yes: JSON-serialize the actual value (fixes Go map syntax bug)
+//   - If no: Output as unquoted JavaScript identifiers
 //
 // Example:
-//   Input:  map[string]interface{}{
-//             "title": "Hello",
-//             "content": AlpineExpression{Expr: "content"}, // where content is a map in dataScope
-//             "count": 42,
-//           }
-//   Output: `{title: 'Hello', content: {...}, count: 42}`
+//
+//	Input:  map[string]interface{}{
+//	          "title": "Hello",
+//	          "content": AlpineExpression{Expr: "content"}, // where content is a map in dataScope
+//	          "count": 42,
+//	        }
+//	Output: `{title: 'Hello', content: {...}, count: 42}`
 //
 // CRITICAL FIX: AlpineExpression values that reference complex objects (maps/slices)
 // are now JSON-serialized to prevent Go map syntax from appearing in the output.
@@ -344,9 +355,10 @@ func serializePropsForRuntime(props map[string]interface{}, dataScope map[string
 // 4. Nested properties: "component.name" → resolve nested access
 //
 // Example:
-//   dataScope := map[string]any{"component": map[string]any{"name": "Hero2436"}}
-//   evaluateNameExpression("component.name", dataScope)
-//   // Returns: "Hero2436", nil
+//
+//	dataScope := map[string]any{"component": map[string]any{"name": "Hero2436"}}
+//	evaluateNameExpression("component.name", dataScope)
+//	// Returns: "Hero2436", nil
 func evaluateNameExpression(nameExpr string, dataScope map[string]any) (string, error) {
 	nameExpr = strings.TrimSpace(nameExpr)
 
@@ -394,13 +406,14 @@ func evaluateNameExpression(nameExpr string, dataScope map[string]any) (string, 
 // Cognitive Load: 10 (string splitting: 2, iterative resolution: 6, type checking: 2)
 //
 // Example:
-//   dataScope := map[string]any{
-//     "component": map[string]any{
-//       "fields": map[string]any{"title": "Hello"},
-//     },
-//   }
-//   resolveNestedPropertyAccess("component.fields.title", dataScope)
-//   // Returns: "Hello"
+//
+//	dataScope := map[string]any{
+//	  "component": map[string]any{
+//	    "fields": map[string]any{"title": "Hello"},
+//	  },
+//	}
+//	resolveNestedPropertyAccess("component.fields.title", dataScope)
+//	// Returns: "Hello"
 func resolveNestedPropertyAccess(expr string, dataScope map[string]any) any {
 	parts := strings.Split(expr, ".")
 	if len(parts) == 0 {
@@ -450,15 +463,16 @@ func resolveNestedPropertyAccess(expr string, dataScope map[string]any) any {
 // This function expands spread operator syntax like {...component.fields} into individual props.
 //
 // Example:
-//   spreadExprs := []string{"component.fields", "overrides"}
-//   dataScope := map[string]any{
-//     "component": map[string]any{
-//       "fields": map[string]any{"title": "Hello", "link": "/about"},
-//     },
-//     "overrides": map[string]any{"title": "Override"},
-//   }
-//   resolveSpreadProps(spreadExprs, dataScope)
-//   // Returns: map[string]any{"title": "Override", "link": "/about"}
+//
+//	spreadExprs := []string{"component.fields", "overrides"}
+//	dataScope := map[string]any{
+//	  "component": map[string]any{
+//	    "fields": map[string]any{"title": "Hello", "link": "/about"},
+//	  },
+//	  "overrides": map[string]any{"title": "Override"},
+//	}
+//	resolveSpreadProps(spreadExprs, dataScope)
+//	// Returns: map[string]any{"title": "Override", "link": "/about"}
 func resolveSpreadProps(spreadExprs []string, dataScope map[string]any) map[string]any {
 	result := make(map[string]any)
 
@@ -517,8 +531,9 @@ func resolveSpreadProps(spreadExprs []string, dataScope map[string]any) map[stri
 // to actual values, it returns the spread expression itself wrapped as an AlpineExpression.
 //
 // Example:
-//   spreadExprs := []string{"component.fields"}
-//   // Returns: map with special marker indicating this should be output as "...component.fields"
+//
+//	spreadExprs := []string{"component.fields"}
+//	// Returns: map with special marker indicating this should be output as "...component.fields"
 //
 // IMPORTANT: For runtime components, spread props need to be evaluated by Alpine.js,
 // not resolved at build-time.
@@ -576,13 +591,14 @@ func resolveSpreadPropsForRuntime(spreadExprs []string, dataScope map[string]any
 // 3. Later props override earlier (rightmost wins)
 //
 // Example:
-//   spreadProps := map[string]any{"title": "Spread Title", "link": "/spread"}
-//   regularProps := []ast.ComponentProp{
-//     {Name: "title", Value: "Override Title", IsDynamic: false},
-//     {Name: "theme", Value: "dark", IsDynamic: false},
-//   }
-//   mergeProps(spreadProps, regularProps, dataScope)
-//   // Returns: {"title": "Override Title", "link": "/spread", "theme": "dark"}
+//
+//	spreadProps := map[string]any{"title": "Spread Title", "link": "/spread"}
+//	regularProps := []ast.ComponentProp{
+//	  {Name: "title", Value: "Override Title", IsDynamic: false},
+//	  {Name: "theme", Value: "dark", IsDynamic: false},
+//	}
+//	mergeProps(spreadProps, regularProps, dataScope)
+//	// Returns: {"title": "Override Title", "link": "/spread", "theme": "dark"}
 func mergeProps(spreadProps map[string]any, regularProps []ast.ComponentProp, dataScope map[string]any) map[string]any {
 	// Start with spread props
 	result := make(map[string]any, len(spreadProps)+len(regularProps))
@@ -615,17 +631,18 @@ func mergeProps(spreadProps map[string]any, regularProps []ast.ComponentProp, da
 // resolved to their actual values.
 //
 // Example:
-//   spreadProps := map[string]any{"title": AlpineExpression{Expr: "component.fields.title"}}
-//   regularProps := []ast.ComponentProp{
-//     {Name: "content", Value: "{content}", IsDynamic: true},
-//     {Name: "theme", Value: "dark", IsDynamic: false},
-//   }
-//   mergePropsForRuntime(spreadProps, regularProps, dataScope)
-//   // Returns: {
-//   //   "title": AlpineExpression{Expr: "component.fields.title"},
-//   //   "content": AlpineExpression{Expr: "content"},
-//   //   "theme": "dark"
-//   // }
+//
+//	spreadProps := map[string]any{"title": AlpineExpression{Expr: "component.fields.title"}}
+//	regularProps := []ast.ComponentProp{
+//	  {Name: "content", Value: "{content}", IsDynamic: true},
+//	  {Name: "theme", Value: "dark", IsDynamic: false},
+//	}
+//	mergePropsForRuntime(spreadProps, regularProps, dataScope)
+//	// Returns: {
+//	//   "title": AlpineExpression{Expr: "component.fields.title"},
+//	//   "content": AlpineExpression{Expr: "content"},
+//	//   "theme": "dark"
+//	// }
 func mergePropsForRuntime(spreadProps map[string]any, regularProps []ast.ComponentProp, dataScope map[string]any) map[string]any {
 	// Start with spread props (already contains AlpineExpressions)
 	result := make(map[string]any, len(spreadProps)+len(regularProps))
@@ -657,9 +674,10 @@ func mergePropsForRuntime(spreadProps map[string]any, regularProps []ast.Compone
 // Dynamic props ({var}) are returned as AlpineExpression instead of resolved values.
 //
 // Example:
-//   prop := ComponentProp{Name: "content", Value: "{content}", IsDynamic: true}
-//   resolvePropValueForRuntime(prop, dataScope)
-//   // Returns: AlpineExpression{Expr: "content"}
+//
+//	prop := ComponentProp{Name: "content", Value: "{content}", IsDynamic: true}
+//	resolvePropValueForRuntime(prop, dataScope)
+//	// Returns: AlpineExpression{Expr: "content"}
 func resolvePropValueForRuntime(prop ast.ComponentProp, dataScope map[string]any) any {
 	if prop.IsDynamic {
 		// For dynamic props ({var}), extract the variable name or expression
@@ -694,16 +712,17 @@ func resolvePropValueForRuntime(prop ast.ComponentProp, dataScope map[string]any
 // instead of fmt.Sprintf("%v"), which was causing Go map syntax to appear in the output.
 //
 // Example:
-//   Input:  map[string]any{
-//             "title": "Hello",
-//             "content": map[string]any{"components": []any{...}},
-//             "count": 42,
-//           }
-//   Output: []ComponentProp{
-//             {Name: "title", Value: "Hello"},
-//             {Name: "content", Value: `{"components":[...]}`},
-//             {Name: "count", Value: "42"},
-//           }
+//
+//	Input:  map[string]any{
+//	          "title": "Hello",
+//	          "content": map[string]any{"components": []any{...}},
+//	          "count": 42,
+//	        }
+//	Output: []ComponentProp{
+//	          {Name: "title", Value: "Hello"},
+//	          {Name: "content", Value: `{"components":[...]}`},
+//	          {Name: "count", Value: "42"},
+//	        }
 func convertPropsMapToComponentProps(propsMap map[string]any) []ast.ComponentProp {
 	props := make([]ast.ComponentProp, 0, len(propsMap))
 
@@ -764,8 +783,9 @@ func convertPropsMapToComponentProps(propsMap map[string]any) []ast.ComponentPro
 // or debugging. This is used when component lookup fails.
 //
 // Example:
-//   createDynamicByNamePlaceholder(node, "Component 'Foo' not found")
-//   // Returns: <div x-component="ERROR: Component 'Foo' not found"></div>
+//
+//	createDynamicByNamePlaceholder(node, "Component 'Foo' not found")
+//	// Returns: <div x-component="ERROR: Component 'Foo' not found"></div>
 func createDynamicByNamePlaceholder(node *ast.DynamicComponentByNameNode, message string) []ast.Node {
 	log.Printf("createDynamicByNamePlaceholder: %s", message)
 

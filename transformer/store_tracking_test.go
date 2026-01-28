@@ -10,10 +10,10 @@ import (
 // Cognitive Load: 8 (test setup + assertions)
 func TestTrackStoreReferences(t *testing.T) {
 	tests := []struct {
-		name              string
-		template          *ast.Template
-		expectedStores    []string
-		expectedDefs      map[string]string
+		name           string
+		template       *ast.Template
+		expectedStores []string
+		expectedDefs   map[string]string
 	}{
 		{
 			name: "single store in text",
@@ -290,10 +290,10 @@ func TestTrackStoreReferences(t *testing.T) {
 // Cognitive Load: 6 (focused test with clear assertions)
 func TestGetReferencedStoreDefinitions(t *testing.T) {
 	tests := []struct {
-		name                 string
-		allDefinitions       map[string]string
-		referencedStores     []string
-		expectedDefinitions  map[string]string
+		name                string
+		allDefinitions      map[string]string
+		referencedStores    []string
+		expectedDefinitions map[string]string
 	}{
 		{
 			name: "get only referenced stores",

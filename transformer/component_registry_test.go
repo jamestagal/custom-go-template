@@ -25,10 +25,10 @@ func TestComponentRegistryNormalization(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		registerAs     string
-		lookupKeys     []string
-		shouldFindAll  bool
+		name          string
+		registerAs    string
+		lookupKeys    []string
+		shouldFindAll bool
 	}{
 		{
 			name:       "Component registered by name",

@@ -116,8 +116,8 @@ func TestTransformLoopWithStoreCollection(t *testing.T) {
 		{
 			name: "store collection with nested property access",
 			loop: &ast.Loop{
-				Value:      "product",  // FIXED
-				Iterator:   "",         // FIXED
+				Value:      "product", // FIXED
+				Iterator:   "",        // FIXED
 				Collection: "$user.profile.wishlist.products",
 				Content: []ast.Node{
 					&ast.Element{
@@ -138,8 +138,8 @@ func TestTransformLoopWithStoreCollection(t *testing.T) {
 		{
 			name: "loop with store collection and index",
 			loop: &ast.Loop{
-				Value:      "item",      // FIXED: swapped from Iterator
-				Iterator:   "index",     // FIXED: swapped from Value
+				Value:      "item",  // FIXED: swapped from Iterator
+				Iterator:   "index", // FIXED: swapped from Value
 				Collection: "$cart.items",
 				Content: []ast.Node{
 					&ast.Element{
@@ -162,8 +162,8 @@ func TestTransformLoopWithStoreCollection(t *testing.T) {
 		{
 			name: "loop body with store expressions",
 			loop: &ast.Loop{
-				Value:      "item",  // FIXED
-				Iterator:   "",      // FIXED
+				Value:      "item", // FIXED
+				Iterator:   "",     // FIXED
 				Collection: "$cart.items",
 				Content: []ast.Node{
 					&ast.Element{
@@ -248,8 +248,8 @@ func TestTransformNestedLoopsWithStores(t *testing.T) {
 		{
 			name: "nested loops: outer store, inner regular",
 			loop: &ast.Loop{
-				Value:      "category",  // FIXED
-				Iterator:   "",          // FIXED
+				Value:      "category", // FIXED
+				Iterator:   "",         // FIXED
 				Collection: "$catalog.categories",
 				Content: []ast.Node{
 					&ast.Element{
@@ -257,8 +257,8 @@ func TestTransformNestedLoopsWithStores(t *testing.T) {
 						Children: []ast.Node{
 							&ast.ExpressionNode{Expression: "category.name"},
 							&ast.Loop{
-								Value:      "product",  // FIXED
-								Iterator:   "",         // FIXED
+								Value:      "product", // FIXED
+								Iterator:   "",        // FIXED
 								Collection: "category.products",
 								Content: []ast.Node{
 									&ast.Element{

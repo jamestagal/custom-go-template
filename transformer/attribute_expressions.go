@@ -316,7 +316,7 @@ func tryResolvePropertyAccess(expr string, dataScope map[string]any) (string, bo
 
 // tryResolveFallbackExpression handles expressions with || fallback operator
 // Example: "post.fields.title || 'Untitled'" → resolves to title value or 'Untitled'
-// Example: "post.fields.publish?.date || ''" → resolves to date value or ''
+// Example: "post.fields.publish?.date || ”" → resolves to date value or ”
 // Cognitive Load: 12 (string parsing + recursive resolution)
 func tryResolveFallbackExpression(expr string, dataScope map[string]any) (string, bool) {
 	// Split on || operator

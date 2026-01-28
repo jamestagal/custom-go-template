@@ -44,7 +44,6 @@ var (
 	allContentCached  bool
 )
 
-
 func main() {
 	log.Println("Starting server...")
 
@@ -76,7 +75,6 @@ func main() {
 		log.Printf("WARNING: Failed to generate content.js: %v", err)
 	}
 
-
 	// Register static file handlers (must be registered first to avoid conflicts)
 	http.HandleFunc("/scripts/", func(w http.ResponseWriter, r *http.Request) {
 		serveStaticFile(w, r)
@@ -102,6 +100,10 @@ func main() {
 	})
 	http.HandleFunc("/generated/", func(w http.ResponseWriter, r *http.Request) {
 		serveGeneratedFile(w, r)
+	})
+	// Serve content JSON files for CMS
+	http.HandleFunc("/content/", func(w http.ResponseWriter, r *http.Request) {
+		serveContentFile(w, r)
 	})
 	log.Println("Registered static file handlers")
 
@@ -156,6 +158,19 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request) {
 
 	// Serve the file
 	log.Printf("[serveStaticFile] Serving: %s from %s", path, filePath)
+	http.ServeFile(w, r, filePath)
+}
+
+// serveContentFile serves JSON content files for CMS
+// Route: /content/* → ./content/*
+func serveContentFile(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	filePath := "." + path
+
+	// Set JSON content type
+	w.Header().Set("Content-Type", "application/json")
+
+	log.Printf("[serveContentFile] Serving: %s from %s", path, filePath)
 	http.ServeFile(w, r, filePath)
 }
 
@@ -706,10 +721,22 @@ func renderTemplateWithProps(entrypoint string, explicitProps map[string]interfa
 	// Only pages that use runtime component resolution get these scripts
 	finalHTML = injectRuntimeScripts(finalHTML)
 
-	// Add build time comment
+	// Add build time comment and floating label
 	totalBuildTime := time.Since(startTime)
 	htmlComment := fmt.Sprintf("<!-- Build time: %v -->\n", totalBuildTime)
 	finalHTML = htmlComment + finalHTML
+
+	// Inject floating build time label for development feedback
+	finalHTML = injectBuildTimeLabel(finalHTML, totalBuildTime)
+
+	// Add data-content-filepath for CMS (Plenti pattern)
+	// This tells the CMS which JSON file contains the content for this page
+	contentFilePath := loader.RoutePathToFilePath(r.URL.Path)
+	if contentFilePath != "" {
+		// Add attribute to <html> tag
+		htmlTagRegex := regexp.MustCompile(`(?i)<html([^>]*)>`)
+		finalHTML = htmlTagRegex.ReplaceAllString(finalHTML, fmt.Sprintf(`<html$1 data-content-filepath="%s">`, contentFilePath))
+	}
 
 	// Send response
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1028,10 +1055,20 @@ func renderTemplate(entrypoint string, w http.ResponseWriter, r *http.Request) {
 	// Only pages that use runtime component resolution get these scripts
 	finalHTML = injectRuntimeScripts(finalHTML)
 
-	// Add build time comment
+	// Add build time comment and floating label
 	totalBuildTime := time.Since(startTime)
 	htmlComment := fmt.Sprintf("<!-- Build time: %v -->\n", totalBuildTime)
 	finalHTML = htmlComment + finalHTML
+
+	// Inject floating build time label for development feedback
+	finalHTML = injectBuildTimeLabel(finalHTML, totalBuildTime)
+
+	// Add data-content-filepath for CMS (Plenti pattern)
+	contentFilePath := loader.RoutePathToFilePath(r.URL.Path)
+	if contentFilePath != "" {
+		htmlTagRegex := regexp.MustCompile(`(?i)<html([^>]*)>`)
+		finalHTML = htmlTagRegex.ReplaceAllString(finalHTML, fmt.Sprintf(`<html$1 data-content-filepath="%s">`, contentFilePath))
+	}
 
 	// Send response
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1176,6 +1213,56 @@ func injectRuntimeScripts(html string) string {
 	// Find </head> and inject before it (after Alpine.js CDN which also goes in head)
 	headEndRegex := regexp.MustCompile(`(?i)</head>`)
 	html = headEndRegex.ReplaceAllString(html, runtimeScript+"</head>")
+
+	return html
+}
+
+// injectBuildTimeLabel injects a floating build time label into the HTML.
+// This provides visual feedback during development showing how fast pages build.
+//
+// Pattern: Helper Function [Load: 5]
+// Cognitive Load: 5 (format: 1, regex: 2, replace: 2)
+func injectBuildTimeLabel(html string, buildTime time.Duration) string {
+	// Format build time nicely
+	var buildTimeStr string
+	if buildTime < time.Millisecond {
+		buildTimeStr = fmt.Sprintf("%.2fµs", float64(buildTime.Microseconds()))
+	} else if buildTime < time.Second {
+		buildTimeStr = fmt.Sprintf("%.2fms", float64(buildTime.Microseconds())/1000.0)
+	} else {
+		buildTimeStr = fmt.Sprintf("%.2fs", buildTime.Seconds())
+	}
+
+	// Create floating label with inline styles (no external CSS needed)
+	label := fmt.Sprintf(`<div id="build-time-label" style="
+		position: fixed;
+		top: 10px;
+		left: 10px;
+		background: white;
+		color: #333;
+		padding: 8px 16px;
+		border-radius: 20px;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		font-size: 12px;
+		font-weight: 600;
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+		z-index: 99999;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		cursor: pointer;
+		transition: transform 0.2s, opacity 0.2s;
+		border: 1px solid #e5e7eb;
+	" onclick="this.style.display='none'" title="Click to dismiss">
+		<img src="/images/plenti.png" alt="Plenti" style="height: 20px; width: auto;">
+		<span>Build: <strong>%s</strong></span>
+	</div>`, buildTimeStr)
+
+	// Inject before </body>
+	bodyEndRegex := regexp.MustCompile(`(?i)</body>`)
+	if bodyEndRegex.MatchString(html) {
+		html = bodyEndRegex.ReplaceAllString(html, label+"</body>")
+	}
 
 	return html
 }
@@ -1777,7 +1864,7 @@ func registerContentPageRoutes() {
 		currentLayoutName := layoutName
 		http.HandleFunc(currentRoute, func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[Handler] %s called for URL: %s", currentRoute, r.URL.Path)
-			if err := renderWithWrapper(currentLayoutName, w, r); err != nil{
+			if err := renderWithWrapper(currentLayoutName, w, r); err != nil {
 				log.Printf("Error rendering %s with wrapper (layout %s): %v", currentRoute, currentLayoutName, err)
 				http.Error(w, "Failed to render page", http.StatusInternalServerError)
 			}

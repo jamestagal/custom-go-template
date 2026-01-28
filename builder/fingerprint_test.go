@@ -13,9 +13,9 @@ func TestGenerateBuildFingerprint_Consistency(t *testing.T) {
 
 	// Create test files
 	testFiles := map[string]string{
-		"index.html":      "<html><body>Hello</body></html>",
-		"style.css":       "body { color: red; }",
-		"script.js":       "console.log('hello');",
+		"index.html":       "<html><body>Hello</body></html>",
+		"style.css":        "body { color: red; }",
+		"script.js":        "console.log('hello');",
 		"nested/page.html": "<html><body>Nested</body></html>",
 	}
 

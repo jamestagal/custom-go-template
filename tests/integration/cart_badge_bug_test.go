@@ -90,7 +90,7 @@ store cart = {
 
 	// Also check what we should NOT have
 	badPatterns := []struct {
-		name        string
+		name          string
 		shouldNotHave string
 		desc          string
 	}{
