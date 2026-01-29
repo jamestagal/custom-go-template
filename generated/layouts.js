@@ -3,25 +3,829 @@
 // Lookup: registry['layouts_components_' + name + '_html']
 
 const registry = {
-  'layouts_components_jim_test_animals_loop_html': (props) => `<div class="animals" style="background-color: #f0f0f0; padding: 1rem; margin: 2rem 0;">
-  <h2>Animals Loop with Advanced Features</h2><template x-for="animal in props.animals"><template x-if="animal == \"cat\"">
-      <div>Hi <span x-text="animal"></span>!</div></template><template x-else>
-      <div>Bye <span x-text="animal"></span>.</div></template>
-    <div :class="animal">${props.name} likes: <span x-text="animal"></span>s</div>
-    <div style="color: #666; font-size: 0.875rem;">Backwards: <span x-text="animal.split('').reverse().join('')"></span></div>
-    <button :onclick="animals = animals.filter(a => a !== animal)">Remove <span x-text="animal"></span></button>
-    <br></br></template>
-  <h3>Add new animal:</h3>
-  <input type="text" name="newAnimal" x-model="newAnimal" placeholder="animal name"></input>
-  <button onclick="{animals = [newAnimal, ...animals]; newAnimal = ''}">Add Animal</button>
+  'layouts_components_CartBadge_html': (props) => `<div class="cart-badge">
+  <div class="cart-icon-wrapper">
+    🛒
+    <template x-if="$cart.items.length > 0">
+      <span class="cart-count"></span></template>
+  </div>
+  <div class="cart-details">
+    <div class="cart-items"><template x-if="$cart.items.length === 0">
+        <span class="empty-cart">Cart is empty</span></template><template x-else>
+        <span class="item-count"> items</span></template>
+    </div><template x-if="$cart.items.length > 0">
+      <div class="cart-total">
+        Total: $<strong x-text="$store.cart.formattedTotal"></strong>
+      </div></template>
+  </div>
 </div><style>
-  .animals {
+.cart-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  min-width: 200px;
+}
+
+.cart-icon-wrapper {
+  position: relative;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.cart-count {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #dc2626;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 0.15rem 0.4rem;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.cart-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cart-items {
+  font-size: 0.9rem;
+}
+
+.empty-cart {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.item-count {
+  color: #374151;
+  font-weight: 500;
+}
+
+.cart-total {
+  font-size: 0.85rem;
+  color: #059669;
+}
+</style>`,
+  'layouts_components_adminpanel_html': (props) => `<style>
+  .admin-panel {
+    background-color: white;
     border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
   }
-  .animals div {
-    margin: 0.5rem 0;
+  
+  .admin-header {
+    background-color: #333;
+    color: white;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .admin-title {
+    font-size: 1.25rem;
+    font-weight: bold;
+  }
+  
+  .admin-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .admin-badge {
+    background-color: #dc3545;
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+  }
+  
+  .admin-content {
+    padding: 1.5rem;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .stat-card {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+  
+  .stat-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+  }
+  
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+  }
+  
+  .action-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .action-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f5;
+  }
+  
+  .action-info {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .action-desc {
+    font-weight: 500;
+  }
+  
+  .action-user {
+    font-size: 0.875rem;
+    color: #6c757d;
+  }
+  
+  .action-time {
+    font-size: 0.875rem;
+    color: #6c757d;
+    text-align: right;
+  }
+  
+  .admin-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+  
+  .admin-button {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  
+  .admin-button:hover {
+    background-color: #0069d9;
+  }
+  
+  .admin-button-secondary {
+    background-color: #6c757d;
+  }
+  
+  .admin-button-secondary:hover {
+    background-color: #5a6268;
+  }
+</style><div class="admin-panel">
+  <div class="admin-header">
+    <div class="admin-title">Admin Dashboard</div>
+    <div class="admin-user">
+      <span>${props.user.name}</span>
+      <span class="admin-badge">${props.user.role}</span>
+    </div>
+  </div>
+  
+  <div class="admin-content">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">${props.stats.users}</div>
+        <div class="stat-label">Registered Users</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-value">${props.stats.products}</div>
+        <div class="stat-label">Products</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-value">${props.stats.orders}</div>
+        <div class="stat-label">Orders</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-value">${props.formatCurrency(props.stats.revenue)}</div>
+        <div class="stat-label">Total Revenue</div>
+      </div>
+    </div>
+    
+    <h3 class="section-title">Recent Activity</h3>
+    <ul class="action-list"><template x-for="action in props.recentActions">
+        <li class="action-item">
+          <div class="action-info">
+            <span class="action-desc"><span x-text="action.action"></span></span>
+            <span class="action-user">by <span x-text="action.user"></span></span>
+          </div>
+          <div class="action-time"><span x-text="formatTimestamp(action.timestamp)"></span></div>
+        </li></template>
+    </ul>
+    
+    <div class="admin-actions">
+      <button class="admin-button">Add New Product</button>
+      <button class="admin-button">Manage Users</button>
+      <button class="admin-button admin-button-secondary">View All Activity</button>
+    </div>
+  </div>
+</div>`,
+  'layouts_content_news_html': (props) => `<template x-if="published">
+<div class="blog-container main-content-wrapper">
+  <div class="main-content">
+    <article class="blog-article">
+      <!-- Hero Image -->
+      <picture class="blog-mainImage">
+        <img alt="${props.blogImage?.alt || 'Blog image'}" decoding="async" src="${props.blogImage?.src}" width="${props.blogImage?.width || 1200}" height="${props.blogImage?.height || 600}">
+      </picture>
+
+      <!-- Image Caption --><template x-if="figcaption">
+      <figure class="image-caption">
+        <span class="caption">${props.figcaption.caption}</span><template x-if="figcaption.attribution">
+        <span class="attribution">
+          <a class="source" target="_blank" href="${props.figcaption.attribution.link}">
+            ${props.figcaption.attribution.text}
+          </a>
+        </span></template>
+      </figure></template>
+
+      <!-- Article Header -->
+      <div class="article-group">
+        <h1 class="blog-h1">${props.title}</h1>
+
+        <div class="blog-authorGroup"><template x-if="author?.image">
+          <picture class="blog-author-img">
+            <img alt="${props.author.image.alt}" decoding="async" height="32" src="${props.author.image.src}" width="32">
+          </picture></template>
+          <span class="blog-author">${props.author?.name || 'Author'}</span>
+          <span class="blog-dot" aria-hidden="true"></span>
+          <span class="blog-date">${props.publish?.date}</span>
+        </div>
+      </div>
+
+      <!-- Article Content --><template x-if="textItems"><template x-for="item in props.textItems">
+        <section id="blog-content">
+          <h4><span x-text="item.title"></span></h4>
+          <p><span x-text="item.paragraph"></span></p>
+        </section></template></template>
+
+      <!-- Photo Gallery (if present) --><template x-if="photos">
+      <section id="photo-gallery">
+        <div class="photo-grid"><template x-for="photo in props.photos">
+          <div class="photo-item">
+            <img :src="photo.src" :alt="photo.alt" :width="photo.width" :height="photo.height">
+          </div></template>
+        </div>
+      </section></template>
+    </article>
+  </div>
+
+  <!-- Sidebar with Featured Posts -->
+</div></template><template x-else>
+<div class="draft-message">
+  <h2>This post is currently a draft</h2>
+  <p>Published posts will appear here.</p>
+</div></template><style>
+/* ============================================
+   Blog Container - Main Layout Grid
+   ============================================ */
+.blog-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  /* padding-top clears fixed nav (~160px) + content spacing */
+  padding: 10rem 2rem 2rem 2rem;
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 3rem;
+  background-color: #fff;
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 1024px) {
+  .blog-container {
+    grid-template-columns: 1fr;
+    padding: 8rem 1.5rem 2rem 1.5rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .blog-container {
+    padding: 7rem 1rem 1.5rem 1rem;
+  }
+}
+
+.main-content {
+  width: 100%;
+  min-width: 0; /* Prevent grid blowout */
+}
+
+/* ============================================
+   Draft Message (unpublished posts)
+   ============================================ */
+.draft-message {
+  max-width: 800px;
+  margin: 12rem auto 4rem;
+  padding: 3rem;
+  text-align: center;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 2px dashed #ccc;
+}
+
+.draft-message h2 {
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+.draft-message p {
+  color: #999;
+}
+
+/* ============================================
+   Photo Gallery
+   ============================================ */
+#photo-gallery {
+  margin: 2rem 0;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.photo-item {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.photo-item img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+/* ============================================
+   Dynamic Image Content
+   ============================================ */
+.main-content-wrapper .blog-article #dynamic-image-content {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media only screen and (max-width: 550px) {
+  .main-content-wrapper .blog-article #dynamic-image-content {
+    margin-left: 0rem;
+    margin-right: -4rem;
+    width: calc(100% + 2rem);
+  }
+}
+
+/* ============================================
+   Blog Article Styles
+   ============================================ */
+/* Mobile - 360px */
+@media only screen and (min-width: 0em) {
+  .blog-article {
+    width: 100%;
+    max-width: 41.6875em;
+    display: block;
+  }
+  .blog-article .blog-mainImage {
+    width: 100%;
+    height: clamp(250px, 40vw, 570px);
+    margin-bottom: 0.5em;
+    display: block;
+    position: relative;
+    overflow: hidden;
+  }
+  .blog-article .blog-mainImage img {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  .blog-article .blog-author-img {
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: block;
+    position: relative;
+    overflow: hidden;
+  }
+  .blog-article .blog-author-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  .blog-article .blog-authorGroup {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .blog-article .blog-author,
+  .blog-article .blog-date {
+    font-size: 0.875rem;
+    line-height: 1.5em;
+    color: var(--bodyTextColor);
+  }
+  .blog-article .blog-dot {
+    width: 3px;
+    height: 3px;
+    background-color: #fe4f70;
+    border-radius: 50%;
+    display: block;
+  }
+  .blog-article .blog-h1 {
+    font-size: clamp(20px, 7vw, 36px);
+    font-weight: 700;
+    line-height: 1.4em;
+    max-width: 42.375rem;
+    margin: 1rem 0;
+    color: var(--headerColor);
+  }
+  .blog-article #blog-content:first-of-type {
+    margin-top: 1em;
+    padding-top: 1.5625em;
+    border-top: 1px solid #ebebeb;
+  }
+  .blog-article #blog-content {
+    margin-top: -1em;
+    padding-top: 1em;
+    border-top: none;
+  }
+  .blog-article #blog-content h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.75em;
+    margin-bottom: 1rem;
+    color: var(--headerColor);
+  }
+  .blog-article #blog-content h2 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.5em;
+    margin-bottom: 1rem;
+    color: var(--headerColor);
+  }
+  .blog-article #blog-content h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.5em;
+    margin-bottom: 1rem;
+    color: var(--headerColor);
+  }
+  .blog-article #blog-content h4,
+  .blog-article #blog-content h5,
+  .blog-article #blog-content h6 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.5em;
+    margin-bottom: 1rem;
+    color: var(--headerColor);
+  }
+  .blog-article #blog-content p {
+    font-size: 1rem;
+    line-height: 1.6em;
+    margin: 0;
+    margin-bottom: 1rem;
+    color: var(--bodyTextColor);
+  }
+  .blog-article #blog-content a {
+    font-size: inherit;
+    text-decoration: underline;
+    color: var(--primary);
+  }
+  .blog-article #blog-content ul,
+  .blog-article #blog-content ol {
+    margin: 0;
+    margin: 1rem 0;
+    /* padding-left: 2.5rem; */
+  }
+  .blog-article #blog-content ul li,
+  .blog-article #blog-content ol li {
+    font-size: 1rem;
+    line-height: 1.6em;
+    list-style: circle;
+    margin-bottom: 1rem;
+    color: var(--bodyTextColor);
+  }
+  .blog-article #blog-content img {
+    width: 100%;
+    /* height: auto; */
+    /* margin: 1rem 0; */
+    /* border-radius: 0.5rem; */
+    display: block;
+  }
+  /* New styles for caption */
+  .blog-article .image-caption {
+    font-size: 0.6rem;
+    line-height: 1.4;
+    color: #4b4b4e;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    margin-bottom: 1.5em;
   }
 
+  .blog-article .image-caption .caption,
+  .blog-article .image-caption .attribution {
+    display: inline-block;
+    width: 100%;
+  }
+
+  .blog-article .image-caption .source {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .blog-article .image-caption .source:hover {
+    text-decoration: underline;
+  }
+}
+/* Tablet - 768px */
+@media only screen and (min-width: 48em) {
+  .blog-article .image-caption {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: nowrap;
+  }
+
+  .blog-article .image-caption .caption {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+  }
+
+  .blog-article .image-caption .attribution {
+    flex-shrink: 0;
+    width: auto;
+  }
+}
+
+</style>`,
+  'layouts_components_jim_test_todos_html': (props) => `<div style="margin: 2rem 0;">
+  <h2>Task List - First 5 Tasks</h2>
+
+  <h2 style="margin-top: 2rem;">Task List - Tasks 6-14</h2>
+</div><style>
+  h2 {
+    color: #1f2937;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  /* Todos table styling */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  thead {
+    background-color: #f3f4f6;
+  }
+
+  th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #e5e7eb;
+    color: #1f2937;
+  }
+
+  tbody tr:hover {
+    background-color: #f9fafb;
+  }
+</style>`,
+  'layouts_global_header_html': (props) => `<style>
+  .header {
+    background-color: #f8f9fa;
+    padding: 1rem 0;
+    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 2rem;
+  }
+
+  .header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2rem;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+  }
+
+  .brand svg {
+    height: 32px;
+    width: auto;
+  }
+
+  .nav {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .nav-item {
+    color: #495057;
+    text-decoration: none;
+  }
+
+  .nav-item:hover {
+    color: #228be6;
+  }
+</style><header class="header">
+  <div class="header-container">
+    <a href="/" class="brand">
+      <svg width="36.206mm" height="7.781mm" version="1.1" viewBox="0 0 36.206 7.781" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(-264.95 11.104)">
+          <path d="m273.59-6.453-2e-3 1.6107c-7e-3 0.22466-0.12785 0.35734-0.35253 0.36241-0.25549 0-0.36051-0.14631-0.36051-0.36123v-4.6353c0-0.092936 0.0232-0.16264 0.0696-0.20911 0.0464-0.052254 0.11906-0.092936 0.2178-0.12198 0.16852-0.052248 0.37175-0.090037 0.6099-0.11327 0.24404-0.023229 0.47924-0.034889 0.70576-0.034889 0.7377 0 1.2751 0.15683 1.612 0.4705 0.34263 0.30786 0.51403 0.72609 0.51403 1.2547 0 0.54021-0.17425 0.97296-0.52275 1.2982-0.34852 0.31948-0.88589 0.47922-1.612 0.47922zm0.83646-0.59249c0.46468 0 0.82484-0.095841 1.0804-0.28753 0.25564-0.19168 0.38343-0.48792 0.38343-0.88872 0-0.39499-0.12489-0.68252-0.37466-0.86259-0.24395-0.18588-0.59546-0.27882-1.0543-0.27882-0.1568 0-0.31363 0.00874-0.47042 0.026165-0.15106 0.011654-0.2876 0.02902-0.40959 0.052251v2.2393z">
+          <path d="m290.02-4.9895c0.13651 0 0.23267-0.00934 0.28845-0.027942 0.062-0.024852 0.12724-0.037205 0.19548-0.037205 0.068 0 0.13031 0.027942 0.18614 0.083763 0.0561 0.049626 0.0837 0.12719 0.0837 0.23267 0 0.099268-0.0499 0.17062-0.1489 0.21405-0.21711 0.099268-0.40323 0.14891-0.55839 0.14891-0.15512 0-0.29778-0.00934-0.42812-0.027942-0.12403-0.012426-0.24506-0.052715-0.36289-0.12099-0.27922-0.16132-0.41883-0.44672-0.41883-0.8562v-2.3639h-0.53971c-0.0931 0-0.24964-0.10621-0.25249-0.29294-2e-3 -0.17599 0.15385-0.26609 0.23168-0.26866l0.55806-0.00462 0.0103-0.64389c5e-3 -0.12544 0.16669-0.25549 0.33632-0.25619 0.18493 7.719e-4 0.34881 0.12909 0.3458 0.26617v0.60493h0.86549c0.0871 0 0.15818 0.027942 0.21402 0.083754 0.056 0.055807 0.0837 0.12719 0.0837 0.21405 0 0.086862-0.0279 0.15821-0.0837 0.21405-0.0562 0.055807-0.12713 0.083761-0.21402 0.083761h-0.86549v2.308c0 0.19234 0.0588 0.32263 0.17683 0.39087 0.062 0.037205 0.16125 0.055884 0.29781 0.055884z">
+          <g transform="matrix(.77185 0 0 .77185 312.99 -65.312)" fill-rule="evenodd" stroke-width=".26458px">
+            <path d="m-54.57 74.523c-1.7919 1.907-5.3906 2.3551-4.3001 4.9881 0.36199 0.74862-0.27419 1.0155-0.50107 0.61951 0 0-3.4086-2.8786-1.4504-4.6156 0.98084-1.0161 6.9801-5.3003 6.3041-1.3029z" fill="#1c7fc7">
+            <path d="m-57.629 73.238s-1.5075 0.83503-2.7039 1.8531c0 0 3.0859-1.3869 5.7631-0.56799 0 0 0.39145-1.6984-3.0593-1.2851z" fill="#004a77" fill-opacity=".87434">
+            <path d="m-62.252 72.183s0.38056-1.1878 2.1798-1.9508l0.96418 0.28985s6.7226-1.3794 4.5374 4.0016c0 0 0.5771-2.071-4.5695-1.033l-0.70199 0.43123c-1.906-0.26683-2.4099-1.7389-2.4099-1.7389" fill="#22a6ed">
+          </g>
+          <path d="m277.62-9.6188q0-0.14572 0.10242-0.2368 0.10234-0.10019 0.25131-0.10019 0.14885 0 0.24197 0.10019 0.10234 0.091077 0.10234 0.2368v4.8453q0 0.13662-0.10234 0.2368-0.0931 0.10019-0.24197 0.10019-0.14898 0-0.25131-0.10019-0.10242-0.10018-0.10242-0.2368z">
+          <path d="m280.03-6.1675q0.0651 0.51186 0.39083 0.81897 0.33506 0.29781 0.91202 0.29781 0.58636 0 0.99581-0.18613 0.13033-0.065145 0.23266-0.065145 0.10242-0.00934 0.18612 0.074482 0.0931 0.083761 0.0931 0.18613 0 0.20474-0.16752 0.2885-0.15823 0.083758-0.28845 0.14891-0.13034 0.065144-0.27927 0.11168-0.34429 0.093063-0.80033 0.093063-0.93997 0-1.4611-0.52116-0.51184-0.53048-0.51184-1.4984 0-0.83759 0.43737-1.396 0.49331-0.62354 1.3866-0.62354 0.85624 0 1.3495 0.577 0.46533 0.53978 0.46533 1.3494 0 0.1396-0.10234 0.24197-0.0931 0.10237-0.24196 0.10237zm1.126-1.6845q-0.67936 0-0.9865 0.60492-0.11163 0.21405-0.13952 0.51186h2.2521q-0.0277-0.53978-0.4002-0.85621-0.2978-0.26058-0.72589-0.26058z">
+          <path d="m285.85-7.7962q-0.67009 0-1.2564 0.73522v2.2801q0 0.1396-0.10244 0.24197-0.10232 0.10237-0.24199 0.10237-0.13951 0-0.24199-0.10237-0.10232-0.10237-0.10232-0.24197v-3.2666q0-0.14891 0.093-0.25128 0.10246-0.10237 0.2513-0.10237 0.13964 0 0.24199 0.10237 0.10244 0.093062 0.10244 0.25128v0.31642q0.30708-0.31642 0.53042-0.45602 0.42814-0.25128 0.81904-0.25128 0.40014 0 0.65139 0.12099 0.25126 0.11167 0.42812 0.32573 0.35368 0.41879 0.35368 1.0423v2.1684q0 0.1396-0.10242 0.24197-0.10234 0.10237-0.24195 0.10237-0.13958 0-0.24199-0.10237-0.10234-0.10237-0.10234-0.24197v-2.094q0-0.42811-0.19544-0.67007-0.19549-0.25127-0.64217-0.25127z">
+          <path d="m291.49-8.0475q0-0.15821 0.10242-0.25128 0.10234-0.10237 0.25127-0.10237 0.14887 0 0.24197 0.10237 0.093 0.093062 0.093 0.25128v3.2666q0 0.1396-0.093 0.24197-0.0931 0.10237-0.24197 0.10237-0.14894 0-0.25127-0.10237-0.10242-0.10237-0.10242-0.24197zm0.76312-1.4983q0 0.16751-0.11161 0.27919-0.11174 0.11168-0.27921 0.11168h-0.0465q-0.16751 0-0.27921-0.11168-0.10234-0.11168-0.10234-0.27919v-0.027942q0-0.16752 0.11165-0.2792 0.11167-0.11167 0.26989-0.11167h0.0465q0.16747 0 0.27921 0.11167 0.11161 0.11168 0.11161 0.2792z">
+          <path d="m295.26-5.0508q0.42813 0 0.80971-0.20474 0.13025-0.074483 0.24196-0.074483 0.11166-0.00934 0.19538 0.093062 0.0839 0.10237 0.0839 0.24197 0 0.1303-0.17686 0.24198-0.53977 0.35365-1.2098 0.35365-0.84694 0-1.4332-0.53047-0.61426-0.5677-0.60495-1.489 0-0.92135 0.60495-1.489 0.57697-0.53978 1.4332-0.53047 0.45601 0 0.74448 0.12099 0.29781 0.11167 0.46533 0.23266 0.17686 0.11168 0.17686 0.25128 0 0.1396-0.0839 0.23267-0.0837 0.093062-0.16746 0.093062-0.13033 0-0.26988-0.074483-0.39088-0.21405-0.80971-0.20474-0.67006 0-1.0423 0.38156-0.363 0.37226-0.363 0.98649 0 0.61423 0.363 0.99579 0.37224 0.37226 1.0423 0.37226z">
+          <path d="m299.21-8.4383q0.88411 0 1.4239 0.55839 0.53971 0.5677 0.52112 1.4611 0 0.90273-0.52112 1.4611-0.53979 0.55839-1.4239 0.55839-0.89347 0-1.4146-0.55839-0.53979-0.55839-0.53979-1.4611 0-0.91204 0.53979-1.4611 0.52111-0.55839 1.4146-0.55839zm-0.85627 3.0991q0.18617 0.15821 0.40954 0.23267 0.23266 0.074482 0.44673 0.074482 0.21402 0 0.43739-0.074482 0.22337-0.074483 0.40943-0.24197 0.4095-0.37226 0.4095-1.0796 0-0.68868-0.4095-1.0702-0.34429-0.31642-0.84682-0.30712-0.82832 0-1.1447 0.74453-0.11171 0.26988-0.11171 0.64215 0 0.37226 0.11171 0.64215 0.11164 0.26989 0.28846 0.43741z">
+        </g>
+      </svg>
+    </a>
+
+    <nav class="nav">
+      <a href="/" class="nav-item">Home</a>
+      <a href="/products" class="nav-item">Products</a>
+      <a href="/login" class="nav-item">Login</a>
+      <a href="/register" class="nav-item">Register</a>
+    </nav>
+  </div>
+</header>`,
+  'layouts_components_featured_posts_sidebar_html': (props) => `<div class="blog-sidebar">
+  <div class="blog-featured-group">
+    <span class="blog-header">Featured Posts</span><template x-if="allContent"><template x-for="post in props.allContent"><template x-if="post.type === \"news\"">
+          <a :href="post.path" class="blog-feature">
+            <picture class="blog-featureImage">
+              <img :alt="post.fields.blogImage?.alt || 'Blog image'" decoding="async" :src="post.fields.blogImage.src" width="100" height="100">
+            </picture>
+
+            <div class="content-group">
+              <h3 class="feature-h3"><span x-text="post.fields.title || 'Untitled'"></span></h3>
+              <span class="feature-date"><span x-text="post.fields.publish?.date || ''"></span></span>
+            </div>
+          </a></template></template></template><template x-else>
+      <p class="no-posts">No featured posts available.</p></template>
+  </div>
+</div><style>
+.blog-sidebar {
+  background: #f9f9f9;
+  padding: 2rem;
+  border-radius: 8px;
+}
+
+.blog-featured-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.blog-header {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #333;
+  border-bottom: 2px solid #4CAF50;
+  padding-bottom: 0.5rem;
+}
+
+.blog-feature {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 4px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.blog-feature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.blog-featureImage {
+  flex-shrink: 0;
+  width: 100px;
+  height: 100px;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.blog-featureImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.content-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.feature-h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.feature-date {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.no-posts {
+  color: #666;
+  font-style: italic;
+}
+</style>`,
+  'layouts_components_jim_test_advanced_loops_html': (props) => `<div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin: 2rem 0;">
+  <h2>Advanced Loop Patterns</h2>
+
+  <h3 style="font-size: 1rem; margin: 1rem 0 0.5rem; color: #374151;">Array Spread in Loop:</h3>
+  <div style="background-color: white; padding: 1rem; border-radius: 0.375rem; margin-bottom: 1.5rem;"><template x-for="animal in props.["🦄 unicorn", ...animals]">
+      <div style="padding: 0.25rem 0; color: #1f2937;"><span x-text="animal"></span></div></template>
+  </div>
+
+  <h3 style="font-size: 1rem; margin: 1rem 0 0.5rem; color: #374151;">Inline Array Iteration:</h3>
+  <div style="background-color: white; padding: 1rem; border-radius: 0.375rem;"><template x-for="word in props.["Waller", "loves Plenti", "uses AI", "is Australian"]">
+      <div style="padding: 0.25rem 0; color: #1f2937;">${props.name} <span x-text="word"></span></div></template><template x-for="phrase in props.["rocks", "codes", "innovates"]">
+      <div style="padding: 0.25rem 0; color: #1f2937; font-style: italic;">${props.name} <span x-text="phrase"></span>!</div></template>
+  </div>
+</div><style>
   h2 {
     color: #1f2937;
     font-size: 1.5rem;
@@ -35,72 +839,10 @@ const registry = {
     margin-bottom: 0.5rem;
     font-weight: 500;
   }
-
-  /* Button styling */
-  button {
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    font-weight: 500;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-    outline: none;
-  }
-
-  .animals button {
-    background-color: #dc2626;
-    color: white;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8rem;
-  }
-
-  .animals button:hover {
-    background-color: #b91c1c;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-
-  .animals button:active {
-    transform: translateY(0);
-    box-shadow: none;
-  }
-
-  .animals > button {
-    background-color: #16a34a;
-    color: white;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    margin-top: 0.5rem;
-  }
-
-  .animals > button:hover {
-    background-color: #15803d;
-  }
-
-  .animals input {
-    padding: 0.5rem;
-    border: 2px solid #e5e7eb;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    margin-right: 0.5rem;
-    outline: none;
-    transition: border-color 0.2s ease;
-  }
-
-  .animals input:focus {
-    border-color: #16a34a;
-  }
-
-  .animals h3 {
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    color: #1f2937;
-    font-size: 1.125rem;
-  }
 </style>`,
-  'layouts_components_jim_test_user_profiles_html': (props) => `<div style="margin: 2rem 0;">
-  <h2>User Profile Examples with Object Props</h2>
+  'layouts_components_jim_test_age_examples_html': (props) => `<div style="margin: 2rem 0;">
+  <h2>Age Component Examples</h2>
+  <div style="margin-bottom: 0.5rem; font-size: 0.875rem; color: #666;">Passing dynamic props to components:</div>
 </div><style>
   h2 {
     color: #1f2937;
@@ -108,107 +850,331 @@ const registry = {
     margin-bottom: 0.5rem;
     font-weight: 600;
   }
-
-  /* Role badge color classes */
-  .bg-red-100 {
-    background-color: #fee2e2;
+</style>`,
+  'layouts_components_userdashboard_html': (props) => `<style>
+  .dashboard {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
   }
-  .text-red-800 {
-    color: #991b1b;
+  
+  .dashboard-header {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
   }
-  .bg-purple-100 {
-    background-color: #f3e8ff;
+  
+  .welcome-message {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
   }
-  .text-purple-800 {
-    color: #6b21a8;
+  
+  .dashboard-content {
+    padding: 1.5rem;
   }
-  .bg-blue-100 {
-    background-color: #dbeafe;
+  
+  .dashboard-sections {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
   }
-  .text-blue-800 {
-    color: #1e40af;
+  
+  .dashboard-section {
+    margin-bottom: 2rem;
   }
-  .bg-green-100 {
-    background-color: #dcfce7;
+  
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
-  .text-green-800 {
-    color: #166534;
-  }
-  .bg-gray-100 {
-    background-color: #f3f4f6;
-  }
-  .text-gray-800 {
-    color: #1f2937;
-  }
-
-  /* Role badge styling */
-  .profile-role {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 0.375rem;
+  
+  .section-link {
     font-size: 0.875rem;
+    color: #007bff;
+    text-decoration: none;
+  }
+  
+  .order-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .order-table th {
+    text-align: left;
+    padding: 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+  }
+  
+  .order-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f1f3f5;
+  }
+  
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
     font-weight: 500;
   }
-</style>`,
-  'layouts_components_notification_html': (props) => `<style>
-  .notification {
+  
+  .wishlist-item {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 1rem;
-    border-radius: 0.25rem;
-    margin-bottom: 0.75rem;
-    position: relative;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f5;
   }
   
-  .notification-info {
-    background-color: #e0f2fe;
-    border-left: 4px solid #38bdf8;
+  .wishlist-name {
+    font-weight: 500;
   }
   
-  .notification-success {
-    background-color: #dcfce7;
-    border-left: 4px solid #4ade80;
+  .wishlist-price {
+    color: #495057;
   }
   
-  .notification-warning {
-    background-color: #fef3c7;
-    border-left: 4px solid #fbbf24;
+  .summary-card {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-top: 1rem;
   }
   
-  .notification-error {
-    background-color: #fee2e2;
-    border-left: 4px solid #f87171;
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
   }
   
-  .notification-icon {
-    margin-right: 0.75rem;
-    font-size: 1rem;
+  .summary-label {
+    color: #6c757d;
   }
   
-  .notification-message {
-    flex: 1;
+  .summary-total {
+    font-size: 1.125rem;
+    font-weight: bold;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
   }
   
-  .notification-dismiss {
-    background: none;
+  .dashboard-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  
+  .dashboard-button {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
     border: none;
-    color: #6b7280;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
     cursor: pointer;
-    font-size: 1rem;
-    padding: 0.25rem;
   }
   
-  .notification-dismiss:hover {
-    color: #374151;
+  .dashboard-button:hover {
+    background-color: #0069d9;
   }
-</style><div class="notification notification-${props.type}"><template x-if="type == \"info\"">
-    <div class="notification-icon">ℹ️</div></template><template x-else-if="type == \"success\"">
-    <div class="notification-icon">✓</div></template><template x-else-if="type == \"warning\"">
-    <div class="notification-icon">⚠️</div></template><template x-else>
-    <div class="notification-icon">✕</div></template>
-  <div class="notification-message">${props.message}</div><template x-if="dismissable">
-    <button class="notification-dismiss" @click="currentNotification = null">×</button></template>
+  
+  .dashboard-button-outline {
+    background-color: transparent;
+    color: #007bff;
+    border: 1px solid #007bff;
+  }
+  
+  .dashboard-button-outline:hover {
+    background-color: #f1f8ff;
+  }
+</style><div class="dashboard">
+  <div class="dashboard-header">
+    <div class="welcome-message">Welcome back, ${props.user.name}!</div>
+    <div>${props.user.email}</div>
+  </div>
+  
+  <div class="dashboard-content">
+    <div class="dashboard-sections">
+      <div>
+        <div class="dashboard-section">
+          <div class="section-title">
+            <span>Your Recent Orders</span>
+            <a href="#" class="section-link">View All Orders</a>
+          </div><template x-if="user.orders && user.orders.length > 0">
+            <table class="order-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody><template x-for="order in props.user.orders">
+                  <tr>
+                    <td><span x-text="order.id "></span></td>
+                    <td><span x-text="formatDate(order.date)"></span></td>
+                    <td>
+                      <span :class="getStatusColor(order.status) ">
+                        <span x-text="order.status "></span>
+                      </span>
+                    </td>
+                    <td><span x-text="formatCurrency(order.total)"></span></td>
+                  </tr></template>
+              </tbody>
+            </table>
+            
+            <div class="summary-card">
+              <div class="summary-row">
+                <span class="summary-label">Total Orders</span>
+                <span>${props.user.orders.length}</span>
+              </div>
+              <div class="summary-total">
+                <span>Total Spent</span>
+                <span>${props.formatCurrency(props.totalOrdersValue)}</span>
+              </div>
+            </div></template><template x-else>
+            <p>You haven't placed any orders yet.</p></template>
+        </div>
+        
+        <div class="dashboard-actions">
+          <button class="dashboard-button">View All Orders</button>
+          <button class="dashboard-button dashboard-button-outline">Track an Order</button>
+        </div>
+      </div>
+      
+      <div>
+        <div class="dashboard-section">
+          <div class="section-title">
+            <span>Your Wishlist</span>
+            <a href="#" class="section-link">View All</a>
+          </div><template x-if="user.wishlist && user.wishlist.length > 0">
+            <div><template x-for="item in props.user.wishlist">
+                <div class="wishlist-item">
+                  <div class="wishlist-name"><span x-text="item.name"></span></div>
+                  <div class="wishlist-price"><span x-text="formatCurrency(item.price)"></span></div>
+                </div></template>
+            </div></template><template x-else>
+            <p>Your wishlist is empty.</p></template>
+        </div>
+        
+        <div class="dashboard-section">
+          <div class="section-title">Account Settings</div>
+          <div>
+            <button class="dashboard-button dashboard-button-outline" style="width: 100%; margin-bottom: 0.5rem;">
+              Edit Profile
+            </button>
+            <button class="dashboard-button dashboard-button-outline" style="width: 100%; margin-bottom: 0.5rem;">
+              Change Password
+            </button>
+            <button class="dashboard-button dashboard-button-outline" style="width: 100%;">
+              Manage Payment Methods
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>`,
+  'layouts_global_html_html': (props) => `<html lang="en">
+
+<!-- Global Head Component -->
+
+<body>
+	<!-- CMS Panel -->
+	<div id="plenti_cms"></div>
+	<button id="toggle_plenti_cms">Toggle CMS</button>
+
+	<!-- User Menu (conditional - if authenticated) -->
+	<!-- {#if user && $user.isAuthenticated}
+		<UserMenu user={user} content={content} shadowContent={shadowContent} />
+	{/if} -->
+
+	<!-- Login Modal (conditional) -->
+	<!-- <LoginModal /> -->
+
+	<main>
+		<!-- Global Navigation (position: fixed) -->
+
+		<!-- Content wrapper - sections handle their own nav clearance and spacing -->
+		<!-- Full-width sections (hero, services) use their own padding-top for nav clearance -->
+		<!-- Text-heavy pages can add their own container padding as needed -->
+		<div class="content-wrapper">
+			<!-- ============================================ -->
+			<!-- DYNAMIC CONTENT LAYOUT INJECTION             -->
+			<!-- This is where page-specific layouts render  -->
+			<!-- For pages â renders layouts/content/pages.html -->
+			<!-- For courses â renders layouts/content/courses.html -->
+			<!-- ============================================ -->
+
+			<!-- Dynamic layout component injection -->
+			<!-- In Svelte this is: <svelte:component this={layout} {...content.fields} /> -->
+			<!-- In our Go template engine, this is handled by the server -->
+			<!-- The server will inject the appropriate layout based on the route -->
+
+			<!-- Slot for dynamic content - replaced by server with specific layout -->
+			<!-- Pass content explicitly (Pages layout needs it for iteration) -->
+			<!-- allContent passed for layouts that need to list other content (e.g., news sidebar) -->
+			<!-- Pass BOTH components array AND spread fields for compatibility -->
+			<!-- - components array: for collection-type layouts (jim-test.html) -->
+			<!-- - spread fields: for single-type layouts (_index.html) -->
+			<!-- Newsletter Subscription (optional global component) -->
+			<!-- <Newsletter /> -->
+		</div>
+
+		<!-- Global Footer (full-width, outside content wrapper) -->
+	</main>
+
+</body>
+
+</html><style>
+  /* Content wrapper - centers and constrains content */
+/*   .content-wrapper {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 10rem 2rem 2rem 2rem;
+  } */
+
+  /* Full-width sections break out of the container */
+  .content-wrapper > div > section,
+  .content-wrapper section[id^="hero"],
+  .content-wrapper section[id^="services"],
+  .content-wrapper section[id^="why"] {
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    max-width: none;
+  }
+</style>`,
+  'layouts_content_pages_html': (props) => `<div class="page-content-container"><template x-for="component in props.components"></template>
+</div><style>
+  /* Container for page content - centers and constrains text-heavy pages */
+  .page-content-container {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 10rem 2rem 2rem 2rem;
+  }
+
+  /* Full-width sections break out of the container */
+  .page-content-container > section {
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    padding-left: 0;
+    padding-right: 0;
+  }
+</style>`,
   'layouts_components_services2437_html': (props) => `<!-- ============================================ --><!--                  Services                    --><!-- ============================================ --><section id="services-2437">
 	<div class="cs-container">
 		<div class="cs-content">
@@ -536,1010 +1502,745 @@ const registry = {
   }
 }
 </style>`,
-  'layouts_components_todos_html': (props) => `<table class="todos-table">
-  <thead>
-    <tr>
-      <th style="width: 40px; text-align: center;">#</th>
-      <th>Task</th>
-      <th style="width: 120px; text-align: center;">Status</th>
-    </tr>
-  </thead>
-  <tbody><template x-for="(todo, index) in props.todos.slice(start, start + number)">
-      <tr>
-        <td style="text-align: center; color: #6b7280; font-weight: 500;"><span x-text="(start * 1) + index + 1"></span></td>
-        <td :style="todo.completed ? 'text-decoration: line-through; color: #9ca3af;' : ''"><span x-text="todo.title"></span></td>
-        <td style="text-align: center;">
-          <span :style="todo.completed ? 'color: #16a34a; font-weight: 600;' : 'color: #dc2626; font-weight: 600;'">
-            <span x-text="todo.completed ? '✓ Done' : '○ Pending'"></span>
-          </span>
-        </td>
-      </tr></template>
-  </tbody>
-</table>`,
-  'layouts_content_committee_html': (props) => `<div class="blog-container main-content-wrapper">
-  <div class="main-content">
-    <article class="blog-article">
-
-      <div class="article-group">
-        <h1 class="blog-h1">
-          ${props.title}
-        </h1>
-        <div class="blog-authorGroup">
-          <picture class="blog-author-img">
-            <img alt="${props.author.image.alt}" decoding="async" height="32" src="${props.author.image.src}" width="32">
-          </picture>
-          <span class="blog-author">${props.author.name}</span>
-          <span class="blog-dot" aria-hidden="true"></span>
-          <span class="blog-date">${props.publish.date}</span>
-        </div>
+  'layouts_content_committee_page_html': (props) => `<section id="blog-1702">
+  <picture class="cs-background">
+    <img loading="lazy" decoding="async" src="https://picsum.photos/522/609?random=meeting" alt="committee meeting" width="522" height="609" aria-hidden="true">
+  </picture>
+  <div class="cs-container">
+    <div class="cs-news">
+      <div class="cs-content">
+        <span class="cs-topper">${props.subtitle}</span>
+        <h2 class="cs-title">${props.page_title}</h2>
       </div>
-      <section id="blog-content"><template x-for="item in props.textItems">
-          <h4><span x-text="item.title"></span></h4>
-          <p><span x-text="item.paragraph"></span></p></template>
-      </section>
-    </article>
-    <!-- TODO: Add Socials component -->
+      <div class="cs-card-group"><template x-for="post in props.allContent"><template x-if="post.type === \"committee\"">
+          <div class="cs-item">
+            <span class="cs-date"><span x-text="post.fields.publish.date"></span></span>
+            <div class="cs-item-text">
+              <h3 class="cs-h3">
+                <span x-text="post.fields.title"></span>
+              </h3>
+              <p class="cs-desc">
+                <span x-text="post.fields.excerpt"></span>
+              </p>
+              <a :href="post.path" class="cs-link">
+                <span class="cs-link-text">Read more &rarr;</span>
+              </a>
+            </div>
+          </div></template></template>
+      </div>
+    </div>
   </div>
-   <!-- Sidebar with Featured Posts -->
-</div><style>
-  /* Page container - needs padding to clear fixed nav */
-  .blog-container.main-content-wrapper {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 10rem 2rem 2rem 2rem;
-    display: grid;
-    grid-template-columns: 1fr 350px;
-    gap: 3rem;
-    background-color: #fff;
+</section><style>
+/*-- -------------------------- -->
+<---           Blog             -->
+<--- -------------------------- -*/
+/* Mobile - 360px */
+@media only screen and (min-width: 0rem) {
+  #blog-1702 {
+    padding: var(--sectionPadding);
     position: relative;
     z-index: 1;
+    background-color: #f7f7f7;
+    display: flex;
+    flex-direction: column;
+    padding-top: 9em;
   }
-
-  @media (max-width: 1024px) {
-    .blog-container.main-content-wrapper {
-      grid-template-columns: 1fr;
-      padding: 8rem 1.5rem 2rem 1.5rem;
-    }
-  }
-
-  @media (max-width: 600px) {
-    .blog-container.main-content-wrapper {
-      padding: 7rem 1rem 1.5rem 1rem;
-    }
-  }
-
-  /*-- -------------------------- -->
-  <---        Blog Articles       -->
-  <--- -------------------------- -*/
-  /* Mobile - 360px */
-  @media only screen and (min-width: 0em) {
-    .blog-article {
-      width: 100%;
-      max-width: 49.6875em;
-      display: block;
-    }
-    .blog-article .blog-mainImage img {
-      width: 100%;
-      height: 100%;
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
-    .blog-article .blog-author-img {
-      width: 2em;
-      height: 2em;
-      border-radius: 50%;
-      display: block;
-      position: relative;
-      overflow: hidden;
-    }
-    .blog-article .blog-author-img img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
-    .blog-article .blog-authorGroup {
-      display: flex;
-      justify-content: flex-start;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .blog-article .blog-author,
-    .blog-article .blog-date {
-      font-size: 0.875rem;
-      line-height: 1.5em;
-      color: var(--bodyTextColor);
-    }
-    .blog-article .blog-dot {
-      width: 3px;
-      height: 3px;
-      background-color: #fe4f70;
-      border-radius: 50%;
-      display: block;
-    }
-    .blog-article .blog-h1 {
-      font-size: clamp(20px, 7vw, 36px);
-      font-weight: 700;
-      line-height: 1.4em;
-      max-width: 42.375rem;
-      margin: 1rem 0;
-      color: var(--headerColor);
-    }
-    .blog-article #blog-content {
-      margin-top: 1em;
-      padding-top: 1.5625em;
-      border-top: 1px solid #ebebeb;
-    }
-    .blog-article #blog-content h1 {
-      font-size: 2.25rem;
-      font-weight: 700;
-      line-height: 1.75em;
-      margin-bottom: 1rem;
-      color: var(--headerColor);
-    }
-    .blog-article #blog-content h2 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      line-height: 1.5em;
-      margin-bottom: 1rem;
-      color: var(--headerColor);
-    }
-    .blog-article #blog-content h3 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      line-height: 1.5em;
-      margin-bottom: 1rem;
-      color: var(--headerColor);
-    }
-    .blog-article #blog-content h4,
-    .blog-article #blog-content h5,
-    .blog-article #blog-content h6 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      line-height: 1.5em;
-      margin-bottom: 1rem;
-      color: var(--headerColor);
-    }
-    .blog-article #blog-content p {
-      font-size: 1rem;
-      line-height: 1.6em;
-      margin: 0;
-      margin-bottom: 1rem;
-      color: var(--bodyTextColor);
-    }
-    .blog-article #blog-content a {
-      font-size: inherit;
-      text-decoration: underline;
-      color: var(--primary);
-    }
-    .blog-article #blog-content ul,
-    .blog-article #blog-content ol {
-      margin: 0;
-      margin: 1rem 0;
-      padding-left: 0.5rem;
-    }
-    .blog-article #blog-content ul li,
-    .blog-article #blog-content ol li {
-      font-size: 1rem;
-      line-height: 1.6em;
-      list-style: circle;
-      margin-bottom: 1rem;
-      color: var(--bodyTextColor);
-    }
-    .blog-article #blog-content img {
-      width: 100%;
-      height: auto;
-      margin: 1rem 0;
-      border-radius: 0.5rem;
-      display: block;
-    }
-  }
-</style>`,
-  'layouts_content_news_html': (props) => `<template x-if="published">
-<div class="blog-container main-content-wrapper">
-  <div class="main-content">
-    <article class="blog-article">
-      <!-- Hero Image -->
-      <picture class="blog-mainImage">
-        <img alt="${props.blogImage?.alt || 'Blog image'}" decoding="async" src="${props.blogImage?.src}" width="${props.blogImage?.width || 1200}" height="${props.blogImage?.height || 600}">
-      </picture>
-
-      <!-- Image Caption --><template x-if="figcaption">
-      <figure class="image-caption">
-        <span class="caption">${props.figcaption.caption}</span><template x-if="figcaption.attribution">
-        <span class="attribution">
-          <a class="source" target="_blank" href="${props.figcaption.attribution.link}">
-            ${props.figcaption.attribution.text}
-          </a>
-        </span></template>
-      </figure></template>
-
-      <!-- Article Header -->
-      <div class="article-group">
-        <h1 class="blog-h1">${props.title}</h1>
-
-        <div class="blog-authorGroup"><template x-if="author?.image">
-          <picture class="blog-author-img">
-            <img alt="${props.author.image.alt}" decoding="async" height="32" src="${props.author.image.src}" width="32">
-          </picture></template>
-          <span class="blog-author">${props.author?.name || 'Author'}</span>
-          <span class="blog-dot" aria-hidden="true"></span>
-          <span class="blog-date">${props.publish?.date}</span>
-        </div>
-      </div>
-
-      <!-- Article Content --><template x-if="textItems"><template x-for="item in props.textItems">
-        <section id="blog-content">
-          <h4><span x-text="item.title"></span></h4>
-          <p><span x-text="item.paragraph"></span></p>
-        </section></template></template>
-
-      <!-- Photo Gallery (if present) --><template x-if="photos && photos.length > 0">
-      <section id="photo-gallery">
-        <div class="photo-grid"><template x-for="photo in props.photos">
-          <div class="photo-item">
-            <img :src="photo.src" :alt="photo.alt || 'Gallery photo'" :width="photo.width || 400" :height="photo.height || 300">
-          </div></template>
-        </div>
-      </section></template>
-    </article>
-  </div>
-
-  <!-- Sidebar with Featured Posts -->
-</div></template><template x-else>
-<div class="draft-message">
-  <h2>This post is currently a draft</h2>
-  <p>Published posts will appear here.</p>
-</div></template><style>
-/* ============================================
-   Blog Container - Main Layout Grid
-   ============================================ */
-.blog-container {
-  max-width: 1280px;
-  margin: 0 auto;
-  /* padding-top clears fixed nav (~160px) + content spacing */
-  padding: 10rem 2rem 2rem 2rem;
-  display: grid;
-  grid-template-columns: 1fr 350px;
-  gap: 3rem;
-  background-color: #fff;
-  position: relative;
-  z-index: 1;
-}
-
-@media (max-width: 1024px) {
-  .blog-container {
-    grid-template-columns: 1fr;
-    padding: 8rem 1.5rem 2rem 1.5rem;
-  }
-}
-
-@media (max-width: 600px) {
-  .blog-container {
-    padding: 7rem 1rem 1.5rem 1rem;
-  }
-}
-
-.main-content {
-  width: 100%;
-  min-width: 0; /* Prevent grid blowout */
-}
-
-/* ============================================
-   Draft Message (unpublished posts)
-   ============================================ */
-.draft-message {
-  max-width: 800px;
-  margin: 12rem auto 4rem;
-  padding: 3rem;
-  text-align: center;
-  background: #f9f9f9;
-  border-radius: 8px;
-  border: 2px dashed #ccc;
-}
-
-.draft-message h2 {
-  color: #666;
-  margin-bottom: 1rem;
-}
-
-.draft-message p {
-  color: #999;
-}
-
-/* ============================================
-   Photo Gallery
-   ============================================ */
-#photo-gallery {
-  margin: 2rem 0;
-}
-
-.photo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.photo-item {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.photo-item img {
-  width: 100%;
-  height: 180px;
-  object-fit: cover;
-  display: block;
-}
-
-/* ============================================
-   Dynamic Image Content
-   ============================================ */
-.main-content-wrapper .blog-article #dynamic-image-content {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-@media only screen and (max-width: 550px) {
-  .main-content-wrapper .blog-article #dynamic-image-content {
-    margin-left: 0rem;
-    margin-right: -4rem;
-    width: calc(100% + 2rem);
-  }
-}
-
-/* ============================================
-   Blog Article Styles
-   ============================================ */
-/* Mobile - 360px */
-@media only screen and (min-width: 0em) {
-  .blog-article {
+  #blog-1702 .cs-container {
     width: 100%;
-    max-width: 41.6875em;
-    display: block;
+    max-width: 100%;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    order: 1;
+    padding: 0;
   }
-  .blog-article .blog-mainImage {
+  #blog-1702 .cs-news {
     width: 100%;
-    height: clamp(250px, 40vw, 570px);
-    margin-bottom: 0.5em;
-    display: block;
+    max-width: 100%;
+    margin: 0;
+    padding: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1rem, 4vw, 3rem);
+    align-items: center;
+  }
+  #blog-1702 .cs-content {
+    text-align: left;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  #blog-1702 .cs-title {
+    margin: 0;
+  }
+  #blog-1702 .cs-card-group {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  #blog-1702 .cs-item {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    list-style: none;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+    background-color: #fff;
+    border: 1px solid #e8e8e8;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    grid-column: span 12;
     position: relative;
     overflow: hidden;
+    transition: box-shadow 0.3s, border-color 0.3s;
   }
-  .blog-article .blog-mainImage img {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
+  #blog-1702 .cs-date {
+    font-size: 0.9rem;
+    line-height: 1.2em;
+    font-weight: 700;
+    text-align: inherit;
+    margin: 0;
+    padding: 0.25rem 0.5rem;
+    box-sizing: border-box;
+    background-color: var(--primary);
+    color: var(--headerColor);
+    display: inline-block;
+    left: 1.5rem;
+    bottom: 100%;
+    z-index: 2;
   }
-  .blog-article .blog-author-img {
-    width: 2em;
-    height: 2em;
-    border-radius: 50%;
+  #blog-1702 .cs-picture {
+    width: auto;
+    height: 11.4375rem;
     display: block;
-    position: relative;
-    overflow: hidden;
   }
-  .blog-article .blog-author-img img {
+  #blog-1702 .cs-picture img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    position: absolute;
-    top: 0;
-    left: 0;
   }
-  .blog-article .blog-authorGroup {
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 0.75rem;
-  }
-  .blog-article .blog-author,
-  .blog-article .blog-date {
-    font-size: 0.875rem;
-    line-height: 1.5em;
-    color: var(--bodyTextColor);
-  }
-  .blog-article .blog-dot {
-    width: 3px;
-    height: 3px;
-    background-color: #fe4f70;
-    border-radius: 50%;
-    display: block;
-  }
-  .blog-article .blog-h1 {
-    font-size: clamp(20px, 7vw, 36px);
-    font-weight: 700;
-    line-height: 1.4em;
-    max-width: 42.375rem;
-    margin: 1rem 0;
-    color: var(--headerColor);
-  }
-  .blog-article #blog-content:first-of-type {
-    margin-top: 1em;
-    padding-top: 1.5625em;
-    border-top: 1px solid #ebebeb;
-  }
-  .blog-article #blog-content {
-    margin-top: -1em;
-    padding-top: 1em;
-    border-top: none;
-  }
-  .blog-article #blog-content h1 {
-    font-size: 2.25rem;
-    font-weight: 700;
-    line-height: 1.75em;
-    margin-bottom: 1rem;
-    color: var(--headerColor);
-  }
-  .blog-article #blog-content h2 {
-    font-size: 1.75rem;
-    font-weight: 700;
-    line-height: 1.5em;
-    margin-bottom: 1rem;
-    color: var(--headerColor);
-  }
-  .blog-article #blog-content h3 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    line-height: 1.5em;
-    margin-bottom: 1rem;
-    color: var(--headerColor);
-  }
-  .blog-article #blog-content h4,
-  .blog-article #blog-content h5,
-  .blog-article #blog-content h6 {
-    font-size: 1.1rem;
-    font-weight: 700;
-    line-height: 1.5em;
-    margin-bottom: 1rem;
-    color: var(--headerColor);
-  }
-  .blog-article #blog-content p {
-    font-size: 1rem;
-    line-height: 1.6em;
-    margin: 0;
-    margin-bottom: 1rem;
-    color: var(--bodyTextColor);
-  }
-  .blog-article #blog-content a {
-    font-size: inherit;
-    text-decoration: underline;
-    color: var(--primary);
-  }
-  .blog-article #blog-content ul,
-  .blog-article #blog-content ol {
-    margin: 0;
-    margin: 1rem 0;
-    /* padding-left: 2.5rem; */
-  }
-  .blog-article #blog-content ul li,
-  .blog-article #blog-content ol li {
-    font-size: 1rem;
-    line-height: 1.6em;
-    list-style: circle;
-    margin-bottom: 1rem;
-    color: var(--bodyTextColor);
-  }
-  .blog-article #blog-content img {
-    width: 100%;
-    /* height: auto; */
-    /* margin: 1rem 0; */
-    /* border-radius: 0.5rem; */
-    display: block;
-  }
-  /* New styles for caption */
-  .blog-article .image-caption {
-    font-size: 0.6rem;
-    line-height: 1.4;
-    color: #4b4b4e;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25em;
-    margin-bottom: 1.5em;
-  }
-
-  .blog-article .image-caption .caption,
-  .blog-article .image-caption .attribution {
-    display: inline-block;
-    width: 100%;
-  }
-
-  .blog-article .image-caption .source {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .blog-article .image-caption .source:hover {
-    text-decoration: underline;
-  }
-}
-/* Tablet - 768px */
-@media only screen and (min-width: 48em) {
-  .blog-article .image-caption {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: baseline;
-    flex-wrap: nowrap;
-  }
-
-  .blog-article .image-caption .caption {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: left;
-  }
-
-  .blog-article .image-caption .attribution {
-    flex-shrink: 0;
-    width: auto;
-  }
-}
-
-</style>`,
-  'layouts_components_productcard_html': (props) => `<style>
-  .product-card {
-    border: 1px solid #e9ecef;
-    border-radius: 0.5rem;
+  #blog-1702 .cs-item-text {
+    flex: 1 0 0;
     padding: 1rem;
-    transition: transform 0.2s, box-shadow 0.2s;
   }
-  
-  .product-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-  
-  .product-card.featured {
-    border-color: #ffd43b;
-    background-color: #fff9db;
-  }
-  
-  .product-name {
-    font-size: 1.25rem;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-  }
-  
-  .product-price {
-    font-size: 1.5rem;
-    color: #495057;
-    margin-bottom: 0.5rem;
-  }
-  
-  .product-status {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    margin-bottom: 0.5rem;
-  }
-  
-  .in-stock {
-    background-color: #d3f9d8;
-    color: #2b8a3e;
-  }
-  
-  .out-of-stock {
-    background-color: #ffe3e3;
-    color: #c92a2a;
-  }
-  
-  .featured-badge {
-    display: inline-block;
-    background-color: #fff3bf;
-    color: #e67700;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: bold;
-    margin-left: 0.5rem;
-  }
-  
-  .product-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-top: 0.5rem;
-  }
-  
-  .product-tag {
-    background-color: #e9ecef;
-    border-radius: 9999px;
-    padding: 0.125rem 0.5rem;
-    font-size: 0.75rem;
-  }
-  
-  .add-to-cart {
-    width: 100%;
-    padding: 0.5rem;
-    background-color: #228be6;
-    color: white;
-    border: none;
-    border-radius: 0.25rem;
-    margin-top: 0.5rem;
-    cursor: pointer;
-  }
-  
-  .add-to-cart:hover {
-    background-color: #1c7ed6;
-  }
-  
-  .add-to-cart:disabled {
-    background-color: #adb5bd;
-    cursor: not-allowed;
-  }
-</style><div class="product-card ${props.featured ? 'featured' : ''}">
-  <div class="product-name">
-    ${props.name}<template x-if="featured">
-      <span class="featured-badge">Featured</span></template>
-  </div>
-
-  <div class="product-price">$${props.price}</div><template x-if="inStock">
-    <div class="product-status in-stock">In Stock</div></template><template x-else>
-    <div class="product-status out-of-stock">Out of Stock</div></template><template x-if="tags && tags.length > 0">
-    <div class="product-tags"><template x-for="tag in props.tags">
-        <span class="product-tag"><span x-text="tag"></span></span></template>
-    </div></template><template x-if="inStock">
-    <button class="add-to-cart">Add to Cart</button></template><template x-else>
-    <button class="add-to-cart" disabled="">Sold Out</button></template>
-</div>`,
-  'layouts_global_footer_html': (props) => `<!-- ============================================ --><!--                   Footer                     --><!-- ============================================ --><footer id="cs-footer-2440">
-    <div class="cs-container">
-        <div class="cs-top">
-            <div class="cs-logo-group">
-                <a class="cs-logo" aria-label="go back to home" href="">
-                    <img class="cs-logo-img" aria-hidden="true" loading="lazy" decoding="async" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/artistitch.svg" alt="logo" width="260" height="48"></img>
-                </a>
-                <ul class="cs-contact-group">
-                    <li class="cs-contact-li">
-                        <img class="cs-contact-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-phone.svg" alt="phone icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true"></img>
-                        <a class="cs-contact-link" href="tel:555-474-7386">555-474-7386</a>
-                    </li>
-                    <li class="cs-contact-li">
-                        <img class="cs-contact-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-email.svg" alt="email icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true"></img>
-                        <a class="cs-contact-link" href="mailto:ArtiStitchart@gmail.com">ArtiStitchart@gmail.com</a>
-                    </li>
-                    <li class="cs-contact-li">
-                        <img class="cs-contact-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-location.svg" alt="location icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true"></img>
-                        <a class="cs-contact-link" href="">555 Fake St, Portland, OR 97217, United States</a>
-                    </li>
-                </ul>
-            </div>
-            <!--Sitemap-->
-            <ul class="cs-ul">
-                <li class="cs-li">
-                    <span class="cs-header">Quick Links</span>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Home</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">About</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Services</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Artist</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">FAQ</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Contact</a>
-                </li>
-            </ul>
-            <ul class="cs-ul">
-                <li class="cs-li">
-                    <span class="cs-header">Our Services</span>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Custom UV Body Painting</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Spiritual & Symbolic Art</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Workshops & Education</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Body Art Reworks</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Live Event Painting</a>
-                </li>
-                <li class="cs-li">
-                    <a class="cs-link" href="">Symbolic Expression Art</a>
-                </li>
-            </ul>
-            <div class="cs-subscribe-group">
-                <span class="cs-header">Sign up to receive the latest news and events from us.</span>
-                <form class="cs-form" name="Footer Subscribe" method="post">
-                    <input class="cs-input" aria-label="email" name="email" type="email" placeholder="Email Address" required=""></input>
-                    <button class="cs-button-solid" name="submit" type="submit" aria-label="submit">
-                        <img class="cs-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-upper-right-arrow.svg" alt="arrow icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true"></img>
-                    </button>
-                </form>
-            </div>
-        </div>
-        <!--Bottom Copyright And Social-->
-        <div class="cs-bottom">
-            <div class="cs-flex">
-                <a href="" class="cs-link">Facebook</a>
-                <div class="cs-divider" aria-hidden="true"></div>
-                <a href="" class="cs-link">Instagram</a>
-                <div class="cs-divider" aria-hidden="true"></div>
-                <a href="" class="cs-link">Tiktok</a>
-                <div class="cs-divider" aria-hidden="true"></div>
-                <a href="" class="cs-link">Youtube</a>
-            </div>
-            <span class="cs-copyright-group">
-                <span class="cs-copyright">© Copyright 2025 -</span>
-                <a class="cs-link" href="">ArtiStitch</a>
-            </span>
-        </div>
-    </div>
-</footer><style>
-    /*-- -------------------------- -->
-<---           Footer           -->
-<--- -------------------------- -*/
-
-/* Mobile */
-@media only screen and (min-width: 0rem) {
-  #cs-footer-2440 {
-    padding: var(--sectionPadding);
-    padding-bottom: 1.5rem;
-    background-color: #111418;
-    overflow: hidden;
-  }
-  #cs-footer-2440 .cs-container {
-    width: 100%;
-    max-width: 80rem;
-    margin: auto;
-  }
-  #cs-footer-2440 .cs-top {
-    display: flex;
-    flex-direction: column;
-    /* 16px - 80px */
-    column-gap: clamp(1rem, 6vw, 5rem);
-    row-gap: 2rem;
-  }
-  #cs-footer-2440 .cs-logo-group {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    /* 32px - 72px */
-    gap: clamp(2rem, 5vw, 4.5rem);
-  }
-  #cs-footer-2440 .cs-logo {
-    max-width: 12.8125rem;
-    height: auto;
-    display: block;
-  }
-  #cs-footer-2440 .cs-logo-img {
-    width: 100%;
-    height: auto;
-    display: block;
-  }
-  #cs-footer-2440 .cs-contact-group {
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.875rem;
-  }
-  #cs-footer-2440 .cs-contact-li {
-    display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  #cs-footer-2440 .cs-contact-icon {
-    width: 1.5rem;
-    height: auto;
-    display: block;
-  }
-  #cs-footer-2440 .cs-contact-link {
+  #blog-1702 .cs-h3 {
     font-size: 1rem;
-    font-weight: 400;
-    line-height: 1.5em;
-    text-decoration: none;
-    color: var(--bodyTextColorWhite);
-    opacity: 0.8;
-  }
-  #cs-footer-2440 .cs-ul {
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  #cs-footer-2440 .cs-header {
-    font-size: 1.25rem;
     font-weight: 700;
     line-height: 1.2em;
-    margin: 0 0 0.75rem;
-    color: var(--bodyTextColorWhite);
-    display: block;
-  }
-  #cs-footer-2440 .cs-header .cs-link {
-    opacity: 1;
-  }
-  #cs-footer-2440 .cs-li {
-    font-size: 1rem;
-    line-height: 1.5em;
-    list-style: none;
+    text-overflow: ellipsis;
     margin: 0;
+    margin-bottom: 0.5rem;
+    color: var(--headerColor);
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
-  #cs-footer-2440 .cs-link {
+  #blog-1702 .cs-desc {
+    font-size: 0.9rem;
+    line-height: 1.5em;
+    text-overflow: ellipsis;
+    margin: 0;
+    color: var(--bodyTextColor);
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  #blog-1702 .cs-link {
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.2em;
+    text-align: inherit;
     text-decoration: none;
-    color: var(--bodyTextColorWhite);
-    opacity: 0.8;
+    margin-top: 0.5rem;
+    color: var(--primary);
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.625rem;
     transition: color 0.3s;
   }
-  #cs-footer-2440 .cs-link:hover {
-    color: var(--primary);
+  #blog-1702 .cs-link:hover .cs-arrow {
+    transform: translateX(0.25rem);
   }
-  #cs-footer-2440 .cs-subscribe-group {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+  #blog-1702 .cs-link-text {
+    width: fit-content;
+    display: block;
   }
-  #cs-footer-2440 .cs-subscribe-group .cs-header {
-    margin: 0;
-  }
-  #cs-footer-2440 .cs-form {
-    width: 100%;
-    display: flex;
-    align-items: stretch;
-    gap: 1rem;
-  }
-  #cs-footer-2440 .cs-input {
-    width: 100%;
-    padding: 1rem;
-    background-color: transparent;
-    color: var(--bodyTextColorWhite);
-    border: none;
-    border-bottom: 1px solid #21252E;
-  }
-  #cs-footer-2440 .cs-button-solid {
-    font-size: 1rem;
-    font-weight: 700;
-    /* 46px - 56px */
-    line-height: clamp(2.875rem, 5.5vw, 3.5rem);
-    text-align: center;
-    text-decoration: none;
-    min-width: 9.375rem;
-    margin: 0;
-    padding: 0 1rem;
-    background-color: var(--primary);
-    color: var(--bodyTextColorWhite);
-    display: inline-block;
-    position: relative;
-    z-index: 1;
-  }
-  #cs-footer-2440 .cs-button-solid:before {
-    content: "";
-    width: 0%;
-    height: 100%;
-    background: #fff;
-    opacity: 1;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: -1;
-    transition: width 0.3s;
-  }
-  #cs-footer-2440 .cs-button-solid:hover:before {
-    width: 100%;
-  }
-  #cs-footer-2440 .cs-button-solid {
-    min-width: auto;
-    border: none;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  #cs-footer-2440 .cs-icon {
+  #blog-1702 .cs-arrow {
     width: 1.25rem;
     height: auto;
     display: block;
+    transition: filter 0.3s, transform 0.3s;
   }
-  #cs-footer-2440 .cs-bottom {
-    /* 48px - 80px */
-    margin-top: clamp(3rem, 6vw, 5rem);
-    /* 24px - 40px */
-    padding-top: clamp(1.5rem, 3vw, 2.5rem);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.75rem;
-    position: relative;
-    z-index: 1;
-  }
-  #cs-footer-2440 .cs-bottom:before {
-    content: '';
+  #blog-1702 .cs-background {
     width: 100%;
-    max-width: 80rem;
-    height: 1px;
-    background: #2D2F2E;
-    opacity: 1;
     display: block;
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
+    height: 38.5rem;
+    order: 2;
+    padding-top: 2em;
   }
-  #cs-footer-2440 .cs-flex {
-    display: flex;
-    flex-flow: wrap row;
-    justify-content: center;
-    align-items: center;
-    column-gap: 0.75rem;
-    row-gap: 0.25rem;
-  }
-  #cs-footer-2440 .cs-divider {
-    width: 1px;
-    height: 0.8125rem;
-    background-color: var(--bodyTextColorWhite);
-    opacity: 0.8;
-    display: block;
-  }
-  #cs-footer-2440 .cs-copyright {
-    text-decoration: none;
-    color: var(--bodyTextColorWhite);
-    opacity: 0.8;
-    transition: color 0.3s;
+  #blog-1702 .cs-background img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 }
+
 /* Tablet - 768px */
 @media only screen and (min-width: 48rem) {
-  #cs-footer-2440 .cs-top {
-    flex-direction: row;
-    justify-content: flex-end;
-    flex-wrap: wrap;
+  #blog-1702 {
+    padding: var(--sectionPadding);
+    display: block;
+    padding-top: 0em;
   }
-  #cs-footer-2440 .cs-logo-group {
-    /* 285px - 316px */
-    max-width: clamp(17.8125rem, 22vw, 19.75rem);
-    margin-right: auto;
+  #blog-1702 .cs-container {
+    width: 80%;
+    padding: inherit;
+    justify-content: flex-start;
+    order: unset;
+    padding-top: 7em;
   }
-  #cs-footer-2440 .cs-ul {
-    /* Add padding to offset the .cs-ul from the logo, which sits above the rest of the items */
-    padding-top: 5.25rem;
-    flex: none;
+  #blog-1702 .cs-title {
+    margin: 0;
   }
-  #cs-footer-2440 .cs-subscribe-group {
-    width: 100%;
-  }
-  #cs-footer-2440 .cs-bottom {
-    flex-direction: row;
-    justify-content: space-between;
-  }
-}
-/* Desktop - 1024px */
-@media only screen and (min-width: 64rem) {
-  #cs-footer-2440 .cs-top {
-    flex-wrap: nowrap;
-  }
-  #cs-footer-2440 .cs-ul {
+  #blog-1702 .cs-news {
+    width: 44vw;
+    max-width: 36.25rem;
+    margin: 0;
     padding: 0;
   }
-  #cs-footer-2440 .cs-subscribe-group {
-    width: initial;
-    /* 281px - 372px */
-    max-width: clamp(17.5625rem, 26vw, 23.25rem);
+  #blog-1702 .cs-card-group {
+    gap: clamp(1rem, 3vw, 2rem);
+  }
+  #blog-1702 .cs-picture {
+    width: 11.25rem;
+    height: 11.25rem;
+  }
+  #blog-1702 .cs-background {
+    width: 30%;
+    height: auto;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    order: unset;
   }
 }
+
+/* Large Desktop - 1300px */
+@media only screen and (min-width: 81.25rem) {
+  #blog-1702 .cs-background {
+    width: 50vw;
+    left: 50%;
+    right: auto;
+    margin-left: 13.75rem;
+  }
+}
+</style>`,
+  'layouts_components_ThemeToggle_html': (props) => `<div class="theme-toggle">
+  <span class="theme-label">Theme:</span>
+  <div class="toggle-buttons">
+    <button @click="$store.theme.setLight()" class="theme-btn" :class="{ active: $store.theme.mode === 'light' }">
+      ☀️ Light
+    </button>
+    <button @click="$store.theme.setDark()" class="theme-btn" :class="{ active: $store.theme.mode === 'dark' }">
+      🌙 Dark
+    </button>
+  </div>
+  <button @click="$store.theme.toggle()" class="toggle-btn" title="Toggle theme">
+    🔄
+  </button>
+</div><style>
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.theme-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.toggle-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.theme-btn {
+  border: 2px solid #e5e7eb;
+  background: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  color: #6b7280;
+}
+
+.theme-btn:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.theme-btn.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.toggle-btn {
+  border: none;
+  background: #2563eb;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  background: #1d4ed8;
+  transform: rotate(180deg);
+}
+</style>`,
+  'layouts_components_footer-old_html': (props) => `<style>
+  .footer {
+    background-color: #f8f9fa;
+    padding: 2rem 0;
+    margin-top: 3rem;
+    border-top: 1px solid #e9ecef;
+  }
+  
+  .footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+  
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 2rem;
+  }
+  
+  .footer-brand {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+  }
+  
+  .footer-description {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+  }
+  
+  .footer-heading {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+  }
+  
+  .footer-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .footer-link {
+    margin-bottom: 0.5rem;
+  }
+  
+  .footer-link a {
+    color: #495057;
+    text-decoration: none;
+  }
+  
+  .footer-link a:hover {
+    color: #228be6;
+    text-decoration: underline;
+  }
+  
+  .social-links {
+    display: flex;
+    gap: 0.75rem;
+  }
+  
+  .social-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    background-color: #e9ecef;
+    border-radius: 50%;
+    text-decoration: none;
+    transition: background-color 0.2s;
+  }
+  
+  .social-link:hover {
+    background-color: #dee2e6;
+  }
+  
+  .copyright {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e9ecef;
+    color: #6c757d;
+  }
+</style><footer class="footer">
+  <div class="footer-container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">${props.companyName}</div>
+        <p class="footer-description">
+          Our custom template engine makes building reactive web applications simple and efficient.
+          We focus on developer experience without sacrificing performance.
+        </p>
+        <div class="social-links"><template x-for="social in props.socialLinks">
+            <a :href="social.url" class="social-link" :title="social.label">
+              <span x-text="social.icon "></span>
+            </a></template>
+        </div>
+      </div>
+      
+      <div>
+        <h3 class="footer-heading">Quick Links</h3>
+        <ul class="footer-links"><template x-for="(link, index) in props.links.slice(0, 3)">
+            <li class="footer-link">
+              <a :href="link.url"><span x-text="link.label"></span></a>
+            </li></template>
+        </ul>
+      </div>
+      
+      <div>
+        <h3 class="footer-heading">Resources</h3>
+        <ul class="footer-links"><template x-for="(link, index) in props.links.slice(3)">
+            <li class="footer-link">
+              <a :href="link.url"><span x-text="link.label"></span></a>
+            </li></template>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="copyright">
+      &copy; ${props.year} ${props.companyName}. All rights reserved.
+    </div>
+  </div>
+</footer>`,
+  'layouts_content__index_html': (props) => `<template x-for="component in props.content.components"></template>`,
+  'layouts_content_jim-test_html': (props) => `<html lang="en">
+<body>
+  <!-- CMS Panel -->
+  <div id="plenti_cms"></div>
+  <button id="toggle_plenti_cms">Toggle CMS</button>
+
+  <main>
+    <div class="text-content-container">
+
+      <h1>${props.salutation} ${props.name}!</h1>
+
+    <!-- Basic conditionals --><template x-if="name.length > 3">
+      <div id="praise">${props.name} is a long name</div><template x-if="age > 1">
+        <div>Has been born</div></template></template><template x-else-if="name.length == 2">
+      <div id="praise">${props.name} is medium</div></template><template x-else>
+      <div id="praise">${props.name} is a short name</div></template>
+
+    <!-- Component usage with props --><template x-if="age > 0">
+      <div style="margin: 2rem 0;">
+        <h2>Age Component Examples</h2>
+        <div style="margin-bottom: 0.5rem; font-size: 0.875rem; color: #666;">Passing dynamic props to components:</div>
+      </div>
+
+      <!-- Dynamic components (Jim's innovative <= syntax) with object props -->
+      <div style="margin: 2rem 0;">
+        <h2>User Profile Examples with Object Props</h2>
+      </div>
+
+      <!-- Loops with nested conditionals and advanced JS expressions -->
+      <div class="animals" style="background-color: #f0f0f0; padding: 1rem; margin: 2rem 0;">
+        <h2>Animals Loop with Advanced Features</h2><template x-for="animal in props.animals"><template x-if="animal == \"cat\"">
+            <div>Hi <span x-text="animal"></span>!</div></template><template x-else>
+            <div>Bye <span x-text="animal"></span>.</div></template>
+          <div :class="animal">${props.name} likes: <span x-text="animal"></span>s</div>
+          <div style="color: #666; font-size: 0.875rem;">Backwards: <span x-text="animal.split('').reverse().join('')"></span></div>
+          <button :onclick="animals = animals.filter(a => a !== animal)">Remove <span x-text="animal"></span></button>
+          <br></br></template>
+        <h3>Add new animal:</h3>
+        <input type="text" name="newAnimal" x-model="newAnimal" placeholder="animal name"></input>
+        <button onclick="{animals = [newAnimal, ...animals]; newAnimal = ''}">Add Animal</button>
+      </div>
+
+      <!-- Advanced loop examples: array spread, different variable declarations -->
+      <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin: 2rem 0;">
+        <h2>Advanced Loop Patterns</h2>
+
+        <h3 style="font-size: 1rem; margin: 1rem 0 0.5rem; color: #374151;">Array Spread in Loop:</h3>
+        <div style="background-color: white; padding: 1rem; border-radius: 0.375rem; margin-bottom: 1.5rem;"><template x-for="animal in props.["🦄 unicorn", ...animals]">
+            <div style="padding: 0.25rem 0; color: #1f2937;"><span x-text="animal"></span></div></template>
+        </div>
+
+        <h3 style="font-size: 1rem; margin: 1rem 0 0.5rem; color: #374151;">Inline Array Iteration:</h3>
+        <div style="background-color: white; padding: 1rem; border-radius: 0.375rem;"><template x-for="word in props.["Waller", "loves Plenti", "uses AI", "is Australian"]">
+            <div style="padding: 0.25rem 0; color: #1f2937;">${props.name} <span x-text="word"></span></div></template><template x-for="phrase in props.["rocks", "codes", "innovates"]">
+            <div style="padding: 0.25rem 0; color: #1f2937; font-style: italic;">${props.name} <span x-text="phrase"></span>!</div></template>
+        </div>
+      </div>
+
+      <!-- Dynamic Todos Component Examples -->
+      <div style="margin: 2rem 0;">
+        <h2>Task List - First 5 Tasks</h2>
+
+        <h2 style="margin-top: 2rem;">Task List - Tasks 6-14</h2>
+      </div>
+
+
+      <!-- Interactive Notification Examples -->
+      <div style="margin: 2rem 0;">
+        <h2>Interactive Notification Examples</h2>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;"><template x-for="notif in props.notifications">
+            <button style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; background-color: #3b82f6; color: white;" :onclick="currentNotification = notif">
+              Show <span x-text="notif.type"></span>
+            </button></template>
+          <button style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; background-color: #6b7280; color: white;" onclick="{currentNotification = null}">
+            Clear
+          </button>
+        </div><template x-if="currentNotification"></template>
+      </div></template>
+    </div>
+  </main>
+</body>
+</html><style>
+  /* Content container for text-heavy pages */
+  .text-content-container {
+    max-width: 80rem;
+    margin: 0 auto;
+    /* padding: 10rem 2rem 2rem 2rem; */
+  }
+
+  /* Header styles */
+  .header {
+    background-color: #f8f9fa;
+    padding: 1rem 0;
+    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 2rem;
+  }
+
+  .header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2rem;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+  }
+
+  .brand svg {
+    height: 32px;
+    width: auto;
+  }
+
+  .nav {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .nav-item {
+    color: #495057;
+    text-decoration: none;
+  }
+
+  .nav-item:hover {
+    color: #228be6;
+  }
+
+  h1 {
+    color: orange;
+  }
+  #praise {
+    font-size: 2rem;
+    color: green;
+  }
+  .animals {
+    border-radius: 0.5rem;
+  }
+  .animals div {
+    margin: 0.5rem 0;
+  }
+
+  /* Role badge color classes */
+  .bg-red-100 {
+    background-color: #fee2e2;
+  }
+  .text-red-800 {
+    color: #991b1b;
+  }
+  .bg-purple-100 {
+    background-color: #f3e8ff;
+  }
+  .text-purple-800 {
+    color: #6b21a8;
+  }
+  .bg-blue-100 {
+    background-color: #dbeafe;
+  }
+  .text-blue-800 {
+    color: #1e40af;
+  }
+  .bg-green-100 {
+    background-color: #dcfce7;
+  }
+  .text-green-800 {
+    color: #166534;
+  }
+  .bg-gray-100 {
+    background-color: #f3f4f6;
+  }
+  .text-gray-800 {
+    color: #1f2937;
+  }
+
+  /* Role badge styling */
+  .profile-role {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  /* Button styling */
+  button {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    outline: none;
+  }
+
+  .animals button {
+    background-color: #dc2626;
+    color: white;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .animals button:hover {
+    background-color: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .animals button:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+
+  .animals > button {
+    background-color: #16a34a;
+    color: white;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+  }
+
+  .animals > button:hover {
+    background-color: #15803d;
+  }
+
+  .animals input {
+    padding: 0.5rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    margin-right: 0.5rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+  }
+
+  .animals input:focus {
+    border-color: #16a34a;
+  }
+
+  .animals h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: #1f2937;
+    font-size: 1.125rem;
+  }
+
+  /* Todos table styling */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  thead {
+    background-color: #f3f4f6;
+  }
+
+  th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #e5e7eb;
+    color: #1f2937;
+  }
+
+  tbody tr:hover {
+    background-color: #f9fafb;
+  }
+
+  h2 {
+    color: #1f2937;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    color: #374151;
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
 </style>`,
   'layouts_content_news_page_html': (props) => `<section id="blog-1144">
   <div class="cs-container">
@@ -1551,18 +2252,17 @@ const registry = {
     </div>
     <ul class="cs-card-group"><template x-for="post in props.allContent"><template x-if="post.type === \"news\"">
         <li class="cs-item">
-          <picture class="cs-picture" aria-hidden="true">
-            <img loading="lazy" decoding="async" :src="post.fields.blogImage.src" :alt="post.fields.blogImage.alt" :width="post.fields.blogImage.width" :height="post.fields.blogImage.height">
+          <picture class="cs-picture" aria-hidden="true"><template x-if="post.fields.blogImage">
+            <img loading="lazy" decoding="async" :src="post.fields.blogImage.src" :alt="post.fields.blogImage.alt" :width="post.fields.blogImage.width" :height="post.fields.blogImage.height"></template>
           </picture>
-          <div class="cs-flex">
-            <span class="cs-date"><span x-text="post.fields.publish.date"></span></span>
+          <div class="cs-flex"><template x-if="post.fields.publish?.date">
+            <span class="cs-date"><span x-text="post.fields.publish.date"></span></span></template>
             <h3 class="cs-h3">
-              <span x-text="post.fields.title"></span>
-            </h3><template x-if="post.fields.textItems">
-              <p class="cs-item-text">
-                <span x-text="post.fields.textItems[0].paragraph"></span>
-              </p></template><template x-else>
-              <p class="cs-item-text">No content available</p></template>
+              <span x-text="post.fields.title || 'Untitled'"></span>
+            </h3>
+            <p class="cs-item-text">
+              <span x-text="post.fields.excerpt"></span>
+            </p>
             <a :href="post.path" class="cs-link">
               Read post &rarr;
             </a>
@@ -1878,536 +2578,113 @@ const registry = {
   </div>
 </body>
 </html>`,
-  'layouts_global_head_html': (props) => `<head>
-	<meta charset="UTF-8"></meta>
-	<meta name="viewport" content="width=device-width, initial-scale=1.0"></meta>
-	<title>${props.title}</title>
-	<meta name="description" content="${props.description}"></meta>
-
-	<!-- Alpine.js - Global reactive framework (MUST load first) -->
-	<script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
-	<!-- Runtime Components - CONDITIONALLY INJECTED by server -->
-	<!-- Only pages that use runtime component resolution get these scripts -->
-	<!-- See: transformer.HasRuntimeComponents() -->
-
-	<!-- App Scripts -->
-	<script defer="" type="text/javascript" src="/scripts/script.js"></script>
-	<script defer="" type="text/javascript" src="/scripts/cms.js"></script>
-
-	<!-- App Styles -->
-	<link rel="stylesheet" href="/styles/style.css"></link>
-	<link rel="stylesheet" href="/styles/cms.css"></link>
-	  <link rel="preload" href="/static/fonts/roboto-v29-latin-regular.woff2 " as="font" type="font/woff2" crossorigin="">
-</head>`,
-  'layouts_components_jim_test_notifications_html': (props) => `<div style="margin: 2rem 0;">
-  <h2>Interactive Notification Examples</h2>
-  <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;"><template x-for="notif in props.notifications">
-      <button style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; background-color: #3b82f6; color: white;" :onclick="currentNotification = notif">
-        Show <span x-text="notif.type"></span>
-      </button></template>
-    <button style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; background-color: #6b7280; color: white;" onclick="{currentNotification = null}">
-      Clear
-    </button>
-  </div><template x-if="currentNotification"></template>
-</div><style>
-  h2 {
-    color: #1f2937;
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-  }
-
-  button {
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    font-weight: 500;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-    outline: none;
-  }
-
-  button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-
-  button:active {
-    transform: translateY(0);
-    box-shadow: none;
-  }
-</style>`,
-  'layouts_global_html_html': (props) => `<html lang="en">
-
-<!-- Global Head Component -->
-
-<body>
-	<!-- CMS Panel -->
-	<div id="plenti_cms"></div>
-	<button id="toggle_plenti_cms">Toggle CMS</button>
-
-	<!-- User Menu (conditional - if authenticated) -->
-	<!-- {#if user && $user.isAuthenticated}
-		<UserMenu user={user} content={content} shadowContent={shadowContent} />
-	{/if} -->
-
-	<!-- Login Modal (conditional) -->
-	<!-- <LoginModal /> -->
-
-	<main>
-		<!-- Global Navigation (position: fixed) -->
-
-		<!-- Content wrapper - sections handle their own nav clearance and spacing -->
-		<!-- Full-width sections (hero, services) use their own padding-top for nav clearance -->
-		<!-- Text-heavy pages can add their own container padding as needed -->
-		<div class="content-wrapper">
-			<!-- ============================================ -->
-			<!-- DYNAMIC CONTENT LAYOUT INJECTION             -->
-			<!-- This is where page-specific layouts render  -->
-			<!-- For pages â renders layouts/content/pages.html -->
-			<!-- For courses â renders layouts/content/courses.html -->
-			<!-- ============================================ -->
-
-			<!-- Dynamic layout component injection -->
-			<!-- In Svelte this is: <svelte:component this={layout} {...content.fields} /> -->
-			<!-- In our Go template engine, this is handled by the server -->
-			<!-- The server will inject the appropriate layout based on the route -->
-
-			<!-- Slot for dynamic content - replaced by server with specific layout -->
-			<!-- Pass content explicitly (Pages layout needs it for iteration) -->
-			<!-- allContent passed for layouts that need to list other content (e.g., news sidebar) -->
-			<!-- Pass BOTH components array AND spread fields for compatibility -->
-			<!-- - components array: for collection-type layouts (jim-test.html) -->
-			<!-- - spread fields: for single-type layouts (_index.html) -->
-			<!-- Newsletter Subscription (optional global component) -->
-			<!-- <Newsletter /> -->
-		</div>
-
-		<!-- Global Footer (full-width, outside content wrapper) -->
-	</main>
-
-</body>
-
-</html><style>
-  /* Content wrapper - centers and constrains content */
-/*   .content-wrapper {
-    max-width: 80rem;
-    margin: 0 auto;
-    padding: 10rem 2rem 2rem 2rem;
-  } */
-
-  /* Full-width sections break out of the container */
-  .content-wrapper > div > section,
-  .content-wrapper section[id^="hero"],
-  .content-wrapper section[id^="services"],
-  .content-wrapper section[id^="why"] {
-    width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    max-width: none;
-  }
-</style>`,
-  'layouts_content_store-test-minimal_html': (props) => `<html lang="en">
-<head>
-  <meta charset="UTF-8"></meta>
-  <title>${props.title}</title>
-  <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"></link>
-</head>
-<body style="padding: 2rem;">
-  <main class="container">
-    <h1 style="text-align: center; color: #2563eb;">${props.title}</h1>
-
-    <article>
-    <h2>✅ Test 1: Authentication Store</h2>
-    <p>Status: <span class="status"></span></p>
-    <p>User: <strong></strong></p>
-    <p>Email: <strong></strong></p>
-
-    <div style="margin-top: 1rem;">
-      <button @click="$store.auth.login()">Login</button>
-      <button @click="$store.auth.logout()">Logout</button>
-    </div>
-
-    <div class="info-box">
-      <strong>Try it:</strong> Click "Login" and watch the values update reactively!<br></br>
-      Store expressions: <code></code>, <code></code>
-    </div>
-  </div>
-
-  <div class="test-section">
-    <h2>🛒 Test 2: Shopping Cart Store</h2>
-    <p>Items in cart: <strong></strong></p>
-    <p>Total: <strong>$</strong></p>
-
-    <div style="margin-top: 1rem;">
-      <button @click="$store.cart.addItem('Widget', 9.99)">Add Widget ($9.99)</button>
-      <button @click="$store.cart.addItem('Gadget', 19.99)">Add Gadget ($19.99)</button>
-      <button @click="$store.cart.addItem('Doohickey', 29.99)">Add Doohickey ($29.99)</button>
-      <button @click="$store.cart.clear()" class="secondary">Clear Cart</button>
-    </div>
-
-    <div class="info-box">
-      <strong>Try it:</strong> Add items and watch the count and total update!<br></br>
-      Store expressions: <code></code>, <code></code>
-    </div>
-  </div>
-
-  <div class="test-section">
-    <h2>🎨 Test 3: Theme Store</h2>
-    <p>Current theme: <strong></strong></p>
-
-    <div style="margin-top: 1rem;">
-      <button @click="$store.theme.toggle()">Toggle Theme</button>
-    </div>
-
-    <div class="info-box">
-      <strong>Try it:</strong> Click to toggle between "light" and "dark"<br></br>
-      Store expression: <code></code>
-    </div>
-  </div>
-
-  div class="test-section">
-    <h2>🎉 Store System Features Working</h2>
-    <ul>
-      <li>✅ <strong>Inline store definitions</strong> in fence section</li>
-      <li>✅ <strong>Store expressions</strong> transform to Alpine.js syntax</li>
-      <li>✅ <strong>Store initialization</strong> via <code>Alpine.store()</code></li>
-      <li>✅ <strong>Reactive updates</strong> across the page</li>
-      <li>✅ <strong>Store methods</strong> callable from Alpine directives</li>
-      <li>✅ <strong>Nested properties</strong> like <code>$auth.user.name</code></li>
-    </ul>
-
-    <div class="info-box">
-      <strong>View Page Source</strong> to see:<br></br>
-      • Store initialization script in <code>&lt;head&gt;</code><br></br>
-      • Store expressions transformed to <code>&lt;span x-text="$store.X.Y"&gt;</code><br></br>
-      • Alpine.js event handlers with <code>@click="$store.X.method()"</code>
-      </div>
-    </article>
-  </main>
-</body>
-</html>`,
-  'layouts_components_ThemeToggle_html': (props) => `<div class="theme-toggle">
-  <span class="theme-label">Theme:</span>
-  <div class="toggle-buttons">
-    <button @click="$store.theme.setLight()" class="theme-btn" :class="{ active: $store.theme.mode === 'light' }">
-      ☀️ Light
-    </button>
-    <button @click="$store.theme.setDark()" class="theme-btn" :class="{ active: $store.theme.mode === 'dark' }">
-      🌙 Dark
-    </button>
-  </div>
-  <button @click="$store.theme.toggle()" class="toggle-btn" title="Toggle theme">
-    🔄
-  </button>
-</div><style>
-.theme-toggle {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-}
-
-.theme-label {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #374151;
-}
-
-.toggle-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.theme-btn {
-  border: 2px solid #e5e7eb;
-  background: white;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s;
-  color: #6b7280;
-}
-
-.theme-btn:hover {
-  border-color: #d1d5db;
-  background: #f9fafb;
-}
-
-.theme-btn.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #2563eb;
-  font-weight: 600;
-}
-
-.toggle-btn {
-  border: none;
-  background: #2563eb;
-  color: white;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-
-.toggle-btn:hover {
-  background: #1d4ed8;
-  transform: rotate(180deg);
-}
-</style>`,
-  'layouts_content_committee_page_html': (props) => `<section id="blog-1702">
-  <picture class="cs-background">
-    <img loading="lazy" decoding="async" src="/media/images/meeting-background.jpg" alt="committee meeting" width="522" height="609" aria-hidden="true">
-  </picture>
-  <div class="cs-container">
-    <div class="cs-news">
-      <div class="cs-content">
-        <span class="cs-topper">${props.subtitle}</span>
-        <h2 class="cs-title">${props.page_title}</h2>
-      </div>
-      <div class="cs-card-group"><template x-for="post in props.allContent"><template x-if="post.type === \"committee\"">
-          <div class="cs-item">
-            <span class="cs-date"><span x-text="post.fields.publish.date"></span></span>
-            <div class="cs-item-text">
-              <h3 class="cs-h3">
-                <span x-text="post.fields.title"></span>
-              </h3><template x-if="post.fields.textItems">
-                <p class="cs-desc">
-                  <span x-text="post.fields.textItems[0].paragraph"></span>
-                </p></template><template x-else>
-                <p class="cs-desc">No content available</p></template>
-              <a :href="post.path" class="cs-link">
-                <span class="cs-link-text">Read more &rarr;</span>
-              </a>
-            </div>
-          </div></template></template>
-      </div>
-    </div>
-  </div>
-</section><style>
-/*-- -------------------------- -->
-<---           Blog             -->
-<--- -------------------------- -*/
-/* Mobile - 360px */
-@media only screen and (min-width: 0rem) {
-  #blog-1702 {
-    padding: var(--sectionPadding);
-    position: relative;
-    z-index: 1;
-    background-color: #f7f7f7;
-    display: flex;
-    flex-direction: column;
-    padding-top: 9em;
-  }
-  #blog-1702 .cs-container {
-    width: 100%;
-    max-width: 100%;
-    margin: auto;
-    display: flex;
-    flex-direction: column;
-    order: 1;
-    padding: 0;
-  }
-  #blog-1702 .cs-news {
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    padding: 1rem 0;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(1rem, 4vw, 3rem);
-    align-items: center;
-  }
-  #blog-1702 .cs-content {
-    text-align: left;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  #blog-1702 .cs-title {
-    margin: 0;
-  }
-  #blog-1702 .cs-card-group {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-  }
-  #blog-1702 .cs-item {
-    display: flex;
-    flex-direction: column;
-    text-align: left;
-    list-style: none;
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    box-sizing: border-box;
-    background-color: #fff;
-    border: 1px solid #e8e8e8;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    grid-column: span 12;
-    position: relative;
-    overflow: hidden;
-    transition: box-shadow 0.3s, border-color 0.3s;
-  }
-  #blog-1702 .cs-date {
-    font-size: 0.9rem;
-    line-height: 1.2em;
-    font-weight: 700;
-    text-align: inherit;
-    margin: 0;
-    padding: 0.25rem 0.5rem;
-    box-sizing: border-box;
-    background-color: var(--primary);
-    color: var(--headerColor);
-    display: inline-block;
-    left: 1.5rem;
-    bottom: 100%;
-    z-index: 2;
-  }
-  #blog-1702 .cs-picture {
-    width: auto;
-    height: 11.4375rem;
-    display: block;
-  }
-  #blog-1702 .cs-picture img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  #blog-1702 .cs-item-text {
-    flex: 1 0 0;
+  'layouts_components_productcard_html': (props) => `<style>
+  .product-card {
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
     padding: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
   }
-  #blog-1702 .cs-h3 {
-    font-size: 1rem;
-    font-weight: 700;
-    line-height: 1.2em;
-    text-overflow: ellipsis;
-    margin: 0;
+  
+  .product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .product-card.featured {
+    border-color: #ffd43b;
+    background-color: #fff9db;
+  }
+  
+  .product-name {
+    font-size: 1.25rem;
+    font-weight: bold;
     margin-bottom: 0.5rem;
-    color: var(--headerColor);
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
   }
-  #blog-1702 .cs-desc {
-    font-size: 0.9rem;
-    line-height: 1.5em;
-    text-overflow: ellipsis;
-    margin: 0;
-    color: var(--bodyTextColor);
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+  
+  .product-price {
+    font-size: 1.5rem;
+    color: #495057;
+    margin-bottom: 0.5rem;
   }
-  #blog-1702 .cs-link {
-    font-size: 0.9rem;
-    font-weight: 700;
-    line-height: 1.2em;
-    text-align: inherit;
-    text-decoration: none;
-    margin-top: 0.5rem;
-    color: var(--primary);
+  
+  .product-status {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .in-stock {
+    background-color: #d3f9d8;
+    color: #2b8a3e;
+  }
+  
+  .out-of-stock {
+    background-color: #ffe3e3;
+    color: #c92a2a;
+  }
+  
+  .featured-badge {
+    display: inline-block;
+    background-color: #fff3bf;
+    color: #e67700;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 0.5rem;
+  }
+  
+  .product-tags {
     display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 0.625rem;
-    transition: color 0.3s;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
   }
-  #blog-1702 .cs-link:hover .cs-arrow {
-    transform: translateX(0.25rem);
+  
+  .product-tag {
+    background-color: #e9ecef;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
   }
-  #blog-1702 .cs-link-text {
-    width: fit-content;
-    display: block;
-  }
-  #blog-1702 .cs-arrow {
-    width: 1.25rem;
-    height: auto;
-    display: block;
-    transition: filter 0.3s, transform 0.3s;
-  }
-  #blog-1702 .cs-background {
+  
+  .add-to-cart {
     width: 100%;
-    display: block;
-    height: 38.5rem;
-    order: 2;
-    padding-top: 2em;
+    padding: 0.5rem;
+    background-color: #228be6;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    margin-top: 0.5rem;
+    cursor: pointer;
   }
-  #blog-1702 .cs-background img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  
+  .add-to-cart:hover {
+    background-color: #1c7ed6;
   }
-}
+  
+  .add-to-cart:disabled {
+    background-color: #adb5bd;
+    cursor: not-allowed;
+  }
+</style><div class="product-card ${props.featured ? 'featured' : ''}">
+  <div class="product-name">
+    ${props.name}<template x-if="featured">
+      <span class="featured-badge">Featured</span></template>
+  </div>
 
-/* Tablet - 768px */
-@media only screen and (min-width: 48rem) {
-  #blog-1702 {
-    padding: var(--sectionPadding);
-    display: block;
-    padding-top: 0em;
-  }
-  #blog-1702 .cs-container {
-    width: 80%;
-    padding: inherit;
-    justify-content: flex-start;
-    order: unset;
-    padding-top: 7em;
-  }
-  #blog-1702 .cs-title {
-    margin: 0;
-  }
-  #blog-1702 .cs-news {
-    width: 44vw;
-    max-width: 36.25rem;
-    margin: 0;
-    padding: 0;
-  }
-  #blog-1702 .cs-card-group {
-    gap: clamp(1rem, 3vw, 2rem);
-  }
-  #blog-1702 .cs-picture {
-    width: 11.25rem;
-    height: 11.25rem;
-  }
-  #blog-1702 .cs-background {
-    width: 30%;
-    height: auto;
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    order: unset;
-  }
-}
-
-/* Large Desktop - 1300px */
-@media only screen and (min-width: 81.25rem) {
-  #blog-1702 .cs-background {
-    width: 50vw;
-    left: 50%;
-    right: auto;
-    margin-left: 13.75rem;
-  }
-}
-</style>`,
+  <div class="product-price">$${props.price}</div><template x-if="inStock">
+    <div class="product-status in-stock">In Stock</div></template><template x-else>
+    <div class="product-status out-of-stock">Out of Stock</div></template><template x-if="tags && tags.length > 0">
+    <div class="product-tags"><template x-for="tag in props.tags">
+        <span class="product-tag"><span x-text="tag"></span></span></template>
+    </div></template><template x-if="inStock">
+    <button class="add-to-cart">Add to Cart</button></template><template x-else>
+    <button class="add-to-cart" disabled="">Sold Out</button></template>
+</div>`,
   'layouts_components_LoginStatus_html': (props) => `<div class="login-status"><template x-if="$auth.isLoggedIn">
     <div class="logged-in">
       <span class="user-info">
@@ -2477,408 +2754,79 @@ const registry = {
   background: #4b5563;
 }
 </style>`,
-  'layouts_components_jim_test_greeting_html': (props) => `<div class="text-content-container">
-  <h1>${props.salutation} ${props.name}!</h1>
+  'layouts_global_head_html': (props) => `<head>
+	<meta charset="UTF-8"></meta>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"></meta>
+	<title>${props.title}</title>
+	<meta name="description" content="${props.description}"></meta>
 
-  <!-- Basic conditionals --><template x-if="name.length > 3">
-    <div id="praise">${props.name} is a long name</div><template x-if="age > 1">
-      <div>Has been born</div></template></template><template x-else-if="name.length == 2">
-    <div id="praise">${props.name} is medium</div></template><template x-else>
-    <div id="praise">${props.name} is a short name</div></template>
-</div><style>
-  .text-content-container {
-    max-width: 80rem;
-    margin: 0 auto;
-    /* padding: 10rem 2rem 2rem 2rem; */
-  }
-  h1 {
-    color: orange;
-  }
-  #praise {
-    font-size: 2rem;
-    color: green;
-  }
-</style>`,
-  'layouts_components_userdashboard_html': (props) => `<style>
-  .dashboard {
-    background-color: white;
-    border-radius: 0.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-  }
-  
-  .dashboard-header {
-    background-color: #f8f9fa;
-    padding: 1.5rem;
-    border-bottom: 1px solid #e9ecef;
-  }
-  
-  .welcome-message {
-    font-size: 1.25rem;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-  }
-  
-  .dashboard-content {
-    padding: 1.5rem;
-  }
-  
-  .dashboard-sections {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1.5rem;
-  }
-  
-  .dashboard-section {
-    margin-bottom: 2rem;
-  }
-  
-  .section-title {
-    font-size: 1.125rem;
-    font-weight: bold;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #dee2e6;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .section-link {
-    font-size: 0.875rem;
-    color: #007bff;
-    text-decoration: none;
-  }
-  
-  .order-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  
-  .order-table th {
-    text-align: left;
-    padding: 0.75rem;
-    border-bottom: 1px solid #dee2e6;
-    font-weight: 600;
-    color: #495057;
-  }
-  
-  .order-table td {
-    padding: 0.75rem;
-    border-bottom: 1px solid #f1f3f5;
-  }
-  
-  .status-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 500;
-  }
-  
-  .wishlist-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #f1f3f5;
-  }
-  
-  .wishlist-name {
-    font-weight: 500;
-  }
-  
-  .wishlist-price {
-    color: #495057;
-  }
-  
-  .summary-card {
-    background-color: #f8f9fa;
-    border-radius: 0.375rem;
-    padding: 1rem;
-    margin-top: 1rem;
-  }
-  
-  .summary-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-  }
-  
-  .summary-label {
-    color: #6c757d;
-  }
-  
-  .summary-total {
-    font-size: 1.125rem;
-    font-weight: bold;
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid #dee2e6;
-    display: flex;
-    justify-content: space-between;
-  }
-  
-  .dashboard-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1rem;
-  }
-  
-  .dashboard-button {
-    padding: 0.5rem 1rem;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    cursor: pointer;
-  }
-  
-  .dashboard-button:hover {
-    background-color: #0069d9;
-  }
-  
-  .dashboard-button-outline {
-    background-color: transparent;
-    color: #007bff;
-    border: 1px solid #007bff;
-  }
-  
-  .dashboard-button-outline:hover {
-    background-color: #f1f8ff;
-  }
-</style><div class="dashboard">
-  <div class="dashboard-header">
-    <div class="welcome-message">Welcome back, ${props.user.name}!</div>
-    <div>${props.user.email}</div>
-  </div>
-  
-  <div class="dashboard-content">
-    <div class="dashboard-sections">
-      <div>
-        <div class="dashboard-section">
-          <div class="section-title">
-            <span>Your Recent Orders</span>
-            <a href="#" class="section-link">View All Orders</a>
-          </div><template x-if="user.orders && user.orders.length > 0">
-            <table class="order-table">
-              <thead>
-                <tr>
-                  <th>Order ID</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody><template x-for="order in props.user.orders">
-                  <tr>
-                    <td><span x-text="order.id "></span></td>
-                    <td><span x-text="formatDate(order.date)"></span></td>
-                    <td>
-                      <span :class="getStatusColor(order.status) ">
-                        <span x-text="order.status "></span>
-                      </span>
-                    </td>
-                    <td><span x-text="formatCurrency(order.total)"></span></td>
-                  </tr></template>
-              </tbody>
-            </table>
-            
-            <div class="summary-card">
-              <div class="summary-row">
-                <span class="summary-label">Total Orders</span>
-                <span>${props.user.orders.length}</span>
-              </div>
-              <div class="summary-total">
-                <span>Total Spent</span>
-                <span>${props.formatCurrency(props.totalOrdersValue)}</span>
-              </div>
-            </div></template><template x-else>
-            <p>You haven't placed any orders yet.</p></template>
-        </div>
-        
-        <div class="dashboard-actions">
-          <button class="dashboard-button">View All Orders</button>
-          <button class="dashboard-button dashboard-button-outline">Track an Order</button>
-        </div>
-      </div>
-      
-      <div>
-        <div class="dashboard-section">
-          <div class="section-title">
-            <span>Your Wishlist</span>
-            <a href="#" class="section-link">View All</a>
-          </div><template x-if="user.wishlist && user.wishlist.length > 0">
-            <div><template x-for="item in props.user.wishlist">
-                <div class="wishlist-item">
-                  <div class="wishlist-name"><span x-text="item.name"></span></div>
-                  <div class="wishlist-price"><span x-text="formatCurrency(item.price)"></span></div>
-                </div></template>
-            </div></template><template x-else>
-            <p>Your wishlist is empty.</p></template>
-        </div>
-        
-        <div class="dashboard-section">
-          <div class="section-title">Account Settings</div>
-          <div>
-            <button class="dashboard-button dashboard-button-outline" style="width: 100%; margin-bottom: 0.5rem;">
-              Edit Profile
-            </button>
-            <button class="dashboard-button dashboard-button-outline" style="width: 100%; margin-bottom: 0.5rem;">
-              Change Password
-            </button>
-            <button class="dashboard-button dashboard-button-outline" style="width: 100%;">
-              Manage Payment Methods
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>`,
-  'layouts_content_pages_html': (props) => `<div class="page-content-container"><template x-for="component in props.content.components"></template>
-</div><style>
-  /* Container for page content - centers and constrains text-heavy pages */
-  .page-content-container {
-    max-width: 80rem;
-    margin: 0 auto;
-    padding: 10rem 2rem 2rem 2rem;
-  }
+	<!-- Alpine.js - Global reactive framework (MUST load first) -->
+	<script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-  /* Full-width sections break out of the container */
-  .page-content-container > section {
-    width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    padding-left: 0;
-    padding-right: 0;
-  }
-</style>`,
-  'layouts_components_footer-old_html': (props) => `<style>
-  .footer {
-    background-color: #f8f9fa;
-    padding: 2rem 0;
-    margin-top: 3rem;
-    border-top: 1px solid #e9ecef;
-  }
-  
-  .footer-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1rem;
-  }
-  
-  .footer-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
-    gap: 2rem;
-  }
-  
-  .footer-brand {
+	<!-- Runtime Components - CONDITIONALLY INJECTED by server -->
+	<!-- Only pages that use runtime component resolution get these scripts -->
+	<!-- See: transformer.HasRuntimeComponents() -->
+
+	<!-- App Scripts -->
+	<script defer="" type="text/javascript" src="/scripts/script.js"></script>
+	<script defer="" type="text/javascript" src="/scripts/cms.js?v=3"></script>
+
+	<!-- App Styles -->
+	<link rel="stylesheet" href="/styles/style.css"></link>
+	<link rel="stylesheet" href="/styles/cms.css"></link>
+	  <link rel="preload" href="/static/fonts/roboto-v29-latin-regular.woff2 " as="font" type="font/woff2" crossorigin="">
+</head>`,
+  'layouts_components_jim_test_user_profiles_html': (props) => `<div style="margin: 2rem 0;">
+  <h2>User Profile Examples with Object Props</h2>
+</div><style>
+  h2 {
+    color: #1f2937;
     font-size: 1.5rem;
-    font-weight: bold;
-    margin-bottom: 1rem;
-  }
-  
-  .footer-description {
-    color: #6c757d;
-    margin-bottom: 1.5rem;
-  }
-  
-  .footer-heading {
-    font-size: 1.25rem;
-    font-weight: bold;
-    margin-bottom: 1rem;
-  }
-  
-  .footer-links {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  .footer-link {
     margin-bottom: 0.5rem;
+    font-weight: 600;
   }
-  
-  .footer-link a {
-    color: #495057;
-    text-decoration: none;
+
+  /* Role badge color classes */
+  .bg-red-100 {
+    background-color: #fee2e2;
   }
-  
-  .footer-link a:hover {
-    color: #228be6;
-    text-decoration: underline;
+  .text-red-800 {
+    color: #991b1b;
   }
-  
-  .social-links {
-    display: flex;
-    gap: 0.75rem;
+  .bg-purple-100 {
+    background-color: #f3e8ff;
   }
-  
-  .social-link {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    background-color: #e9ecef;
-    border-radius: 50%;
-    text-decoration: none;
-    transition: background-color 0.2s;
+  .text-purple-800 {
+    color: #6b21a8;
   }
-  
-  .social-link:hover {
-    background-color: #dee2e6;
+  .bg-blue-100 {
+    background-color: #dbeafe;
   }
-  
-  .copyright {
-    text-align: center;
-    margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid #e9ecef;
-    color: #6c757d;
+  .text-blue-800 {
+    color: #1e40af;
   }
-</style><footer class="footer">
-  <div class="footer-container">
-    <div class="footer-grid">
-      <div>
-        <div class="footer-brand">${props.companyName}</div>
-        <p class="footer-description">
-          Our custom template engine makes building reactive web applications simple and efficient.
-          We focus on developer experience without sacrificing performance.
-        </p>
-        <div class="social-links"><template x-for="social in props.socialLinks">
-            <a :href="social.url" class="social-link" :title="social.label">
-              <span x-text="social.icon "></span>
-            </a></template>
-        </div>
-      </div>
-      
-      <div>
-        <h3 class="footer-heading">Quick Links</h3>
-        <ul class="footer-links"><template x-for="(link, index) in props.links.slice(0, 3)">
-            <li class="footer-link">
-              <a :href="link.url"><span x-text="link.label"></span></a>
-            </li></template>
-        </ul>
-      </div>
-      
-      <div>
-        <h3 class="footer-heading">Resources</h3>
-        <ul class="footer-links"><template x-for="(link, index) in props.links.slice(3)">
-            <li class="footer-link">
-              <a :href="link.url"><span x-text="link.label"></span></a>
-            </li></template>
-        </ul>
-      </div>
-    </div>
-    
-    <div class="copyright">
-      &copy; ${props.year} ${props.companyName}. All rights reserved.
-    </div>
-  </div>
-</footer>`,
+  .bg-green-100 {
+    background-color: #dcfce7;
+  }
+  .text-green-800 {
+    color: #166534;
+  }
+  .bg-gray-100 {
+    background-color: #f3f4f6;
+  }
+  .text-gray-800 {
+    color: #1f2937;
+  }
+
+  /* Role badge styling */
+  .profile-role {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+</style>`,
   'layouts_components_headerlogo_html': (props) => `<style>
   .header {
     background-color: #f8f9fa;
@@ -2948,671 +2896,65 @@ const registry = {
     </nav>
   </div>
 </header>`,
-  'layouts_content_store-demo_html': (props) => `<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Store System - Component Demo</title>
-    <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  </head>
-  <!--
-    CONTEXT EXAMPLE 1: Dynamic Styling (:style with Template Literals)
-    - Context: Alpine directive with JavaScript template literal
-    - Syntax: MUST use $store.* (full Alpine syntax)
-    - Why: Inside backticks, this is raw JavaScript - no transformation
-    - Rule: :style="\`...\${$store.name.prop}...\`"
-  -->
-  <body :style="\`background-color: $${$store.theme.getCurrentColors().background}; color: $${$store.theme.getCurrentColors().text}; --code-bg: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#5a7ec5'}; transition: all 0.3s ease;\`">
-    <div class="container">
-      <!--
-        CONTEXT EXAMPLE 2: Dynamic Styling (:style with Method Calls)
-        - Context: Alpine :style directive
-        - Syntax: $store.* with method calls
-        - Why: Calling store methods in Alpine binding
-        - Rule: :style="\`...\${$store.name.method()}...\`"
-      -->
-      <h1 :style="\`color: $${$store.theme.getCurrentColors().text};\`">
-        Global Store System - Component Demo
-      </h1>
-      <!--
-        CONTEXT EXAMPLE 3: Dynamic Styling (:style with Secondary Color)
-        - Context: Alpine :style directive
-        - Syntax: $store.* accessing nested property
-        - Rule: Can access deeply nested properties in template literals
-      -->
-      <p class="subtitle" :style="\`color: $${$store.theme.getCurrentColors().secondary};\`">
-        Reusable components demonstrating the Global Store System
-      </p>
-
-      <!-- Header with Store Components -->
-      <!--
-        CONTEXT EXAMPLE 4: Dynamic Styling with Ternary Operators
-        - Context: :style directive with conditional logic
-        - Syntax: $store.* with JavaScript ternary operator
-        - Why: Ternary operators are JavaScript expressions
-        - Rule: :style="\`...\${$store.name.prop === 'value' ? 'a' : 'b'}...\`"
-      -->
-      <div class="header" :style="\`background: $${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-      </div>
-
-      <!-- Interactive Demo Section -->
-      <div class="demo-section" :style="\`background: $${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-        <h2>🧪 Try the Interactive Demo</h2>
-        <p>
-          These buttons modify the stores, and all components above update
-          automatically:
-        </p>
-
-        <!-- Auth Actions -->
-        <div class="action-group" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-          <h3>Authentication Actions</h3>
-          <!--
-            CONTEXT EXAMPLE 5: Event Handlers (@click)
-            - Context: Alpine event handler directive
-            - Syntax: MUST use $store.* (full Alpine syntax)
-            - Why: @ directives execute JavaScript directly
-            - Rule: @click="$store.name.method()"
-            - Note: NO curly braces {} needed in @ directives
-          -->
-          <button @click="$store.auth.login()" class="btn btn-primary">
-            Login as Test User
-          </button>
-          <button @click="$store.auth.logout()" class="btn btn-secondary">
-            Logout
-          </button>
-        </div>
-
-        <!-- Cart Actions -->
-        <div class="action-group" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-          <h3>Shopping Cart Actions</h3>
-          <!--
-            CONTEXT EXAMPLE 6: Event Handlers with Method Arguments
-            - Context: @click with method calls passing objects
-            - Syntax: $store.* with method arguments
-            - Rule: @click="$store.name.method({ key: value })"
-            - Note: Can pass complex objects as arguments
-          -->
-          <button @click="$store.cart.addItem({ name: 'Widget', price: 9.99 })" class="btn btn-success">
-            Add Widget ($9.99)
-          </button>
-          <button @click="$store.cart.addItem({ name: 'Gadget', price: 19.99 })" class="btn btn-success">
-            Add Gadget ($19.99)
-          </button>
-          <button @click="$store.cart.addItem({ name: 'Doohickey', price: 29.99 })" class="btn btn-success">
-            Add Doohickey ($29.99)
-          </button>
-          <button @click="$store.cart.clear()" class="btn btn-danger">
-            Clear Cart
-          </button>
-        </div>
-
-        <!-- Theme Actions -->
-        <div class="action-group" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-          <h3>Theme Actions</h3>
-          <p class="note">
-            The ThemeToggle component above provides its own buttons, but you
-            can also control the theme from anywhere in your app:
-          </p>
-          <!--
-            CONTEXT EXAMPLE 18: Multiple Event Handlers (Different Methods)
-            - Context: Multiple buttons with different store method calls
-            - Demonstrates: Each button can call different store methods
-            - Rule: @click="$store.name.method()" for each button
-          -->
-          <button @click="$store.theme.setLight()" class="btn btn-light">
-            Set Light Mode
-          </button>
-          <button @click="$store.theme.setDark()" class="btn btn-dark">
-            Set Dark Mode
-          </button>
-          <div style="
-              margin-top: 1rem;
-              padding: 1rem;
-              background: rgba(59, 130, 246, 0.1);
-              border-radius: 6px;
-              border-left: 4px solid #3b82f6;
-            ">
-            <strong>Visual Feedback Test:</strong>
-            <p style="margin-top: 0.5rem; font-size: 0.95rem">
-              Click the theme buttons above and watch the entire page change
-              <!--
-                CONTEXT EXAMPLE 7: x-text Directive
-                - Context: Alpine x-text directive (displays reactive text)
-                - Syntax: MUST use $store.* (full Alpine syntax)
-                - Why: x-text is an Alpine directive, expects JavaScript
-                - Rule: <tag x-text="$store.name.prop"></tag>
-                - Note: NO curly braces {} needed in x-text
-              -->
-              colors! Current mode: <strong x-text="$store.theme.mode"></strong>
-            </p>
-          </div>
-
-          <!-- Additional Alpine Directive Examples -->
-          <div style="margin-top: 1rem; padding: 1rem; background: rgba(251, 146, 60, 0.1); border-radius: 6px; border-left: 4px solid #f97316;">
-            <!--
-              CONTEXT EXAMPLE 19: x-show Directive (Conditional Display)
-              - Context: Alpine x-show directive (shows/hides element)
-              - Syntax: x-show="$store.name.prop"
-              - Why: x-show is an Alpine directive, expects JavaScript
-              - Rule: Element stays in DOM, visibility toggles
-              - Note: Different from x-if (which removes from DOM)
-            -->
-            <div x-show="$store.theme.mode === 'dark'">
-              <strong>🌙 Dark Mode Activated!</strong>
-              <p style="margin-top: 0.5rem; font-size: 0.9rem;">This message only shows in dark mode (using x-show)</p>
-            </div>
-            <div x-show="$store.theme.mode === 'light'">
-              <strong>☀️ Light Mode Activated!</strong>
-              <p style="margin-top: 0.5rem; font-size: 0.9rem;">This message only shows in light mode (using x-show)</p>
-            </div>
-          </div>
-
-          <div style="margin-top: 1rem; padding: 1rem; background: rgba(139, 92, 246, 0.1); border-radius: 6px; border-left: 4px solid #8b5cf6;">
-            <!--
-              CONTEXT EXAMPLE 20: x-bind:class (Dynamic Classes)
-              - Context: Alpine x-bind:class directive (or shorthand :class)
-              - Syntax: :class="$store.name.prop"
-              - Why: Reactive class binding
-              - Rule: Can bind single class or object of classes
-              - Note: :class is shorthand for x-bind:class
-            -->
-            <p style="margin-bottom: 0.5rem;">
-              <strong>Dynamic Class Example:</strong>
-            </p>
-            <div :class="$store.theme.mode" style="padding: 0.75rem; border-radius: 4px; font-weight: 500;">
-              This div has a dynamic class: "<span x-text="$store.theme.mode"></span>"
-            </div>
-            <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #6b7280;">
-              Try toggling the theme to see the class change!
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Store State Display -->
-      <div class="state-section" :style="\`background: $${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-        <h2>📊 Current Store State</h2>
-        <p>Real-time view of the store data:</p>
-
-        <div class="state-grid">
-          <!-- Auth Store State -->
-          <div class="state-card store-card-hover" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-            <h3>🔐 Auth Store</h3>
-            <!--
-              CONTEXT EXAMPLE 8: Template Conditionals ({if})
-              - Context: Template directive (custom syntax)
-              - Syntax: CAN use {$name.prop} shorthand
-              - Why: Template syntax gets transformed by engine
-              - Rule: {if $name.prop} content {/if}
-              - Transforms to: <template x-if="$store.name.prop">
-            --><template x-if="$auth.isLoggedIn">
-            <!--
-              CONTEXT EXAMPLE 9: Text Content in Curly Braces
-              - Context: Text content (not an attribute or directive)
-              - Syntax: CAN use {$name.prop} shorthand
-              - Why: Template syntax, gets wrapped in <span x-text>
-              - Rule: {$name.prop}
-              - Transforms to: <span x-text="$store.name.prop"></span>
-            -->
-            <p><strong>Status:</strong> ✅ Logged In</p>
-            <p><strong>User:</strong> </p>
-            <p><strong>Email:</strong> </p></template><template x-else>
-            <p><strong>Status:</strong> ❌ Logged Out</p>
-            <p><em>Please log in to access your account</em></p></template>
-            <small style="color: #6b7280">💡 Hover to see store object</small>
-            <div class="tech-details">
-              <!--
-                CONTEXT EXAMPLE 10: x-text with Ternary Operator
-                - Context: x-text directive with conditional expression
-                - Syntax: $store.* with JavaScript ternary
-                - Rule: x-text="$store.name.prop ? value : other"
-                - Note: This is JavaScript, not template syntax
-              -->
-              <pre class="state-display">isLoggedIn: <span x-text="$store.auth.isLoggedIn" style="color: #10b981;"></span>
-user: <span x-text="$store.auth.user ? $store.auth.user.name : 'null'" style="color: #10b981;"></span></pre>
-            </div>
-          </div>
-
-          <!-- Cart Store State -->
-          <div class="state-card store-card-hover" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-            <h3>🛒 Cart Store</h3>
-            <!--
-              CONTEXT EXAMPLE 11: Conditional with Property Access
-              - Context: {if} directive accessing array length
-              - Syntax: {$name.prop.length > 0}
-              - Why: Template conditional, gets transformed
-              - Transforms to: <template x-if="$store.name.prop.length > 0">
-            --><template x-if="$cart.items.length > 0">
-            <!--
-              CONTEXT EXAMPLE 12: Text Content with Computed Property
-              - Context: Text content using store getter
-              - Syntax: {$name.computedProperty}
-              - Why: Getters are accessed like regular properties
-              - Note: formattedTotal is a getter in the cart store
-            -->
-            <p><strong>Items:</strong> </p>
-            <p><strong>Total:</strong> $</p>
-            <div class="cart-items-list">
-              <strong>Cart Contents:</strong>
-              <ul>
-                <!--
-                  CONTEXT EXAMPLE 13: Template Loops ({for})
-                  - Context: Template loop directive
-                  - Syntax: {for item in $name.collection}
-                  - Why: Template syntax, gets transformed
-                  - Transforms to: <template x-for="item in $store.name.collection">
-                  - Note: Loop variable (item) is available in loop body
-                --><template x-for="item in props.$cart.items">
-                <!--
-                  CONTEXT EXAMPLE 14: Loop Variable Access (Build-Time Expansion)
-                  - Context: Text content inside loop
-                  - Syntax: {item.prop} (no $ because item is loop variable)
-                  - Why: Loop variable, not a store
-                  - Note: If $cart.items is resolvable, loop expands at build-time
-                -->
-                <li><span x-text="item.name"></span> - $<span x-text="item.price"></span></li></template>
-              </ul>
-            </div></template><template x-else>
-            <p><strong>Items:</strong> 0</p>
-            <p><strong>Total:</strong> $0.00</p>
-            <p><em>Cart is empty</em></p></template>
-            <small style="color: #6b7280">💡 Hover to see store object</small>
-            <div class="tech-details">
-              <!--
-                CONTEXT EXAMPLE 15: x-text with String Concatenation
-                - Context: x-text with JavaScript string concatenation
-                - Syntax: x-text="'string' + $store.name.prop + 'string'"
-                - Why: JavaScript expression, can use + operator
-                - Rule: Use $store.* when concatenating strings
-              -->
-              <pre class="state-display">items: <span x-text="'[' + $store.cart.items.length + ' items]'" style="color: #10b981;"></span>
-total: $<span x-text="$store.cart.formattedTotal" style="color: #10b981;"></span></pre>
-            </div>
-          </div>
-
-          <!-- Theme Store State -->
-          <div class="state-card store-card-hover" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-            <h3>🎨 Theme Store</h3>
-            <!--
-              CONTEXT EXAMPLE 16: Conditional with Equality Comparison
-              - Context: {if} with equality operator
-              - Syntax: {if $name.prop === 'value'}
-              - Why: Template conditional with comparison
-              - Transforms to: <template x-if="$store.name.prop === 'value'">
-              - Note: Evaluated at build-time when possible
-            --><template x-if="$theme.mode === 'light'">
-            <p><strong>Mode:</strong> ☀️ Light</p></template><template x-else>
-            <p><strong>Mode:</strong> 🌙 Dark</p></template>
-            <!--
-              CONTEXT EXAMPLE 17: x-text with Method Call Result
-              - Context: x-text displaying result of store method
-              - Syntax: x-text="$store.name.method().property"
-              - Why: Calling store method, accessing property of result
-              - Note: getCurrentColors() returns an object, we access its props
-            -->
-            <p>
-              <strong>Background:</strong>
-              <span x-text="$store.theme.getCurrentColors().background"></span>
-            </p>
-            <p>
-              <strong>Text Color:</strong>
-              <span x-text="$store.theme.getCurrentColors().text"></span>
-            </p>
-            <small style="color: #6b7280">💡 Hover to see store object</small>
-            <div class="tech-details">
-              <pre class="state-display">mode: "<span x-text="$store.theme.mode" style="color: #10b981;"></span>"
-background: "<span x-text="$store.theme.getCurrentColors().background" style="color: #10b981;"></span>"
-text: "<span x-text="$store.theme.getCurrentColors().text" style="color: #10b981;"></span>"</pre>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Documentation Section -->
-      <div class="docs-section" :style="\`background: $${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-        <h2>📚 How It Works</h2>
-
-        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-          <h3>1. Store Files</h3>
-          <p>Stores are defined in <code>stores/</code> directory:</p>
-          <ul>
-            <li><code>stores/auth.js</code> - Authentication state</li>
-            <li><code>stores/cart.js</code> - Shopping cart state</li>
-            <li><code>stores/theme.js</code> - Theme preferences</li>
-          </ul>
-        </div>
-
-        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-          <h3>2. Components Reference Stores</h3>
-          <p>
-            Components declare which stores they use in their fence section:
-          </p>
-          <pre class="code-display">
----
-import store from './stores/auth.js'
----
-
-<template x-if="$auth.isLoggedIn">
-  Welcome, !</template></pre>
-        </div>
-
-        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-          <h3>3. Automatic Reactivity</h3>
-          <p>When any component modifies a store:</p>
-          <ol>
-            <li>Alpine.js detects the change</li>
-            <li>All components using that store automatically update</li>
-            <li>No manual event handling needed!</li>
-          </ol>
-        </div>
-
-        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
-          <h3>4. Global Scope</h3>
-          <p>Access stores anywhere with <code>$store.storeName</code>:</p>
-          <ul>
-            <li><code>@click="$store.auth.login()"</code> - Call methods</li>
-            <li><code></code> - Read properties</li>
-            <li>
-              <code>{if $cart.items.length > 0}</code> - Use in conditionals
-            </li>
-            <li><code>{for item in $cart.items}</code> - Iterate arrays</li>
-          </ul>
-        </div>
-
-        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'}; border-left: 4px solid #10b981;\`">
-          <h3 style="color: #10b981">5. Theme Reactivity</h3>
-          <p>
-            Notice how all elements on this page use
-            <code>:style</code> bindings:
-          </p>
-          <pre class="code-display">
-:style="&#96;background: &#36;&#123;&#36;store.theme.getCurrentColors().background&#125;;
-         color: &#36;&#123;&#36;store.theme.getCurrentColors().text&#125;;&#96;"</pre>
-          <p style="margin-top: 0.5rem">
-            This makes the entire page reactive to theme changes!
-          </p>
-        </div>
-      </div>
-    </div>
-  </body>
-</html><style>
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-      Ubuntu, Cantarell, sans-serif;
-    line-height: 1.6;
-    padding: 2rem;
-  }
-
-  .container {
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-
-  h1 {
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .subtitle {
-    font-size: 1.1rem;
-    margin-bottom: 2rem;
-  }
-
+  'layouts_components_jim_test_notifications_html': (props) => `<div style="margin: 2rem 0;">
+  <h2>Interactive Notification Examples</h2>
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;"><template x-for="notif in props.notifications">
+      <button style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; background-color: #3b82f6; color: white;" :onclick="currentNotification = notif">
+        Show <span x-text="notif.type"></span>
+      </button></template>
+    <button style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; background-color: #6b7280; color: white;" onclick="{currentNotification = null}">
+      Clear
+    </button>
+  </div><template x-if="currentNotification"></template>
+</div><style>
   h2 {
-    font-size: 1.75rem;
-    margin: 2rem 0 1rem;
+    color: #1f2937;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
   }
 
-  h3 {
-    font-size: 1.25rem;
-    margin-bottom: 0.75rem;
-  }
-
-  /* Header with components */
-  .header {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: 3rem;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border: 1px solid;
-    transition: all 0.3s ease;
-  }
-
-  /* Demo Section */
-  .demo-section {
-    padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    margin-bottom: 2rem;
-    border: 1px solid;
-    transition: all 0.3s ease;
-  }
-
-  .action-group {
-    margin: 1.5rem 0;
-    padding: 1.5rem;
-    border-radius: 8px;
-    border: 1px solid;
-    transition: all 0.3s ease;
-  }
-
-  .action-group h3 {
-    margin-bottom: 1rem;
-  }
-
-  .note {
-    font-size: 0.9rem;
-    color: #6b7280;
-    margin-bottom: 1rem;
-    font-style: italic;
-  }
-
-  /* Buttons */
-  .btn {
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.95rem;
+  button {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
     font-weight: 500;
-    transition: all 0.2s;
-    margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    outline: none;
   }
 
-  .btn-primary {
-    background: #2563eb;
-    color: white;
+  button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
-  .btn-primary:hover {
-    background: #1d4ed8;
-  }
-
-  .btn-secondary {
-    background: #6b7280;
-    color: white;
-  }
-
-  .btn-secondary:hover {
-    background: #4b5563;
-  }
-
-  .btn-success {
-    background: #059669;
-    color: white;
-  }
-
-  .btn-success:hover {
-    background: #047857;
-  }
-
-  .btn-danger {
-    background: #dc2626;
-    color: white;
-  }
-
-  .btn-danger:hover {
-    background: #b91c1c;
-  }
-
-  .btn-light {
-    background: #f3f4f6;
-    color: #374151;
-    border: 1px solid #d1d5db;
-  }
-
-  .btn-light:hover {
-    background: #e5e7eb;
-  }
-
-  .btn-dark {
-    background: #1f2937;
-    color: white;
-  }
-
-  .btn-dark:hover {
-    background: #111827;
-  }
-
-  /* State Section */
-  .state-section {
-    padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    margin-bottom: 2rem;
-    border: 1px solid;
-    transition: all 0.3s ease;
-  }
-
-  .state-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-  }
-
-  .state-card {
-    padding: 1.5rem;
-    border-radius: 8px;
-    border: 1px solid;
-    transition: all 0.3s ease;
-  }
-
-  .state-card h3 {
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
-  }
-
-  .state-display {
-    background: #1f2937;
-    color: #10b981;
-    padding: 1rem;
-    border-radius: 6px;
-    font-family: "Courier New", monospace;
-    font-size: 0.9rem;
-    overflow-x: auto;
-  }
-
-  /* Hover state for technical details */
-  .tech-details {
-    margin-top: 1rem;
-    opacity: 0;
-    max-height: 0;
-    overflow: hidden;
-    transition: opacity 0.3s ease, max-height 0.3s ease;
-  }
-
-  .store-card-hover:hover .tech-details {
-    opacity: 1;
-    max-height: 200px;
-  }
-
-  .tech-details small {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-style: italic;
-  }
-
-  .cart-items-list {
-    font-size: 0.9rem;
-    margin-top: 1rem;
-  }
-
-  .cart-items-list ul {
-    margin-top: 0.5rem;
-    padding-left: 1.5rem;
-  }
-
-  .cart-items-list li {
-    margin-bottom: 0.25rem;
-  }
-
-  /* Documentation Section */
-  .docs-section {
-    padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border: 1px solid;
-    transition: all 0.3s ease;
-  }
-
-  .doc-card {
-    margin: 1.5rem 0;
-    padding: 1.5rem;
-    border-radius: 8px;
-    border-left: 4px solid #2563eb;
-    border: 1px solid;
-    transition: all 0.3s ease;
-  }
-
-  .doc-card h3 {
-    margin-bottom: 0.75rem;
-    color: #2563eb;
-  }
-
-  .doc-card p {
-    margin-bottom: 0.75rem;
-  }
-
-  .doc-card ul,
-  .doc-card ol {
-    margin-left: 1.5rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .doc-card li {
-    margin-bottom: 0.5rem;
-  }
-
-  .code-display {
-    background: #1f2937;
-    color: #10b981;
-    padding: 1rem;
-    border-radius: 6px;
-    font-family: "Courier New", monospace;
-    font-size: 0.85rem;
-    overflow-x: auto;
-    margin-top: 0.5rem;
-  }
-
-  code {
-    background: var(--code-bg);
-    padding: 0.2rem 0.4rem;
-    border-radius: 3px;
-    font-family: "Courier New", monospace;
-    font-size: 0.9em;
+  button:active {
+    transform: translateY(0);
+    box-shadow: none;
   }
 </style>`,
+  'layouts_components_todos_html': (props) => `<table class="todos-table">
+  <thead>
+    <tr>
+      <th style="width: 40px; text-align: center;">#</th>
+      <th>Task</th>
+      <th style="width: 120px; text-align: center;">Status</th>
+    </tr>
+  </thead>
+  <tbody><template x-for="(todo, index) in props.todos.slice(start, start + number)">
+      <tr>
+        <td style="text-align: center; color: #6b7280; font-weight: 500;"><span x-text="(start * 1) + index + 1"></span></td>
+        <td :style="todo.completed ? 'text-decoration: line-through; color: #9ca3af;' : ''"><span x-text="todo.title"></span></td>
+        <td style="text-align: center;">
+          <span :style="todo.completed ? 'color: #16a34a; font-weight: 600;' : 'color: #dc2626; font-weight: 600;'">
+            <span x-text="todo.completed ? '✓ Done' : '○ Pending'"></span>
+          </span>
+        </td>
+      </tr></template>
+  </tbody>
+</table>`,
   'layouts_global_nav_html': (props) => `<!-- ============================================ --><!--                 Navigation                   --><!-- ============================================ --><header id="cs-navigation" :class="{'cs-active': mobileMenuOpen}">
     <div class="cs-container">
         <div class="cs-top">
@@ -4337,6 +3679,681 @@ import store from './stores/auth.js'
   }
 }
 </style>`,
+  'layouts_components_userprofile_html': (props) => `<style>
+  .profile-card {
+    border-radius: 0.5rem;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+
+  .profile-compact {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+  }
+
+  .profile-header {
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile-avatar {
+    width: 5rem;
+    height: 5rem;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #495057;
+    margin-bottom: 1rem;
+  }
+
+  .profile-avatar-small {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    color: #495057;
+    margin-right: 0.75rem;
+  }
+
+  .profile-name {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+
+  .profile-name-compact {
+    font-size: 1rem;
+    font-weight: bold;
+  }
+
+  .profile-role {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: medium;
+  }
+
+  .profile-details {
+    padding: 1.5rem;
+  }
+
+  .profile-detail {
+    margin-bottom: 0.75rem;
+  }
+
+  .profile-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+  }
+
+  .profile-value {
+    font-size: 1rem;
+  }
+</style><template x-if="compact">
+  <div class="profile-card profile-compact">
+    <div class="profile-avatar-small"><template x-if="user.avatar">
+        <img src="${props.user.avatar}" alt="${props.user.name}"></template><template x-else-if="user.name">
+        ${props.user.name.charAt(0)}</template><template x-else>
+        U</template>
+    </div>
+    <div>
+      <div class="profile-name-compact">${props.user.name}</div><template x-if="showRole">
+        <span class="profile-role ${props.roleBadge.bg} ${props.roleBadge.text}">
+          ${props.user.role}
+        </span></template>
+    </div>
+  </div></template><template x-else>
+  <div class="profile-card">
+    <div class="profile-header">
+      <div class="profile-avatar"><template x-if="user.avatar">
+          <img src="${props.user.avatar}" alt="${props.user.name}"></template><template x-else-if="user.name">
+          ${props.user.name.charAt(0)}</template><template x-else>
+          U</template>
+      </div>
+      <h2 class="profile-name">${props.user.name}</h2><template x-if="showRole">
+        <span class="profile-role ${props.roleBadge.bg} ${props.roleBadge.text}">
+          ${props.user.role}
+        </span></template>
+    </div>
+    <div class="profile-details"><template x-if="showEmail">
+        <div class="profile-detail">
+          <div class="profile-label">Email</div>
+          <div class="profile-value">${props.user.email}</div>
+        </div></template><template x-if="showJoinDate">
+        <div class="profile-detail">
+          <div class="profile-label">Member since</div>
+          <div class="profile-value">${props.formattedJoinDate}</div>
+        </div></template>
+    </div>
+  </div></template><style>
+  /* Role badge color classes */
+  .bg-red-100 {
+    background-color: #fee2e2;
+  }
+  .text-red-800 {
+    color: #991b1b;
+  }
+  .bg-purple-100 {
+    background-color: #f3e8ff;
+  }
+  .text-purple-800 {
+    color: #6b21a8;
+  }
+  .bg-blue-100 {
+    background-color: #dbeafe;
+  }
+  .text-blue-800 {
+    color: #1e40af;
+  }
+  .bg-green-100 {
+    background-color: #dcfce7;
+  }
+  .text-green-800 {
+    color: #166534;
+  }
+  .bg-gray-100 {
+    background-color: #f3f4f6;
+  }
+  .text-gray-800 {
+    color: #1f2937;
+  }
+
+  /* Role badge styling */
+  .profile-role {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+</style>`,
+  'layouts_global_footer_html': (props) => `<!-- ============================================ --><!--                   Footer                     --><!-- ============================================ --><footer id="cs-footer-2440">
+    <div class="cs-container">
+        <div class="cs-top">
+            <div class="cs-logo-group">
+                <a class="cs-logo" aria-label="go back to home" href="">
+                    <img class="cs-logo-img" aria-hidden="true" loading="lazy" decoding="async" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/artistitch.svg" alt="logo" width="260" height="48"></img>
+                </a>
+                <ul class="cs-contact-group">
+                    <li class="cs-contact-li">
+                        <img class="cs-contact-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-phone.svg" alt="phone icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true"></img>
+                        <a class="cs-contact-link" href="tel:555-474-7386">555-474-7386</a>
+                    </li>
+                    <li class="cs-contact-li">
+                        <img class="cs-contact-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-email.svg" alt="email icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true"></img>
+                        <a class="cs-contact-link" href="mailto:ArtiStitchart@gmail.com">ArtiStitchart@gmail.com</a>
+                    </li>
+                    <li class="cs-contact-li">
+                        <img class="cs-contact-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-location.svg" alt="location icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true"></img>
+                        <a class="cs-contact-link" href="">555 Fake St, Portland, OR 97217, United States</a>
+                    </li>
+                </ul>
+            </div>
+            <!--Sitemap-->
+            <ul class="cs-ul">
+                <li class="cs-li">
+                    <span class="cs-header">Quick Links</span>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Home</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">About</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Services</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Artist</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">FAQ</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Contact</a>
+                </li>
+            </ul>
+            <ul class="cs-ul">
+                <li class="cs-li">
+                    <span class="cs-header">Our Services</span>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Custom UV Body Painting</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Spiritual & Symbolic Art</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Workshops & Education</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Body Art Reworks</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Live Event Painting</a>
+                </li>
+                <li class="cs-li">
+                    <a class="cs-link" href="">Symbolic Expression Art</a>
+                </li>
+            </ul>
+            <div class="cs-subscribe-group">
+                <span class="cs-header">Sign up to receive the latest news and events from us.</span>
+                <form class="cs-form" name="Footer Subscribe" method="post">
+                    <input class="cs-input" aria-label="email" name="email" type="email" placeholder="Email Address" required=""></input>
+                    <button class="cs-button-solid" name="submit" type="submit" aria-label="submit">
+                        <img class="cs-icon" src="https://nyc3.digitaloceanspaces.com/csimages2/Icons/white-upper-right-arrow.svg" alt="arrow icon" height="24" width="24" loading="lazy" decoding="async" aria-hidden="true"></img>
+                    </button>
+                </form>
+            </div>
+        </div>
+        <!--Bottom Copyright And Social-->
+        <div class="cs-bottom">
+            <div class="cs-flex">
+                <a href="" class="cs-link">Facebook</a>
+                <div class="cs-divider" aria-hidden="true"></div>
+                <a href="" class="cs-link">Instagram</a>
+                <div class="cs-divider" aria-hidden="true"></div>
+                <a href="" class="cs-link">Tiktok</a>
+                <div class="cs-divider" aria-hidden="true"></div>
+                <a href="" class="cs-link">Youtube</a>
+            </div>
+            <span class="cs-copyright-group">
+                <span class="cs-copyright">© Copyright 2025 -</span>
+                <a class="cs-link" href="">ArtiStitch</a>
+            </span>
+        </div>
+    </div>
+</footer><style>
+    /*-- -------------------------- -->
+<---           Footer           -->
+<--- -------------------------- -*/
+
+/* Mobile */
+@media only screen and (min-width: 0rem) {
+  #cs-footer-2440 {
+    padding: var(--sectionPadding);
+    padding-bottom: 1.5rem;
+    background-color: #111418;
+    overflow: hidden;
+  }
+  #cs-footer-2440 .cs-container {
+    width: 100%;
+    max-width: 80rem;
+    margin: auto;
+  }
+  #cs-footer-2440 .cs-top {
+    display: flex;
+    flex-direction: column;
+    /* 16px - 80px */
+    column-gap: clamp(1rem, 6vw, 5rem);
+    row-gap: 2rem;
+  }
+  #cs-footer-2440 .cs-logo-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    /* 32px - 72px */
+    gap: clamp(2rem, 5vw, 4.5rem);
+  }
+  #cs-footer-2440 .cs-logo {
+    max-width: 12.8125rem;
+    height: auto;
+    display: block;
+  }
+  #cs-footer-2440 .cs-logo-img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  #cs-footer-2440 .cs-contact-group {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.875rem;
+  }
+  #cs-footer-2440 .cs-contact-li {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  #cs-footer-2440 .cs-contact-icon {
+    width: 1.5rem;
+    height: auto;
+    display: block;
+  }
+  #cs-footer-2440 .cs-contact-link {
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5em;
+    text-decoration: none;
+    color: var(--bodyTextColorWhite);
+    opacity: 0.8;
+  }
+  #cs-footer-2440 .cs-ul {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  #cs-footer-2440 .cs-header {
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.2em;
+    margin: 0 0 0.75rem;
+    color: var(--bodyTextColorWhite);
+    display: block;
+  }
+  #cs-footer-2440 .cs-header .cs-link {
+    opacity: 1;
+  }
+  #cs-footer-2440 .cs-li {
+    font-size: 1rem;
+    line-height: 1.5em;
+    list-style: none;
+    margin: 0;
+  }
+  #cs-footer-2440 .cs-link {
+    text-decoration: none;
+    color: var(--bodyTextColorWhite);
+    opacity: 0.8;
+    transition: color 0.3s;
+  }
+  #cs-footer-2440 .cs-link:hover {
+    color: var(--primary);
+  }
+  #cs-footer-2440 .cs-subscribe-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  #cs-footer-2440 .cs-subscribe-group .cs-header {
+    margin: 0;
+  }
+  #cs-footer-2440 .cs-form {
+    width: 100%;
+    display: flex;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  #cs-footer-2440 .cs-input {
+    width: 100%;
+    padding: 1rem;
+    background-color: transparent;
+    color: var(--bodyTextColorWhite);
+    border: none;
+    border-bottom: 1px solid #21252E;
+  }
+  #cs-footer-2440 .cs-button-solid {
+    font-size: 1rem;
+    font-weight: 700;
+    /* 46px - 56px */
+    line-height: clamp(2.875rem, 5.5vw, 3.5rem);
+    text-align: center;
+    text-decoration: none;
+    min-width: 9.375rem;
+    margin: 0;
+    padding: 0 1rem;
+    background-color: var(--primary);
+    color: var(--bodyTextColorWhite);
+    display: inline-block;
+    position: relative;
+    z-index: 1;
+  }
+  #cs-footer-2440 .cs-button-solid:before {
+    content: "";
+    width: 0%;
+    height: 100%;
+    background: #fff;
+    opacity: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    transition: width 0.3s;
+  }
+  #cs-footer-2440 .cs-button-solid:hover:before {
+    width: 100%;
+  }
+  #cs-footer-2440 .cs-button-solid {
+    min-width: auto;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #cs-footer-2440 .cs-icon {
+    width: 1.25rem;
+    height: auto;
+    display: block;
+  }
+  #cs-footer-2440 .cs-bottom {
+    /* 48px - 80px */
+    margin-top: clamp(3rem, 6vw, 5rem);
+    /* 24px - 40px */
+    padding-top: clamp(1.5rem, 3vw, 2.5rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    position: relative;
+    z-index: 1;
+  }
+  #cs-footer-2440 .cs-bottom:before {
+    content: '';
+    width: 100%;
+    max-width: 80rem;
+    height: 1px;
+    background: #2D2F2E;
+    opacity: 1;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  #cs-footer-2440 .cs-flex {
+    display: flex;
+    flex-flow: wrap row;
+    justify-content: center;
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.25rem;
+  }
+  #cs-footer-2440 .cs-divider {
+    width: 1px;
+    height: 0.8125rem;
+    background-color: var(--bodyTextColorWhite);
+    opacity: 0.8;
+    display: block;
+  }
+  #cs-footer-2440 .cs-copyright {
+    text-decoration: none;
+    color: var(--bodyTextColorWhite);
+    opacity: 0.8;
+    transition: color 0.3s;
+  }
+}
+/* Tablet - 768px */
+@media only screen and (min-width: 48rem) {
+  #cs-footer-2440 .cs-top {
+    flex-direction: row;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  #cs-footer-2440 .cs-logo-group {
+    /* 285px - 316px */
+    max-width: clamp(17.8125rem, 22vw, 19.75rem);
+    margin-right: auto;
+  }
+  #cs-footer-2440 .cs-ul {
+    /* Add padding to offset the .cs-ul from the logo, which sits above the rest of the items */
+    padding-top: 5.25rem;
+    flex: none;
+  }
+  #cs-footer-2440 .cs-subscribe-group {
+    width: 100%;
+  }
+  #cs-footer-2440 .cs-bottom {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+/* Desktop - 1024px */
+@media only screen and (min-width: 64rem) {
+  #cs-footer-2440 .cs-top {
+    flex-wrap: nowrap;
+  }
+  #cs-footer-2440 .cs-ul {
+    padding: 0;
+  }
+  #cs-footer-2440 .cs-subscribe-group {
+    width: initial;
+    /* 281px - 372px */
+    max-width: clamp(17.5625rem, 26vw, 23.25rem);
+  }
+}
+</style>`,
+  'layouts_content_store-test-minimal_html': (props) => `<html lang="en">
+<head>
+  <meta charset="UTF-8"></meta>
+  <title>${props.title}</title>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"></link>
+</head>
+<body style="padding: 2rem;">
+  <main class="container">
+    <h1 style="text-align: center; color: #2563eb;">${props.title}</h1>
+
+    <article>
+    <h2>✅ Test 1: Authentication Store</h2>
+    <p>Status: <span class="status"></span></p>
+    <p>User: <strong></strong></p>
+    <p>Email: <strong></strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button @click="$store.auth.login()">Login</button>
+      <button @click="$store.auth.logout()">Logout</button>
+    </div>
+
+    <div class="info-box">
+      <strong>Try it:</strong> Click "Login" and watch the values update reactively!<br></br>
+      Store expressions: <code></code>, <code></code>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>🛒 Test 2: Shopping Cart Store</h2>
+    <p>Items in cart: <strong></strong></p>
+    <p>Total: <strong>$</strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button @click="$store.cart.addItem('Widget', 9.99)">Add Widget ($9.99)</button>
+      <button @click="$store.cart.addItem('Gadget', 19.99)">Add Gadget ($19.99)</button>
+      <button @click="$store.cart.addItem('Doohickey', 29.99)">Add Doohickey ($29.99)</button>
+      <button @click="$store.cart.clear()" class="secondary">Clear Cart</button>
+    </div>
+
+    <div class="info-box">
+      <strong>Try it:</strong> Add items and watch the count and total update!<br></br>
+      Store expressions: <code></code>, <code></code>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>🎨 Test 3: Theme Store</h2>
+    <p>Current theme: <strong></strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button @click="$store.theme.toggle()">Toggle Theme</button>
+    </div>
+
+    <div class="info-box">
+      <strong>Try it:</strong> Click to toggle between "light" and "dark"<br></br>
+      Store expression: <code></code>
+    </div>
+  </div>
+
+  div class="test-section">
+    <h2>🎉 Store System Features Working</h2>
+    <ul>
+      <li>✅ <strong>Inline store definitions</strong> in fence section</li>
+      <li>✅ <strong>Store expressions</strong> transform to Alpine.js syntax</li>
+      <li>✅ <strong>Store initialization</strong> via <code>Alpine.store()</code></li>
+      <li>✅ <strong>Reactive updates</strong> across the page</li>
+      <li>✅ <strong>Store methods</strong> callable from Alpine directives</li>
+      <li>✅ <strong>Nested properties</strong> like <code>$auth.user.name</code></li>
+    </ul>
+
+    <div class="info-box">
+      <strong>View Page Source</strong> to see:<br></br>
+      • Store initialization script in <code>&lt;head&gt;</code><br></br>
+      • Store expressions transformed to <code>&lt;span x-text="$store.X.Y"&gt;</code><br></br>
+      • Alpine.js event handlers with <code>@click="$store.X.method()"</code>
+      </div>
+    </article>
+  </main>
+</body>
+</html>`,
+  'layouts_components_jim_test_greeting_html': (props) => `<div class="text-content-container">
+  <h1>${props.salutation} ${props.name}!</h1>
+
+  <!-- Basic conditionals --><template x-if="name.length > 3">
+    <div id="praise">${props.name} is a long name</div><template x-if="age > 1">
+      <div>Has been born</div></template></template><template x-else-if="name.length == 2">
+    <div id="praise">${props.name} is medium</div></template><template x-else>
+    <div id="praise">${props.name} is a short name</div></template>
+</div><style>
+  .text-content-container {
+    max-width: 80rem;
+    margin: 0 auto;
+    /* padding: 10rem 2rem 2rem 2rem; */
+  }
+  h1 {
+    color: orange;
+  }
+  #praise {
+    font-size: 2rem;
+    color: green;
+  }
+</style>`,
+  'layouts_components_notification_html': (props) => `<style>
+  .notification {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 0.75rem;
+    position: relative;
+  }
+  
+  .notification-info {
+    background-color: #e0f2fe;
+    border-left: 4px solid #38bdf8;
+  }
+  
+  .notification-success {
+    background-color: #dcfce7;
+    border-left: 4px solid #4ade80;
+  }
+  
+  .notification-warning {
+    background-color: #fef3c7;
+    border-left: 4px solid #fbbf24;
+  }
+  
+  .notification-error {
+    background-color: #fee2e2;
+    border-left: 4px solid #f87171;
+  }
+  
+  .notification-icon {
+    margin-right: 0.75rem;
+    font-size: 1rem;
+  }
+  
+  .notification-message {
+    flex: 1;
+  }
+  
+  .notification-dismiss {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.25rem;
+  }
+  
+  .notification-dismiss:hover {
+    color: #374151;
+  }
+</style><div class="notification notification-${props.type}"><template x-if="type == \"info\"">
+    <div class="notification-icon">ℹ️</div></template><template x-else-if="type == \"success\"">
+    <div class="notification-icon">✓</div></template><template x-else-if="type == \"warning\"">
+    <div class="notification-icon">⚠️</div></template><template x-else>
+    <div class="notification-icon">✕</div></template>
+  <div class="notification-message">${props.message}</div><template x-if="dismissable">
+    <button class="notification-dismiss" @click="currentNotification = null">×</button></template>
+</div>`,
   'layouts_components_age_html': (props) => `<div class="age-container">
   <div class="age-info">${props.name}'s age is: ${props.age}</div><template x-if="age > 300">
     <div class="age-badge dust">Dust (300+)</div></template><template x-else-if="age > 200">
@@ -4397,196 +4414,320 @@ import store from './stores/auth.js'
     color: white;
   }
 </style>`,
-  'layouts_components_hero2436_html': (props) => `<!-- ============================================ --><!--                   Hero                       --><!-- ============================================ --><section id="hero-2436">
-    <div class="cs-container">
-        <div class="cs-content">
-            <div class="cs-flex cs-flex1">
-                <span class="cs-topper">${props.topper}</span>
-                <h2 class="cs-title">${props.title}</h2>
-            </div>
-            <div class="cs-flex cs-flex2">
-                <p class="cs-text">
-                    ${props.description}
-                </p>
-                <a href="${props.buttonLink}" class="cs-button-solid">${props.buttonText}</a>
-            </div>
-        </div>
-        <img class="cs-logo-feature" decoding="async" src="https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/Logos/art-logo.svg" alt="logo" width="1280" height="239"></img>
-    </div>
-    <!--Background Image-->
-    <picture class="cs-background">
-        <!--Mobile Image-->
-        <source media="(max-width: 600px)" srcset="https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art4.jpg"></source>
-        <!--Tablet and above Image-->
-        <source media="(min-width: 601px)" srcset="https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art4.jpg"></source>
-        <img decoding="async" src="https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art4.jpg" alt="face with body art" width="1800" height="860" aria-hidden="true" fetchpriority="high"></img>
-    </picture>
-</section><style>
-    /*-- -------------------------- -->
-<---           Hero             -->
-<--- -------------------------- -*/
-
-/* Mobile */
-@media only screen and (min-width: 0rem) {
-  #hero-2436 {
-    min-height: 100vh;
-    padding: var(--sectionPadding);
-    padding-top: clamp(13.75rem, 45vw, 29.6875rem);
-    overflow: hidden;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    position: relative;
-    z-index: 1;
-  }
-  #hero-2436:before {
-    content: '';
-    width: 100%;
-    height: 85%;
-    background: linear-gradient(to bottom, #030711 0%, rgba(3, 7, 17, 0.35) 75%, rgba(3, 7, 17, 0) 100%);
-    opacity: 1;
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: -1;
-  }
-  #hero-2436:after {
-    content: '';
-    width: 100%;
-    height: 35%;
-    background: linear-gradient(to bottom, rgba(1, 1, 4, 0) 0%, #010104 100%);
-    opacity: 1;
-    display: block;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    z-index: -1;
-  }
-  #hero-2436 .cs-container {
-    width: 100%;
-    max-width: 80rem;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: clamp(3rem, 8vw, 8rem);
-  }
-  #hero-2436 .cs-container:before {
-    content: '';
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(to right, rgba(3, 7, 17, 0.64) 0%, rgba(3, 7, 17, 0.64) 18%, rgba(3, 7, 17, 0.51) 25%, rgba(3, 7, 17, 0.32) 35%, rgba(3, 7, 17, 0.32) 60%, rgba(3, 7, 17, 0.64) 78%, rgba(3, 7, 17, 0.64) 80%, rgba(3, 7, 17, 0.64) 100%);
-    opacity: 1;
-    display: block;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    z-index: -1;
-  }
-  #hero-2436 .cs-content {
-    text-align: center;
-    width: 100%;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    row-gap: 1rem;
-    column-gap: clamp(4rem, 10vw, 6.25rem);
-  }
-  #hero-2436 .cs-flex {
-    text-align: inherit;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  #hero-2436 .cs-flex2 {
-    max-width: 33.75rem;
-  }
-  #hero-2436 .cs-topper {
-    color: var(--secondary);
-  }
-  #hero-2436 .cs-title {
-    font-size: clamp(2.4375rem, 6vw, 3.8125rem);
-    margin-bottom: 0;
-    max-width: 15ch;
-    color: var(--bodyTextColorWhite);
-  }
-  #hero-2436 .cs-text {
-    font-size: clamp(1rem, 2vw, 1.25rem);
-    color: var(--bodyTextColorWhite);
+  'layouts_components_header_html': (props) => `<style>
+  .header {
+    background-color: #f8f9fa;
+    padding: 1rem 0;
+    border-bottom: 1px solid #e9ecef;
     margin-bottom: 2rem;
   }
-  #hero-2436 .cs-button-solid {
-    font-size: 1rem;
-    font-weight: 700;
-    /* 46px - 56px */
-    line-height: clamp(2.875rem, 5.5vw, 3.5rem);
-    text-align: center;
-    text-decoration: none;
-    min-width: 9.375rem;
-    margin: 0;
-    padding: 0 1.5rem;
-    background-color: var(--primary);
-    color: var(--bodyTextColorWhite);
-    display: inline-block;
-    position: relative;
-    z-index: 1;
-  }
-  #hero-2436 .cs-button-solid:before {
-    content: "";
-    width: 0%;
-    height: 100%;
-    background: #000;
-    opacity: 1;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: -1;
-    transition: width 0.3s;
-  }
-  #hero-2436 .cs-button-solid:hover:before {
-    width: 100%;
-  }
-  #hero-2436 .cs-logo-feature {
-    width: 100%;
-    height: auto;
-    display: block;
-  }
-  #hero-2436 .cs-background {
-    width: 100%;
-    height: 100%;
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    object-fit: cover;
-    z-index: -2;
-  }
-  #hero-2436 .cs-background img {
-    width: 100%;
-    height: 100%;
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    object-fit: cover;
-  }
-}
-/* Desktop - 1024px */
-@media only screen and (min-width: 64rem) {
-  #hero-2436 .cs-content {
-    flex-direction: row;
+  
+  .header-container {
+    display: flex;
     justify-content: space-between;
+    align-items: center;
   }
-  #hero-2436 .cs-flex {
-    text-align: left;
-    align-items: flex-start;
+  
+  .brand {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
   }
-  #hero-2436 .cs-flex2 {
-    max-width: 26.0625rem;
+
+  .brand svg {
+    height: 32px;
+    width: auto;
   }
+  
+  .nav {
+    display: flex;
+    gap: 1.5rem;
+  }
+  
+  .nav-item {
+    color: #495057;
+    text-decoration: none;
+  }
+  
+  .nav-item:hover {
+    color: #228be6;
+  }
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .user-badge {
+    background-color: #e9ecef;
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  
+  .admin-badge {
+    background-color: #ffe3e3;
+    color: #c92a2a;
+  }
+  
+  .logout-button {
+    background-color: #f1f3f5;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  
+  .logout-button:hover {
+    background-color: #e9ecef;
+  }
+</style><header class="header">
+  <div class="header-container">
+    <div>
+      <a href="/" class="brand">
+        <svg width="36.206mm" height="7.781mm" version="1.1" viewBox="0 0 36.206 7.781" xmlns="http://www.w3.org/2000/svg">
+          <g transform="translate(-264.95 11.104)">
+            <path d="m273.59-6.453-2e-3 1.6107c-7e-3 0.22466-0.12785 0.35734-0.35253 0.36241-0.25549 0-0.36051-0.14631-0.36051-0.36123v-4.6353c0-0.092936 0.0232-0.16264 0.0696-0.20911 0.0464-0.052254 0.11906-0.092936 0.2178-0.12198 0.16852-0.052248 0.37175-0.090037 0.6099-0.11327 0.24404-0.023229 0.47924-0.034889 0.70576-0.034889 0.7377 0 1.2751 0.15683 1.612 0.4705 0.34263 0.30786 0.51403 0.72609 0.51403 1.2547 0 0.54021-0.17425 0.97296-0.52275 1.2982-0.34852 0.31948-0.88589 0.47922-1.612 0.47922zm0.83646-0.59249c0.46468 0 0.82484-0.095841 1.0804-0.28753 0.25564-0.19168 0.38343-0.48792 0.38343-0.88872 0-0.39499-0.12489-0.68252-0.37466-0.86259-0.24395-0.18588-0.59546-0.27882-1.0543-0.27882-0.1568 0-0.31363 0.00874-0.47042 0.026165-0.15106 0.011654-0.2876 0.02902-0.40959 0.052251v2.2393z">
+            <path d="m290.02-4.9895c0.13651 0 0.23267-0.00934 0.28845-0.027942 0.062-0.024852 0.12724-0.037205 0.19548-0.037205 0.068 0 0.13031 0.027942 0.18614 0.083763 0.0561 0.049626 0.0837 0.12719 0.0837 0.23267 0 0.099268-0.0499 0.17062-0.1489 0.21405-0.21711 0.099268-0.40323 0.14891-0.55839 0.14891-0.15512 0-0.29778-0.00934-0.42812-0.027942-0.12403-0.012426-0.24506-0.052715-0.36289-0.12099-0.27922-0.16132-0.41883-0.44672-0.41883-0.8562v-2.3639h-0.53971c-0.0931 0-0.24964-0.10621-0.25249-0.29294-2e-3 -0.17599 0.15385-0.26609 0.23168-0.26866l0.55806-0.00462 0.0103-0.64389c5e-3 -0.12544 0.16669-0.25549 0.33632-0.25619 0.18493 7.719e-4 0.34881 0.12909 0.3458 0.26617v0.60493h0.86549c0.0871 0 0.15818 0.027942 0.21402 0.083754 0.056 0.055807 0.0837 0.12719 0.0837 0.21405 0 0.086862-0.0279 0.15821-0.0837 0.21405-0.0562 0.055807-0.12713 0.083761-0.21402 0.083761h-0.86549v2.308c0 0.19234 0.0588 0.32263 0.17683 0.39087 0.062 0.037205 0.16125 0.055884 0.29781 0.055884z">
+            <g transform="matrix(.77185 0 0 .77185 312.99 -65.312)" fill-rule="evenodd" stroke-width=".26458px">
+              <path d="m-54.57 74.523c-1.7919 1.907-5.3906 2.3551-4.3001 4.9881 0.36199 0.74862-0.27419 1.0155-0.50107 0.61951 0 0-3.4086-2.8786-1.4504-4.6156 0.98084-1.0161 6.9801-5.3003 6.3041-1.3029z" fill="#1c7fc7">
+              <path d="m-57.629 73.238s-1.5075 0.83503-2.7039 1.8531c0 0 3.0859-1.3869 5.7631-0.56799 0 0 0.39145-1.6984-3.0593-1.2851z" fill="#004a77" fill-opacity=".87434">
+              <path d="m-62.252 72.183s0.38056-1.1878 2.1798-1.9508l0.96418 0.28985s6.7226-1.3794 4.5374 4.0016c0 0 0.5771-2.071-4.5695-1.033l-0.70199 0.43123c-1.906-0.26683-2.4099-1.7389-2.4099-1.7389" fill="#22a6ed">
+            </g>
+            <path d="m277.62-9.6188q0-0.14572 0.10242-0.2368 0.10234-0.10019 0.25131-0.10019 0.14885 0 0.24197 0.10019 0.10234 0.091077 0.10234 0.2368v4.8453q0 0.13662-0.10234 0.2368-0.0931 0.10019-0.24197 0.10019-0.14898 0-0.25131-0.10019-0.10242-0.10018-0.10242-0.2368z">
+            <path d="m280.03-6.1675q0.0651 0.51186 0.39083 0.81897 0.33506 0.29781 0.91202 0.29781 0.58636 0 0.99581-0.18613 0.13033-0.065145 0.23266-0.065145 0.10242-0.00934 0.18612 0.074482 0.0931 0.083761 0.0931 0.18613 0 0.20474-0.16752 0.2885-0.15823 0.083758-0.28845 0.14891-0.13034 0.065144-0.27927 0.11168-0.34429 0.093063-0.80033 0.093063-0.93997 0-1.4611-0.52116-0.51184-0.53048-0.51184-1.4984 0-0.83759 0.43737-1.396 0.49331-0.62354 1.3866-0.62354 0.85624 0 1.3495 0.577 0.46533 0.53978 0.46533 1.3494 0 0.1396-0.10234 0.24197-0.0931 0.10237-0.24196 0.10237zm1.126-1.6845q-0.67936 0-0.9865 0.60492-0.11163 0.21405-0.13952 0.51186h2.2521q-0.0277-0.53978-0.4002-0.85621-0.2978-0.26058-0.72589-0.26058z">
+            <path d="m285.85-7.7962q-0.67009 0-1.2564 0.73522v2.2801q0 0.1396-0.10244 0.24197-0.10232 0.10237-0.24199 0.10237-0.13951 0-0.24199-0.10237-0.10232-0.10237-0.10232-0.24197v-3.2666q0-0.14891 0.093-0.25128 0.10246-0.10237 0.2513-0.10237 0.13964 0 0.24199 0.10237 0.10244 0.093062 0.10244 0.25128v0.31642q0.30708-0.31642 0.53042-0.45602 0.42814-0.25128 0.81904-0.25128 0.40014 0 0.65139 0.12099 0.25126 0.11167 0.42812 0.32573 0.35368 0.41879 0.35368 1.0423v2.1684q0 0.1396-0.10242 0.24197-0.10234 0.10237-0.24195 0.10237-0.13958 0-0.24199-0.10237-0.10234-0.10237-0.10234-0.24197v-2.094q0-0.42811-0.19544-0.67007-0.19549-0.25127-0.64217-0.25127z">
+            <path d="m291.49-8.0475q0-0.15821 0.10242-0.25128 0.10234-0.10237 0.25127-0.10237 0.14887 0 0.24197 0.10237 0.093 0.093062 0.093 0.25128v3.2666q0 0.1396-0.093 0.24197-0.0931 0.10237-0.24197 0.10237-0.14894 0-0.25127-0.10237-0.10242-0.10237-0.10242-0.24197zm0.76312-1.4983q0 0.16751-0.11161 0.27919-0.11174 0.11168-0.27921 0.11168h-0.0465q-0.16751 0-0.27921-0.11168-0.10234-0.11168-0.10234-0.27919v-0.027942q0-0.16752 0.11165-0.2792 0.11167-0.11167 0.26989-0.11167h0.0465q0.16747 0 0.27921 0.11167 0.11161 0.11168 0.11161 0.2792z">
+            <path d="m295.26-5.0508q0.42813 0 0.80971-0.20474 0.13025-0.074483 0.24196-0.074483 0.11166-0.00934 0.19538 0.093062 0.0839 0.10237 0.0839 0.24197 0 0.1303-0.17686 0.24198-0.53977 0.35365-1.2098 0.35365-0.84694 0-1.4332-0.53047-0.61426-0.5677-0.60495-1.489 0-0.92135 0.60495-1.489 0.57697-0.53978 1.4332-0.53047 0.45601 0 0.74448 0.12099 0.29781 0.11167 0.46533 0.23266 0.17686 0.11168 0.17686 0.25128 0 0.1396-0.0839 0.23267-0.0837 0.093062-0.16746 0.093062-0.13033 0-0.26988-0.074483-0.39088-0.21405-0.80971-0.20474-0.67006 0-1.0423 0.38156-0.363 0.37226-0.363 0.98649 0 0.61423 0.363 0.99579 0.37224 0.37226 1.0423 0.37226z">
+            <path d="m299.21-8.4383q0.88411 0 1.4239 0.55839 0.53971 0.5677 0.52112 1.4611 0 0.90273-0.52112 1.4611-0.53979 0.55839-1.4239 0.55839-0.89347 0-1.4146-0.55839-0.53979-0.55839-0.53979-1.4611 0-0.91204 0.53979-1.4611 0.52111-0.55839 1.4146-0.55839zm-0.85627 3.0991q0.18617 0.15821 0.40954 0.23267 0.23266 0.074482 0.44673 0.074482 0.21402 0 0.43739-0.074482 0.22337-0.074483 0.40943-0.24197 0.4095-0.37226 0.4095-1.0796 0-0.68868-0.4095-1.0702-0.34429-0.31642-0.84682-0.30712-0.82832 0-1.1447 0.74453-0.11171 0.26988-0.11171 0.64215 0 0.37226 0.11171 0.64215 0.11164 0.26989 0.28846 0.43741z">
+          </g>
+        </svg>
+      </a>
+    </div>
+    
+    <nav class="nav"><template x-for="item in props.navItems">
+        <a :href="item.url" class="nav-item"><span x-text="item.label"></span></a></template>
+    </nav><template x-if="isLoggedIn">
+      <div class="user-info">
+        <span>Welcome, ${props.user.name}</span><template x-if="user.role === \"admin\"">
+          <span class="user-badge admin-badge">Admin</span></template><template x-else>
+          <span class="user-badge">${props.user.role}</span></template>
+      </div></template>
+  </div>
+</header>`,
+  'layouts_components_test_all_content_html': (props) => `<div class="all-content-test">
+    <h2>All Content Test</h2>
+    <p>Total pages loaded: <span x-text="Object.keys(allContent || {}).length"></span></p>
+
+    <ul>
+        <template x-for="(pageData, pageName) in allContent" :key="pageName">
+            <li>
+                <strong x-text="pageName"></strong>:
+                <span x-text="pageData.title || 'No title'"></span>
+            </li>
+        </template>
+    </ul>
+</div><style>
+.all-content-test {
+    border: 2px solid #4CAF50;
+    padding: 20px;
+    margin: 20px 0;
+    background-color: #f9f9f9;
 }
+
+.all-content-test h2 {
+    color: #4CAF50;
+    margin-top: 0;
+}
+
+.all-content-test ul {
+    list-style: none;
+    padding: 0;
+}
+
+.all-content-test li {
+    padding: 8px;
+    margin: 4px 0;
+    background: white;
+    border-left: 3px solid #4CAF50;
+}
+</style>`,
+  'layouts_content_store-test-with-theme_html': (props) => `<html lang="en">
+<head>
+  <meta charset="UTF-8"></meta>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"></meta>
+  <title>${props.title}</title>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body :style="$store.theme.bodyStyle">
+
+  <h1 style="text-align: center;">${props.title}</h1>
+  <p style="text-align: center;">Current theme: <strong></strong></p>
+
+  <!-- APPROACH 1: Inline Styles in Store (using getters) -->
+  <div :style="$store.theme.sectionStyle">
+    <h2 style="margin-top: 0;">🎨 Approach 1: Inline Styles in Store (Getters)</h2>
+    <p><strong>Pattern:</strong> Store defines <code>get bodyStyle()</code>, <code>get sectionStyle()</code>, <code>get buttonStyle()</code></p>
+    <p><strong>Usage:</strong> <code>:style="$store.theme.buttonStyle"</code></p>
+    <button @click="$store.theme.toggle()" :style="$store.theme.buttonStyle">
+      Toggle to  Mode
+    </button>
+    <p style="margin-top: 1rem;">✅ <strong>Benefits:</strong> Single source of truth, DRY, all theme logic in the store</p>
+    <p>✅ <strong>Clean HTML:</strong> No duplication of dark/light values in templates</p>
+  </div>
+
+  <!-- APPROACH 2: CSS Classes -->
+  <div class="theme-section" :class="$store.theme.mode">
+    <h2 style="margin-top: 0;">🎨 Approach 2: CSS Classes with :class Binding</h2>
+    <p><strong>Pattern:</strong> CSS defines <code>.theme-section.light</code> and <code>.theme-section.dark</code></p>
+    <p><strong>Usage:</strong> <code>:class="$store.theme.mode"</code></p>
+    <button class="theme-btn" :class="$store.theme.mode" @click="$store.theme.toggle()">
+      Toggle to  Mode
+    </button>
+    <p style="margin-top: 1rem;">✅ <strong>Benefits:</strong> Separation of concerns, CSS in stylesheets, better performance</p>
+    <p>✅ <strong>Production Ready:</strong> Standard CSS approach, easier for designers</p>
+  </div>
+
+  <!-- Auth Section -->
+  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
+    <h2 style="margin-top: 0;">✅ Authentication Store</h2>
+    <p>Status: <strong></strong></p>
+    <p>User: <strong></strong></p>
+    <p>Email: <strong></strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button @click="$store.auth.login()" :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;'">
+        Login
+      </button>
+      <button @click="$store.auth.logout()" :style="$store.theme.mode === 'dark' ? 'background: #666; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;' : 'background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;'">
+        Logout
+      </button>
+    </div>
+  </div>
+
+  <!-- Cart Section -->
+  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
+    <h2 style="margin-top: 0;">🛒 Shopping Cart Store</h2>
+    <p>Items in cart: <strong></strong></p>
+    <p>Total: <strong>$</strong></p>
+
+    <div style="margin-top: 1rem;">
+      <button @click="$store.cart.addItem('Widget', 9.99)" :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;'">
+        Add Widget ($9.99)
+      </button>
+      <button @click="$store.cart.addItem('Gadget', 19.99)" :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;'">
+        Add Gadget ($19.99)
+      </button>
+      <button @click="$store.cart.addItem('Doohickey', 29.99)" :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;'">
+        Add Doohickey ($29.99)
+      </button>
+      <button @click="$store.cart.clear()" :style="$store.theme.mode === 'dark' ? 'background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;' : 'background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;'">
+        Clear Cart
+      </button>
+    </div>
+  </div>
+
+  <!-- Comparison Section -->
+  <div :style="$store.theme.sectionStyle">
+    <h2 style="margin-top: 0;">📊 Approach Comparison</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th style="text-align: left; padding: 0.5rem; border-bottom: 2px solid #ccc;">Aspect</th>
+          <th style="text-align: left; padding: 0.5rem; border-bottom: 2px solid #ccc;">Approach 1: Store Getters</th>
+          <th style="text-align: left; padding: 0.5rem; border-bottom: 2px solid #ccc;">Approach 2: CSS Classes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>Code Location</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">Styles in store (fence)</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">Styles in <code>&lt;style&gt;</code> tag</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>HTML Usage</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><code>:style="$store.theme.buttonStyle"</code></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><code>:class="$store.theme.mode"</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>DRY Principle</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Excellent - single source</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Excellent - CSS only</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>Performance</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">Good - inline styles</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Better - CSS caching</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>Designer Friendly</strong></td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">JavaScript knowledge needed</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Standard CSS workflow</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem;"><strong>Best For</strong></td>
+          <td style="padding: 0.5rem;">Dynamic, complex theming logic</td>
+          <td style="padding: 0.5rem;">✅ Production apps, team workflows</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</body>
+</html><style>
+  /* Approach 2: CSS Classes for theming */
+
+  /* Base section styles */
+  .theme-section {
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    transition: all 0.3s;
+  }
+
+  /* Light mode section */
+  .theme-section.light {
+    background: #f5f5f5;
+    color: #1a1a1a;
+  }
+
+  /* Dark mode section */
+  .theme-section.dark {
+    background: #2d2d2d;
+    color: #e0e0e0;
+  }
+
+  /* Base button styles */
+  .theme-btn {
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  /* Light mode button */
+  .theme-btn.light {
+    background: #2563eb;
+    color: white;
+  }
+
+  .theme-btn.light:hover {
+    background: #1d4ed8;
+  }
+
+  /* Dark mode button */
+  .theme-btn.dark {
+    background: #4a9eff;
+    color: white;
+  }
+
+  .theme-btn.dark:hover {
+    background: #3b8ae6;
+  }
 </style>`,
   'layouts_components_whyChoose2425_html': (props) => `<!-- ============================================ --><!--                 Why Choose                   --><!-- ============================================ --><section id="why-2425">
   <div class="cs-container">
@@ -4998,480 +5139,683 @@ import store from './stores/auth.js'
   }
 }
 </style>`,
-  'layouts_content_store-test-with-theme_html': (props) => `<html lang="en">
-<head>
-  <meta charset="UTF-8"></meta>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"></meta>
-  <title>${props.title}</title>
-  <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-</head>
-<body :style="$store.theme.bodyStyle">
+  'layouts_content_store-demo_html': (props) => `<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Store System - Component Demo</title>
+    <script defer="" src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  </head>
+  <!--
+    CONTEXT EXAMPLE 1: Dynamic Styling (:style with Template Literals)
+    - Context: Alpine directive with JavaScript template literal
+    - Syntax: MUST use $store.* (full Alpine syntax)
+    - Why: Inside backticks, this is raw JavaScript - no transformation
+    - Rule: :style="\`...\${$store.name.prop}...\`"
+  -->
+  <body :style="\`background-color: $${$store.theme.getCurrentColors().background}; color: $${$store.theme.getCurrentColors().text}; --code-bg: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#5a7ec5'}; transition: all 0.3s ease;\`">
+    <div class="container">
+      <!--
+        CONTEXT EXAMPLE 2: Dynamic Styling (:style with Method Calls)
+        - Context: Alpine :style directive
+        - Syntax: $store.* with method calls
+        - Why: Calling store methods in Alpine binding
+        - Rule: :style="\`...\${$store.name.method()}...\`"
+      -->
+      <h1 :style="\`color: $${$store.theme.getCurrentColors().text};\`">
+        Global Store System - Component Demo
+      </h1>
+      <!--
+        CONTEXT EXAMPLE 3: Dynamic Styling (:style with Secondary Color)
+        - Context: Alpine :style directive
+        - Syntax: $store.* accessing nested property
+        - Rule: Can access deeply nested properties in template literals
+      -->
+      <p class="subtitle" :style="\`color: $${$store.theme.getCurrentColors().secondary};\`">
+        Reusable components demonstrating the Global Store System
+      </p>
 
-  <h1 style="text-align: center;">${props.title}</h1>
-  <p style="text-align: center;">Current theme: <strong></strong></p>
+      <!-- Header with Store Components -->
+      <!--
+        CONTEXT EXAMPLE 4: Dynamic Styling with Ternary Operators
+        - Context: :style directive with conditional logic
+        - Syntax: $store.* with JavaScript ternary operator
+        - Why: Ternary operators are JavaScript expressions
+        - Rule: :style="\`...\${$store.name.prop === 'value' ? 'a' : 'b'}...\`"
+      -->
+      <div class="header" :style="\`background: $${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+      </div>
 
-  <!-- APPROACH 1: Inline Styles in Store (using getters) -->
-  <div :style="$store.theme.sectionStyle">
-    <h2 style="margin-top: 0;">🎨 Approach 1: Inline Styles in Store (Getters)</h2>
-    <p><strong>Pattern:</strong> Store defines <code>get bodyStyle()</code>, <code>get sectionStyle()</code>, <code>get buttonStyle()</code></p>
-    <p><strong>Usage:</strong> <code>:style="$store.theme.buttonStyle"</code></p>
-    <button @click="$store.theme.toggle()" :style="$store.theme.buttonStyle">
-      Toggle to  Mode
-    </button>
-    <p style="margin-top: 1rem;">✅ <strong>Benefits:</strong> Single source of truth, DRY, all theme logic in the store</p>
-    <p>✅ <strong>Clean HTML:</strong> No duplication of dark/light values in templates</p>
-  </div>
+      <!-- Interactive Demo Section -->
+      <div class="demo-section" :style="\`background: $${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+        <h2>🧪 Try the Interactive Demo</h2>
+        <p>
+          These buttons modify the stores, and all components above update
+          automatically:
+        </p>
 
-  <!-- APPROACH 2: CSS Classes -->
-  <div class="theme-section" :class="$store.theme.mode">
-    <h2 style="margin-top: 0;">🎨 Approach 2: CSS Classes with :class Binding</h2>
-    <p><strong>Pattern:</strong> CSS defines <code>.theme-section.light</code> and <code>.theme-section.dark</code></p>
-    <p><strong>Usage:</strong> <code>:class="$store.theme.mode"</code></p>
-    <button class="theme-btn" :class="$store.theme.mode" @click="$store.theme.toggle()">
-      Toggle to  Mode
-    </button>
-    <p style="margin-top: 1rem;">✅ <strong>Benefits:</strong> Separation of concerns, CSS in stylesheets, better performance</p>
-    <p>✅ <strong>Production Ready:</strong> Standard CSS approach, easier for designers</p>
-  </div>
+        <!-- Auth Actions -->
+        <div class="action-group" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+          <h3>Authentication Actions</h3>
+          <!--
+            CONTEXT EXAMPLE 5: Event Handlers (@click)
+            - Context: Alpine event handler directive
+            - Syntax: MUST use $store.* (full Alpine syntax)
+            - Why: @ directives execute JavaScript directly
+            - Rule: @click="$store.name.method()"
+            - Note: NO curly braces {} needed in @ directives
+          -->
+          <button @click="$store.auth.login()" class="btn btn-primary">
+            Login as Test User
+          </button>
+          <button @click="$store.auth.logout()" class="btn btn-secondary">
+            Logout
+          </button>
+        </div>
 
-  <!-- Auth Section -->
-  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
-    <h2 style="margin-top: 0;">✅ Authentication Store</h2>
-    <p>Status: <strong></strong></p>
-    <p>User: <strong></strong></p>
-    <p>Email: <strong></strong></p>
+        <!-- Cart Actions -->
+        <div class="action-group" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+          <h3>Shopping Cart Actions</h3>
+          <!--
+            CONTEXT EXAMPLE 6: Event Handlers with Method Arguments
+            - Context: @click with method calls passing objects
+            - Syntax: $store.* with method arguments
+            - Rule: @click="$store.name.method({ key: value })"
+            - Note: Can pass complex objects as arguments
+          -->
+          <button @click="$store.cart.addItem({ name: 'Widget', price: 9.99 })" class="btn btn-success">
+            Add Widget ($9.99)
+          </button>
+          <button @click="$store.cart.addItem({ name: 'Gadget', price: 19.99 })" class="btn btn-success">
+            Add Gadget ($19.99)
+          </button>
+          <button @click="$store.cart.addItem({ name: 'Doohickey', price: 29.99 })" class="btn btn-success">
+            Add Doohickey ($29.99)
+          </button>
+          <button @click="$store.cart.clear()" class="btn btn-danger">
+            Clear Cart
+          </button>
+        </div>
 
-    <div style="margin-top: 1rem;">
-      <button @click="$store.auth.login()" :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;'">
-        Login
-      </button>
-      <button @click="$store.auth.logout()" :style="$store.theme.mode === 'dark' ? 'background: #666; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;' : 'background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;'">
-        Logout
-      </button>
+        <!-- Theme Actions -->
+        <div class="action-group" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+          <h3>Theme Actions</h3>
+          <p class="note">
+            The ThemeToggle component above provides its own buttons, but you
+            can also control the theme from anywhere in your app:
+          </p>
+          <!--
+            CONTEXT EXAMPLE 18: Multiple Event Handlers (Different Methods)
+            - Context: Multiple buttons with different store method calls
+            - Demonstrates: Each button can call different store methods
+            - Rule: @click="$store.name.method()" for each button
+          -->
+          <button @click="$store.theme.setLight()" class="btn btn-light">
+            Set Light Mode
+          </button>
+          <button @click="$store.theme.setDark()" class="btn btn-dark">
+            Set Dark Mode
+          </button>
+          <div style="
+              margin-top: 1rem;
+              padding: 1rem;
+              background: rgba(59, 130, 246, 0.1);
+              border-radius: 6px;
+              border-left: 4px solid #3b82f6;
+            ">
+            <strong>Visual Feedback Test:</strong>
+            <p style="margin-top: 0.5rem; font-size: 0.95rem">
+              Click the theme buttons above and watch the entire page change
+              <!--
+                CONTEXT EXAMPLE 7: x-text Directive
+                - Context: Alpine x-text directive (displays reactive text)
+                - Syntax: MUST use $store.* (full Alpine syntax)
+                - Why: x-text is an Alpine directive, expects JavaScript
+                - Rule: <tag x-text="$store.name.prop"></tag>
+                - Note: NO curly braces {} needed in x-text
+              -->
+              colors! Current mode: <strong x-text="$store.theme.mode"></strong>
+            </p>
+          </div>
+
+          <!-- Additional Alpine Directive Examples -->
+          <div style="margin-top: 1rem; padding: 1rem; background: rgba(251, 146, 60, 0.1); border-radius: 6px; border-left: 4px solid #f97316;">
+            <!--
+              CONTEXT EXAMPLE 19: x-show Directive (Conditional Display)
+              - Context: Alpine x-show directive (shows/hides element)
+              - Syntax: x-show="$store.name.prop"
+              - Why: x-show is an Alpine directive, expects JavaScript
+              - Rule: Element stays in DOM, visibility toggles
+              - Note: Different from x-if (which removes from DOM)
+            -->
+            <div x-show="$store.theme.mode === 'dark'">
+              <strong>🌙 Dark Mode Activated!</strong>
+              <p style="margin-top: 0.5rem; font-size: 0.9rem;">This message only shows in dark mode (using x-show)</p>
+            </div>
+            <div x-show="$store.theme.mode === 'light'">
+              <strong>☀️ Light Mode Activated!</strong>
+              <p style="margin-top: 0.5rem; font-size: 0.9rem;">This message only shows in light mode (using x-show)</p>
+            </div>
+          </div>
+
+          <div style="margin-top: 1rem; padding: 1rem; background: rgba(139, 92, 246, 0.1); border-radius: 6px; border-left: 4px solid #8b5cf6;">
+            <!--
+              CONTEXT EXAMPLE 20: x-bind:class (Dynamic Classes)
+              - Context: Alpine x-bind:class directive (or shorthand :class)
+              - Syntax: :class="$store.name.prop"
+              - Why: Reactive class binding
+              - Rule: Can bind single class or object of classes
+              - Note: :class is shorthand for x-bind:class
+            -->
+            <p style="margin-bottom: 0.5rem;">
+              <strong>Dynamic Class Example:</strong>
+            </p>
+            <div :class="$store.theme.mode" style="padding: 0.75rem; border-radius: 4px; font-weight: 500;">
+              This div has a dynamic class: "<span x-text="$store.theme.mode"></span>"
+            </div>
+            <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #6b7280;">
+              Try toggling the theme to see the class change!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Store State Display -->
+      <div class="state-section" :style="\`background: $${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+        <h2>📊 Current Store State</h2>
+        <p>Real-time view of the store data:</p>
+
+        <div class="state-grid">
+          <!-- Auth Store State -->
+          <div class="state-card store-card-hover" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+            <h3>🔐 Auth Store</h3>
+            <!--
+              CONTEXT EXAMPLE 8: Template Conditionals ({if})
+              - Context: Template directive (custom syntax)
+              - Syntax: CAN use {$name.prop} shorthand
+              - Why: Template syntax gets transformed by engine
+              - Rule: {if $name.prop} content {/if}
+              - Transforms to: <template x-if="$store.name.prop">
+            --><template x-if="$auth.isLoggedIn">
+            <!--
+              CONTEXT EXAMPLE 9: Text Content in Curly Braces
+              - Context: Text content (not an attribute or directive)
+              - Syntax: CAN use {$name.prop} shorthand
+              - Why: Template syntax, gets wrapped in <span x-text>
+              - Rule: {$name.prop}
+              - Transforms to: <span x-text="$store.name.prop"></span>
+            -->
+            <p><strong>Status:</strong> ✅ Logged In</p>
+            <p><strong>User:</strong> </p>
+            <p><strong>Email:</strong> </p></template><template x-else>
+            <p><strong>Status:</strong> ❌ Logged Out</p>
+            <p><em>Please log in to access your account</em></p></template>
+            <small style="color: #6b7280">💡 Hover to see store object</small>
+            <div class="tech-details">
+              <!--
+                CONTEXT EXAMPLE 10: x-text with Ternary Operator
+                - Context: x-text directive with conditional expression
+                - Syntax: $store.* with JavaScript ternary
+                - Rule: x-text="$store.name.prop ? value : other"
+                - Note: This is JavaScript, not template syntax
+              -->
+              <pre class="state-display">isLoggedIn: <span x-text="$store.auth.isLoggedIn" style="color: #10b981;"></span>
+user: <span x-text="$store.auth.user ? $store.auth.user.name : 'null'" style="color: #10b981;"></span></pre>
+            </div>
+          </div>
+
+          <!-- Cart Store State -->
+          <div class="state-card store-card-hover" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+            <h3>🛒 Cart Store</h3>
+            <!--
+              CONTEXT EXAMPLE 11: Conditional with Property Access
+              - Context: {if} directive accessing array length
+              - Syntax: {$name.prop.length > 0}
+              - Why: Template conditional, gets transformed
+              - Transforms to: <template x-if="$store.name.prop.length > 0">
+            --><template x-if="$cart.items.length > 0">
+            <!--
+              CONTEXT EXAMPLE 12: Text Content with Computed Property
+              - Context: Text content using store getter
+              - Syntax: {$name.computedProperty}
+              - Why: Getters are accessed like regular properties
+              - Note: formattedTotal is a getter in the cart store
+            -->
+            <p><strong>Items:</strong> </p>
+            <p><strong>Total:</strong> $</p>
+            <div class="cart-items-list">
+              <strong>Cart Contents:</strong>
+              <ul>
+                <!--
+                  CONTEXT EXAMPLE 13: Template Loops ({for})
+                  - Context: Template loop directive
+                  - Syntax: {for item in $name.collection}
+                  - Why: Template syntax, gets transformed
+                  - Transforms to: <template x-for="item in $store.name.collection">
+                  - Note: Loop variable (item) is available in loop body
+                --><template x-for="item in props.$cart.items">
+                <!--
+                  CONTEXT EXAMPLE 14: Loop Variable Access (Build-Time Expansion)
+                  - Context: Text content inside loop
+                  - Syntax: {item.prop} (no $ because item is loop variable)
+                  - Why: Loop variable, not a store
+                  - Note: If $cart.items is resolvable, loop expands at build-time
+                -->
+                <li><span x-text="item.name"></span> - $<span x-text="item.price"></span></li></template>
+              </ul>
+            </div></template><template x-else>
+            <p><strong>Items:</strong> 0</p>
+            <p><strong>Total:</strong> $0.00</p>
+            <p><em>Cart is empty</em></p></template>
+            <small style="color: #6b7280">💡 Hover to see store object</small>
+            <div class="tech-details">
+              <!--
+                CONTEXT EXAMPLE 15: x-text with String Concatenation
+                - Context: x-text with JavaScript string concatenation
+                - Syntax: x-text="'string' + $store.name.prop + 'string'"
+                - Why: JavaScript expression, can use + operator
+                - Rule: Use $store.* when concatenating strings
+              -->
+              <pre class="state-display">items: <span x-text="'[' + $store.cart.items.length + ' items]'" style="color: #10b981;"></span>
+total: $<span x-text="$store.cart.formattedTotal" style="color: #10b981;"></span></pre>
+            </div>
+          </div>
+
+          <!-- Theme Store State -->
+          <div class="state-card store-card-hover" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+            <h3>🎨 Theme Store</h3>
+            <!--
+              CONTEXT EXAMPLE 16: Conditional with Equality Comparison
+              - Context: {if} with equality operator
+              - Syntax: {if $name.prop === 'value'}
+              - Why: Template conditional with comparison
+              - Transforms to: <template x-if="$store.name.prop === 'value'">
+              - Note: Evaluated at build-time when possible
+            --><template x-if="$theme.mode === 'light'">
+            <p><strong>Mode:</strong> ☀️ Light</p></template><template x-else>
+            <p><strong>Mode:</strong> 🌙 Dark</p></template>
+            <!--
+              CONTEXT EXAMPLE 17: x-text with Method Call Result
+              - Context: x-text displaying result of store method
+              - Syntax: x-text="$store.name.method().property"
+              - Why: Calling store method, accessing property of result
+              - Note: getCurrentColors() returns an object, we access its props
+            -->
+            <p>
+              <strong>Background:</strong>
+              <span x-text="$store.theme.getCurrentColors().background"></span>
+            </p>
+            <p>
+              <strong>Text Color:</strong>
+              <span x-text="$store.theme.getCurrentColors().text"></span>
+            </p>
+            <small style="color: #6b7280">💡 Hover to see store object</small>
+            <div class="tech-details">
+              <pre class="state-display">mode: "<span x-text="$store.theme.mode" style="color: #10b981;"></span>"
+background: "<span x-text="$store.theme.getCurrentColors().background" style="color: #10b981;"></span>"
+text: "<span x-text="$store.theme.getCurrentColors().text" style="color: #10b981;"></span>"</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documentation Section -->
+      <div class="docs-section" :style="\`background: $${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+        <h2>📚 How It Works</h2>
+
+        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+          <h3>1. Store Files</h3>
+          <p>Stores are defined in <code>stores/</code> directory:</p>
+          <ul>
+            <li><code>stores/auth.js</code> - Authentication state</li>
+            <li><code>stores/cart.js</code> - Shopping cart state</li>
+            <li><code>stores/theme.js</code> - Theme preferences</li>
+          </ul>
+        </div>
+
+        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+          <h3>2. Components Reference Stores</h3>
+          <p>
+            Components declare which stores they use in their fence section:
+          </p>
+          <pre class="code-display">
+---
+import store from './stores/auth.js'
+---
+
+<template x-if="$auth.isLoggedIn">
+  Welcome, !</template></pre>
+        </div>
+
+        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+          <h3>3. Automatic Reactivity</h3>
+          <p>When any component modifies a store:</p>
+          <ol>
+            <li>Alpine.js detects the change</li>
+            <li>All components using that store automatically update</li>
+            <li>No manual event handling needed!</li>
+          </ol>
+        </div>
+
+        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};\`">
+          <h3>4. Global Scope</h3>
+          <p>Access stores anywhere with <code>$store.storeName</code>:</p>
+          <ul>
+            <li><code>@click="$store.auth.login()"</code> - Call methods</li>
+            <li><code></code> - Read properties</li>
+            <li>
+              <code>{if $cart.items.length > 0}</code> - Use in conditionals
+            </li>
+            <li><code>{for item in $cart.items}</code> - Iterate arrays</li>
+          </ul>
+        </div>
+
+        <div class="doc-card" :style="\`background: $${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: $${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'}; border-left: 4px solid #10b981;\`">
+          <h3 style="color: #10b981">5. Theme Reactivity</h3>
+          <p>
+            Notice how all elements on this page use
+            <code>:style</code> bindings:
+          </p>
+          <pre class="code-display">
+:style="&#96;background: &#36;&#123;&#36;store.theme.getCurrentColors().background&#125;;
+         color: &#36;&#123;&#36;store.theme.getCurrentColors().text&#125;;&#96;"</pre>
+          <p style="margin-top: 0.5rem">
+            This makes the entire page reactive to theme changes!
+          </p>
+        </div>
+      </div>
     </div>
-  </div>
-
-  <!-- Cart Section -->
-  <div :style="$store.theme.mode === 'dark' ? 'background: #2d2d2d; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;' : 'background: #f5f5f5; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;'">
-    <h2 style="margin-top: 0;">🛒 Shopping Cart Store</h2>
-    <p>Items in cart: <strong></strong></p>
-    <p>Total: <strong>$</strong></p>
-
-    <div style="margin-top: 1rem;">
-      <button @click="$store.cart.addItem('Widget', 9.99)" :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;'">
-        Add Widget ($9.99)
-      </button>
-      <button @click="$store.cart.addItem('Gadget', 19.99)" :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;'">
-        Add Gadget ($19.99)
-      </button>
-      <button @click="$store.cart.addItem('Doohickey', 29.99)" :style="$store.theme.mode === 'dark' ? 'background: #4a9eff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;' : 'background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem;'">
-        Add Doohickey ($29.99)
-      </button>
-      <button @click="$store.cart.clear()" :style="$store.theme.mode === 'dark' ? 'background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;' : 'background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;'">
-        Clear Cart
-      </button>
-    </div>
-  </div>
-
-  <!-- Comparison Section -->
-  <div :style="$store.theme.sectionStyle">
-    <h2 style="margin-top: 0;">📊 Approach Comparison</h2>
-    <table style="width: 100%; border-collapse: collapse;">
-      <thead>
-        <tr>
-          <th style="text-align: left; padding: 0.5rem; border-bottom: 2px solid #ccc;">Aspect</th>
-          <th style="text-align: left; padding: 0.5rem; border-bottom: 2px solid #ccc;">Approach 1: Store Getters</th>
-          <th style="text-align: left; padding: 0.5rem; border-bottom: 2px solid #ccc;">Approach 2: CSS Classes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>Code Location</strong></td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">Styles in store (fence)</td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">Styles in <code>&lt;style&gt;</code> tag</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>HTML Usage</strong></td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><code>:style="$store.theme.buttonStyle"</code></td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><code>:class="$store.theme.mode"</code></td>
-        </tr>
-        <tr>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>DRY Principle</strong></td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Excellent - single source</td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Excellent - CSS only</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>Performance</strong></td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">Good - inline styles</td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Better - CSS caching</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;"><strong>Designer Friendly</strong></td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">JavaScript knowledge needed</td>
-          <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">✅ Standard CSS workflow</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.5rem;"><strong>Best For</strong></td>
-          <td style="padding: 0.5rem;">Dynamic, complex theming logic</td>
-          <td style="padding: 0.5rem;">✅ Production apps, team workflows</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-</body>
+  </body>
 </html><style>
-  /* Approach 2: CSS Classes for theming */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
-  /* Base section styles */
-  .theme-section {
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+      Ubuntu, Cantarell, sans-serif;
+    line-height: 1.6;
+    padding: 2rem;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .subtitle {
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.75rem;
+    margin: 2rem 0 1rem;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Header with components */
+  .header {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
     padding: 1.5rem;
-    margin-bottom: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid;
+    transition: all 0.3s ease;
+  }
+
+  /* Demo Section */
+  .demo-section {
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    border: 1px solid;
+    transition: all 0.3s ease;
+  }
+
+  .action-group {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
     border-radius: 8px;
-    transition: all 0.3s;
+    border: 1px solid;
+    transition: all 0.3s ease;
   }
 
-  /* Light mode section */
-  .theme-section.light {
-    background: #f5f5f5;
-    color: #1a1a1a;
+  .action-group h3 {
+    margin-bottom: 1rem;
   }
 
-  /* Dark mode section */
-  .theme-section.dark {
-    background: #2d2d2d;
-    color: #e0e0e0;
+  .note {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-bottom: 1rem;
+    font-style: italic;
   }
 
-  /* Base button styles */
-  .theme-btn {
+  /* Buttons */
+  .btn {
     border: none;
     padding: 0.75rem 1.5rem;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    font-weight: 500;
     transition: all 0.2s;
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
   }
 
-  /* Light mode button */
-  .theme-btn.light {
+  .btn-primary {
     background: #2563eb;
     color: white;
   }
 
-  .theme-btn.light:hover {
+  .btn-primary:hover {
     background: #1d4ed8;
   }
 
-  /* Dark mode button */
-  .theme-btn.dark {
-    background: #4a9eff;
+  .btn-secondary {
+    background: #6b7280;
     color: white;
   }
 
-  .theme-btn.dark:hover {
-    background: #3b8ae6;
+  .btn-secondary:hover {
+    background: #4b5563;
   }
-</style>`,
-  'layouts_components_userprofile_html': (props) => `<style>
-  .profile-card {
-    border-radius: 0.5rem;
-    background-color: white;
+
+  .btn-success {
+    background: #059669;
+    color: white;
+  }
+
+  .btn-success:hover {
+    background: #047857;
+  }
+
+  .btn-danger {
+    background: #dc2626;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #b91c1c;
+  }
+
+  .btn-light {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+  }
+
+  .btn-light:hover {
+    background: #e5e7eb;
+  }
+
+  .btn-dark {
+    background: #1f2937;
+    color: white;
+  }
+
+  .btn-dark:hover {
+    background: #111827;
+  }
+
+  /* State Section */
+  .state-section {
+    padding: 2rem;
+    border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+    margin-bottom: 2rem;
+    border: 1px solid;
+    transition: all 0.3s ease;
   }
 
-  .profile-compact {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem;
+  .state-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
   }
 
-  .profile-header {
+  .state-card {
     padding: 1.5rem;
-    background-color: #f8f9fa;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+    border-radius: 8px;
+    border: 1px solid;
+    transition: all 0.3s ease;
   }
 
-  .profile-avatar {
-    width: 5rem;
-    height: 5rem;
-    border-radius: 50%;
-    background-color: #e9ecef;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    color: #495057;
+  .state-card h3 {
     margin-bottom: 1rem;
+    font-size: 1.1rem;
   }
 
-  .profile-avatar-small {
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    background-color: #e9ecef;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    color: #495057;
-    margin-right: 0.75rem;
+  .state-display {
+    background: #1f2937;
+    color: #10b981;
+    padding: 1rem;
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 0.9rem;
+    overflow-x: auto;
   }
 
-  .profile-name {
-    font-size: 1.25rem;
-    font-weight: bold;
+  /* Hover state for technical details */
+  .tech-details {
+    margin-top: 1rem;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.3s ease, max-height 0.3s ease;
+  }
+
+  .store-card-hover:hover .tech-details {
+    opacity: 1;
+    max-height: 200px;
+  }
+
+  .tech-details small {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-style: italic;
+  }
+
+  .cart-items-list {
+    font-size: 0.9rem;
+    margin-top: 1rem;
+  }
+
+  .cart-items-list ul {
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+  }
+
+  .cart-items-list li {
     margin-bottom: 0.25rem;
   }
 
-  .profile-name-compact {
-    font-size: 1rem;
-    font-weight: bold;
+  /* Documentation Section */
+  .docs-section {
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid;
+    transition: all 0.3s ease;
   }
 
-  .profile-role {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: medium;
-  }
-
-  .profile-details {
+  .doc-card {
+    margin: 1.5rem 0;
     padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #2563eb;
+    border: 1px solid;
+    transition: all 0.3s ease;
   }
 
-  .profile-detail {
+  .doc-card h3 {
+    margin-bottom: 0.75rem;
+    color: #2563eb;
+  }
+
+  .doc-card p {
     margin-bottom: 0.75rem;
   }
 
-  .profile-label {
-    font-size: 0.875rem;
-    color: #6c757d;
-    margin-bottom: 0.25rem;
+  .doc-card ul,
+  .doc-card ol {
+    margin-left: 1.5rem;
+    margin-bottom: 0.75rem;
   }
 
-  .profile-value {
-    font-size: 1rem;
-  }
-</style><template x-if="compact">
-  <div class="profile-card profile-compact">
-    <div class="profile-avatar-small"><template x-if="user.avatar">
-        <img src="${props.user.avatar}" alt="${props.user.name}"></template><template x-else-if="user.name">
-        ${props.user.name.charAt(0)}</template><template x-else>
-        U</template>
-    </div>
-    <div>
-      <div class="profile-name-compact">${props.user.name}</div><template x-if="showRole">
-        <span class="profile-role ${props.roleBadge.bg} ${props.roleBadge.text}">
-          ${props.user.role}
-        </span></template>
-    </div>
-  </div></template><template x-else>
-  <div class="profile-card">
-    <div class="profile-header">
-      <div class="profile-avatar"><template x-if="user.avatar">
-          <img src="${props.user.avatar}" alt="${props.user.name}"></template><template x-else-if="user.name">
-          ${props.user.name.charAt(0)}</template><template x-else>
-          U</template>
-      </div>
-      <h2 class="profile-name">${props.user.name}</h2><template x-if="showRole">
-        <span class="profile-role ${props.roleBadge.bg} ${props.roleBadge.text}">
-          ${props.user.role}
-        </span></template>
-    </div>
-    <div class="profile-details"><template x-if="showEmail">
-        <div class="profile-detail">
-          <div class="profile-label">Email</div>
-          <div class="profile-value">${props.user.email}</div>
-        </div></template><template x-if="showJoinDate">
-        <div class="profile-detail">
-          <div class="profile-label">Member since</div>
-          <div class="profile-value">${props.formattedJoinDate}</div>
-        </div></template>
-    </div>
-  </div></template><style>
-  /* Role badge color classes */
-  .bg-red-100 {
-    background-color: #fee2e2;
-  }
-  .text-red-800 {
-    color: #991b1b;
-  }
-  .bg-purple-100 {
-    background-color: #f3e8ff;
-  }
-  .text-purple-800 {
-    color: #6b21a8;
-  }
-  .bg-blue-100 {
-    background-color: #dbeafe;
-  }
-  .text-blue-800 {
-    color: #1e40af;
-  }
-  .bg-green-100 {
-    background-color: #dcfce7;
-  }
-  .text-green-800 {
-    color: #166534;
-  }
-  .bg-gray-100 {
-    background-color: #f3f4f6;
-  }
-  .text-gray-800 {
-    color: #1f2937;
+  .doc-card li {
+    margin-bottom: 0.5rem;
   }
 
-  /* Role badge styling */
-  .profile-role {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    font-weight: 500;
+  .code-display {
+    background: #1f2937;
+    color: #10b981;
+    padding: 1rem;
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 0.85rem;
+    overflow-x: auto;
+    margin-top: 0.5rem;
+  }
+
+  code {
+    background: var(--code-bg);
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-family: "Courier New", monospace;
+    font-size: 0.9em;
   }
 </style>`,
-  'layouts_content_jim-test_html': (props) => `<html lang="en">
-<body>
-  <!-- CMS Panel -->
-  <div id="plenti_cms"></div>
-  <button id="toggle_plenti_cms">Toggle CMS</button>
-
-  <main>
-    <div class="text-content-container">
-
-      <h1>${props.salutation} ${props.name}!</h1>
-
-    <!-- Basic conditionals --><template x-if="name.length > 3">
-      <div id="praise">${props.name} is a long name</div><template x-if="age > 1">
-        <div>Has been born</div></template></template><template x-else-if="name.length == 2">
-      <div id="praise">${props.name} is medium</div></template><template x-else>
-      <div id="praise">${props.name} is a short name</div></template>
-
-    <!-- Component usage with props --><template x-if="age > 0">
-      <div style="margin: 2rem 0;">
-        <h2>Age Component Examples</h2>
-        <div style="margin-bottom: 0.5rem; font-size: 0.875rem; color: #666;">Passing dynamic props to components:</div>
-      </div>
-
-      <!-- Dynamic components (Jim's innovative <= syntax) with object props -->
-      <div style="margin: 2rem 0;">
-        <h2>User Profile Examples with Object Props</h2>
-      </div>
-
-      <!-- Loops with nested conditionals and advanced JS expressions -->
-      <div class="animals" style="background-color: #f0f0f0; padding: 1rem; margin: 2rem 0;">
-        <h2>Animals Loop with Advanced Features</h2><template x-for="animal in props.animals"><template x-if="animal == \"cat\"">
-            <div>Hi <span x-text="animal"></span>!</div></template><template x-else>
-            <div>Bye <span x-text="animal"></span>.</div></template>
-          <div :class="animal">${props.name} likes: <span x-text="animal"></span>s</div>
-          <div style="color: #666; font-size: 0.875rem;">Backwards: <span x-text="animal.split('').reverse().join('')"></span></div>
-          <button :onclick="animals = animals.filter(a => a !== animal)">Remove <span x-text="animal"></span></button>
-          <br></br></template>
-        <h3>Add new animal:</h3>
-        <input type="text" name="newAnimal" x-model="newAnimal" placeholder="animal name"></input>
-        <button onclick="{animals = [newAnimal, ...animals]; newAnimal = ''}">Add Animal</button>
-      </div>
-
-      <!-- Advanced loop examples: array spread, different variable declarations -->
-      <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin: 2rem 0;">
-        <h2>Advanced Loop Patterns</h2>
-
-        <h3 style="font-size: 1rem; margin: 1rem 0 0.5rem; color: #374151;">Array Spread in Loop:</h3>
-        <div style="background-color: white; padding: 1rem; border-radius: 0.375rem; margin-bottom: 1.5rem;"><template x-for="animal in props.["🦄 unicorn", ...animals]">
-            <div style="padding: 0.25rem 0; color: #1f2937;"><span x-text="animal"></span></div></template>
-        </div>
-
-        <h3 style="font-size: 1rem; margin: 1rem 0 0.5rem; color: #374151;">Inline Array Iteration:</h3>
-        <div style="background-color: white; padding: 1rem; border-radius: 0.375rem;"><template x-for="word in props.["Waller", "loves Plenti", "uses AI", "is Australian"]">
-            <div style="padding: 0.25rem 0; color: #1f2937;">${props.name} <span x-text="word"></span></div></template><template x-for="phrase in props.["rocks", "codes", "innovates"]">
-            <div style="padding: 0.25rem 0; color: #1f2937; font-style: italic;">${props.name} <span x-text="phrase"></span>!</div></template>
-        </div>
-      </div>
-
-      <!-- Dynamic Todos Component Examples -->
-      <div style="margin: 2rem 0;">
-        <h2>Task List - First 5 Tasks</h2>
-
-        <h2 style="margin-top: 2rem;">Task List - Tasks 6-14</h2>
-      </div>
-
-
-      <!-- Interactive Notification Examples -->
-      <div style="margin: 2rem 0;">
-        <h2>Interactive Notification Examples</h2>
-        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;"><template x-for="notif in props.notifications">
-            <button style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; background-color: #3b82f6; color: white;" :onclick="currentNotification = notif">
-              Show <span x-text="notif.type"></span>
-            </button></template>
-          <button style="padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; background-color: #6b7280; color: white;" onclick="{currentNotification = null}">
-            Clear
-          </button>
-        </div><template x-if="currentNotification"></template>
-      </div></template>
-    </div>
-  </main>
-</body>
-</html><style>
-  /* Content container for text-heavy pages */
-  .text-content-container {
-    max-width: 80rem;
-    margin: 0 auto;
-    /* padding: 10rem 2rem 2rem 2rem; */
-  }
-
-  /* Header styles */
-  .header {
-    background-color: #f8f9fa;
-    padding: 1rem 0;
-    border-bottom: 1px solid #e9ecef;
-    margin-bottom: 2rem;
-  }
-
-  .header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 2rem;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    text-decoration: none;
-  }
-
-  .brand svg {
-    height: 32px;
-    width: auto;
-  }
-
-  .nav {
-    display: flex;
-    gap: 1.5rem;
-  }
-
-  .nav-item {
-    color: #495057;
-    text-decoration: none;
-  }
-
-  .nav-item:hover {
-    color: #228be6;
-  }
-
-  h1 {
-    color: orange;
-  }
-  #praise {
-    font-size: 2rem;
-    color: green;
-  }
+  'layouts_components_jim_test_animals_loop_html': (props) => `<div class="animals" style="background-color: #f0f0f0; padding: 1rem; margin: 2rem 0;">
+  <h2>Animals Loop with Advanced Features</h2><template x-for="animal in props.animals"><template x-if="animal == \"cat\"">
+      <div>Hi <span x-text="animal"></span>!</div></template><template x-else>
+      <div>Bye <span x-text="animal"></span>.</div></template>
+    <div :class="animal">${props.name} likes: <span x-text="animal"></span>s</div>
+    <div style="color: #666; font-size: 0.875rem;">Backwards: <span x-text="animal.split('').reverse().join('')"></span></div>
+    <button :onclick="animals = animals.filter(a => a !== animal)">Remove <span x-text="animal"></span></button>
+    <br></br></template>
+  <h3>Add new animal:</h3>
+  <input type="text" name="newAnimal" x-model="newAnimal" placeholder="animal name"></input>
+  <button onclick="{animals = [newAnimal, ...animals]; newAnimal = ''}">Add Animal</button>
+</div><style>
   .animals {
     border-radius: 0.5rem;
   }
@@ -5479,44 +5823,17 @@ import store from './stores/auth.js'
     margin: 0.5rem 0;
   }
 
-  /* Role badge color classes */
-  .bg-red-100 {
-    background-color: #fee2e2;
-  }
-  .text-red-800 {
-    color: #991b1b;
-  }
-  .bg-purple-100 {
-    background-color: #f3e8ff;
-  }
-  .text-purple-800 {
-    color: #6b21a8;
-  }
-  .bg-blue-100 {
-    background-color: #dbeafe;
-  }
-  .text-blue-800 {
-    color: #1e40af;
-  }
-  .bg-green-100 {
-    background-color: #dcfce7;
-  }
-  .text-green-800 {
-    color: #166534;
-  }
-  .bg-gray-100 {
-    background-color: #f3f4f6;
-  }
-  .text-gray-800 {
+  h2 {
     color: #1f2937;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
   }
 
-  /* Role badge styling */
-  .profile-role {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
+  h3 {
+    color: #374151;
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
     font-weight: 500;
   }
 
@@ -5582,583 +5899,378 @@ import store from './stores/auth.js'
     color: #1f2937;
     font-size: 1.125rem;
   }
-
-  /* Todos table styling */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 1rem 0;
-    background-color: white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border-radius: 0.5rem;
-    overflow: hidden;
-  }
-
-  thead {
-    background-color: #f3f4f6;
-  }
-
-  th {
-    padding: 0.75rem 1rem;
-    text-align: left;
-    font-weight: 600;
-    color: #374151;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  td {
-    padding: 0.75rem 1rem;
-    border-top: 1px solid #e5e7eb;
-    color: #1f2937;
-  }
-
-  tbody tr:hover {
-    background-color: #f9fafb;
-  }
-
-  h2 {
-    color: #1f2937;
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-  }
-
-  h3 {
-    color: #374151;
-    font-size: 1.125rem;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-  }
 </style>`,
-  'layouts_components_featured_posts_sidebar_html': (props) => `<div class="blog-sidebar">
-  <div class="blog-featured-group">
-    <span class="blog-header">Featured Posts</span><template x-if="allContent"><template x-for="post in props.allContent"><template x-if="post.type === \"news\"">
-          <a :href="post.path" class="blog-feature">
-            <picture class="blog-featureImage">
-              <img :alt="post.fields.blogImage?.alt || 'Blog image'" decoding="async" :src="post.fields.blogImage.src" width="100" height="100">
-            </picture>
+  'layouts_content_committee_html': (props) => `<div class="blog-container main-content-wrapper">
+  <div class="main-content">
+    <article class="blog-article">
 
-            <div class="content-group">
-              <h3 class="feature-h3"><span x-text="post.fields.title || 'Untitled'"></span></h3>
-              <span class="feature-date"><span x-text="post.fields.publish?.date || ''"></span></span>
-            </div>
-          </a></template></template></template><template x-else>
-      <p class="no-posts">No featured posts available.</p></template>
+      <div class="article-group">
+        <h1 class="blog-h1">
+          ${props.title}
+        </h1>
+        <div class="blog-authorGroup">
+          <picture class="blog-author-img">
+            <img alt="${props.author.image.alt}" decoding="async" height="32" src="${props.author.image.src}" width="32">
+          </picture>
+          <span class="blog-author">${props.author.name}</span>
+          <span class="blog-dot" aria-hidden="true"></span>
+          <span class="blog-date">${props.publish.date}</span>
+        </div>
+      </div>
+      <section id="blog-content"><template x-for="item in props.textItems">
+          <h4><span x-text="item.title"></span></h4>
+          <p><span x-text="item.paragraph"></span></p></template>
+      </section>
+    </article>
+    <!-- TODO: Add Socials component -->
   </div>
+   <!-- Sidebar with Featured Posts -->
 </div><style>
-.blog-sidebar {
-  background: #f9f9f9;
-  padding: 2rem;
-  border-radius: 8px;
-}
-
-.blog-featured-group {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.blog-header {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #333;
-  border-bottom: 2px solid #4CAF50;
-  padding-bottom: 0.5rem;
-}
-
-.blog-feature {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 4px;
-  text-decoration: none;
-  color: inherit;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.blog-feature:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.blog-featureImage {
-  flex-shrink: 0;
-  width: 100px;
-  height: 100px;
-  overflow: hidden;
-  border-radius: 4px;
-}
-
-.blog-featureImage img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.content-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.feature-h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #333;
-  margin: 0;
-  line-height: 1.3;
-}
-
-.feature-date {
-  font-size: 0.85rem;
-  color: #666;
-}
-
-.no-posts {
-  color: #666;
-  font-style: italic;
-}
-</style>`,
-  'layouts_components_test_all_content_html': (props) => `<div class="all-content-test">
-    <h2>All Content Test</h2>
-    <p>Total pages loaded: <span x-text="Object.keys(allContent || {}).length"></span></p>
-
-    <ul>
-        <template x-for="(pageData, pageName) in allContent" :key="pageName">
-            <li>
-                <strong x-text="pageName"></strong>:
-                <span x-text="pageData.title || 'No title'"></span>
-            </li>
-        </template>
-    </ul>
-</div><style>
-.all-content-test {
-    border: 2px solid #4CAF50;
-    padding: 20px;
-    margin: 20px 0;
-    background-color: #f9f9f9;
-}
-
-.all-content-test h2 {
-    color: #4CAF50;
-    margin-top: 0;
-}
-
-.all-content-test ul {
-    list-style: none;
-    padding: 0;
-}
-
-.all-content-test li {
-    padding: 8px;
-    margin: 4px 0;
-    background: white;
-    border-left: 3px solid #4CAF50;
-}
-</style>`,
-  'layouts_components_adminpanel_html': (props) => `<style>
-  .admin-panel {
-    background-color: white;
-    border-radius: 0.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-  }
-  
-  .admin-header {
-    background-color: #333;
-    color: white;
-    padding: 1rem 1.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .admin-title {
-    font-size: 1.25rem;
-    font-weight: bold;
-  }
-  
-  .admin-user {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  
-  .admin-badge {
-    background-color: #dc3545;
-    color: white;
-    font-size: 0.75rem;
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-  }
-  
-  .admin-content {
-    padding: 1.5rem;
-  }
-  
-  .stats-grid {
+  /* Page container - needs padding to clear fixed nav */
+  .blog-container.main-content-wrapper {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 10rem 2rem 2rem 2rem;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    grid-template-columns: 1fr 350px;
+    gap: 3rem;
+    background-color: #fff;
+    position: relative;
+    z-index: 1;
   }
-  
-  .stat-card {
-    background-color: #f8f9fa;
-    border-radius: 0.375rem;
-    padding: 1rem;
+
+  @media (max-width: 1024px) {
+    .blog-container.main-content-wrapper {
+      grid-template-columns: 1fr;
+      padding: 8rem 1.5rem 2rem 1.5rem;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .blog-container.main-content-wrapper {
+      padding: 7rem 1rem 1.5rem 1rem;
+    }
+  }
+
+  /*-- -------------------------- -->
+  <---        Blog Articles       -->
+  <--- -------------------------- -*/
+  /* Mobile - 360px */
+  @media only screen and (min-width: 0em) {
+    .blog-article {
+      width: 100%;
+      max-width: 49.6875em;
+      display: block;
+    }
+    .blog-article .blog-mainImage img {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .blog-article .blog-author-img {
+      width: 2em;
+      height: 2em;
+      border-radius: 50%;
+      display: block;
+      position: relative;
+      overflow: hidden;
+    }
+    .blog-article .blog-author-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .blog-article .blog-authorGroup {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .blog-article .blog-author,
+    .blog-article .blog-date {
+      font-size: 0.875rem;
+      line-height: 1.5em;
+      color: var(--bodyTextColor);
+    }
+    .blog-article .blog-dot {
+      width: 3px;
+      height: 3px;
+      background-color: #fe4f70;
+      border-radius: 50%;
+      display: block;
+    }
+    .blog-article .blog-h1 {
+      font-size: clamp(20px, 7vw, 36px);
+      font-weight: 700;
+      line-height: 1.4em;
+      max-width: 42.375rem;
+      margin: 1rem 0;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content {
+      margin-top: 1em;
+      padding-top: 1.5625em;
+      border-top: 1px solid #ebebeb;
+    }
+    .blog-article #blog-content h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      line-height: 1.75em;
+      margin-bottom: 1rem;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1.5em;
+      margin-bottom: 1rem;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content h3 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1.5em;
+      margin-bottom: 1rem;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content h4,
+    .blog-article #blog-content h5,
+    .blog-article #blog-content h6 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1.5em;
+      margin-bottom: 1rem;
+      color: var(--headerColor);
+    }
+    .blog-article #blog-content p {
+      font-size: 1rem;
+      line-height: 1.6em;
+      margin: 0;
+      margin-bottom: 1rem;
+      color: var(--bodyTextColor);
+    }
+    .blog-article #blog-content a {
+      font-size: inherit;
+      text-decoration: underline;
+      color: var(--primary);
+    }
+    .blog-article #blog-content ul,
+    .blog-article #blog-content ol {
+      margin: 0;
+      margin: 1rem 0;
+      padding-left: 0.5rem;
+    }
+    .blog-article #blog-content ul li,
+    .blog-article #blog-content ol li {
+      font-size: 1rem;
+      line-height: 1.6em;
+      list-style: circle;
+      margin-bottom: 1rem;
+      color: var(--bodyTextColor);
+    }
+    .blog-article #blog-content img {
+      width: 100%;
+      height: auto;
+      margin: 1rem 0;
+      border-radius: 0.5rem;
+      display: block;
+    }
+  }
+</style>`,
+  'layouts_components_hero2436_html': (props) => `<!-- ============================================ --><!--                   Hero                       --><!-- ============================================ --><section id="hero-2436">
+    <div class="cs-container">
+        <div class="cs-content">
+            <div class="cs-flex cs-flex1">
+                <span class="cs-topper">${props.topper}</span>
+                <h2 class="cs-title">${props.title}</h2>
+            </div>
+            <div class="cs-flex cs-flex2">
+                <p class="cs-text">
+                    ${props.description}
+                </p>
+                <a href="${props.buttonLink}" class="cs-button-solid">${props.buttonText}</a>
+            </div>
+        </div>
+        <img class="cs-logo-feature" decoding="async" src="https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/Logos/art-logo.svg" alt="logo" width="1280" height="239"></img>
+    </div>
+    <!--Background Image-->
+    <picture class="cs-background">
+        <!--Mobile Image-->
+        <source media="(max-width: 600px)" srcset="https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art4.jpg"></source>
+        <!--Tablet and above Image-->
+        <source media="(min-width: 601px)" srcset="https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art4.jpg"></source>
+        <img decoding="async" src="https://csimg.nyc3.cdn.digitaloceanspaces.com/Images/People/art4.jpg" alt="face with body art" width="1800" height="860" aria-hidden="true" fetchpriority="high"></img>
+    </picture>
+</section><style>
+    /*-- -------------------------- -->
+<---           Hero             -->
+<--- -------------------------- -*/
+
+/* Mobile */
+@media only screen and (min-width: 0rem) {
+  #hero-2436 {
+    min-height: 100vh;
+    padding: var(--sectionPadding);
+    padding-top: clamp(13.75rem, 45vw, 29.6875rem);
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+  }
+  #hero-2436:before {
+    content: '';
+    width: 100%;
+    height: 85%;
+    background: linear-gradient(to bottom, #030711 0%, rgba(3, 7, 17, 0.35) 75%, rgba(3, 7, 17, 0) 100%);
+    opacity: 1;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+  }
+  #hero-2436:after {
+    content: '';
+    width: 100%;
+    height: 35%;
+    background: linear-gradient(to bottom, rgba(1, 1, 4, 0) 0%, #010104 100%);
+    opacity: 1;
+    display: block;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
+  }
+  #hero-2436 .cs-container {
+    width: 100%;
+    max-width: 80rem;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    gap: clamp(3rem, 8vw, 8rem);
   }
-  
-  .stat-value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    margin-bottom: 0.25rem;
+  #hero-2436 .cs-container:before {
+    content: '';
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, rgba(3, 7, 17, 0.64) 0%, rgba(3, 7, 17, 0.64) 18%, rgba(3, 7, 17, 0.51) 25%, rgba(3, 7, 17, 0.32) 35%, rgba(3, 7, 17, 0.32) 60%, rgba(3, 7, 17, 0.64) 78%, rgba(3, 7, 17, 0.64) 80%, rgba(3, 7, 17, 0.64) 100%);
+    opacity: 1;
+    display: block;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
   }
-  
-  .stat-label {
-    color: #6c757d;
-    font-size: 0.875rem;
-  }
-  
-  .section-title {
-    font-size: 1.125rem;
-    font-weight: bold;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #dee2e6;
-  }
-  
-  .action-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  .action-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #f1f3f5;
-  }
-  
-  .action-info {
+  #hero-2436 .cs-content {
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    row-gap: 1rem;
+    column-gap: clamp(4rem, 10vw, 6.25rem);
   }
-  
-  .action-desc {
-    font-weight: 500;
-  }
-  
-  .action-user {
-    font-size: 0.875rem;
-    color: #6c757d;
-  }
-  
-  .action-time {
-    font-size: 0.875rem;
-    color: #6c757d;
-    text-align: right;
-  }
-  
-  .admin-actions {
+  #hero-2436 .cs-flex {
+    text-align: inherit;
     display: flex;
-    gap: 0.5rem;
-    margin-top: 1.5rem;
+    flex-direction: column;
+    align-items: center;
   }
-  
-  .admin-button {
-    padding: 0.5rem 1rem;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    cursor: pointer;
+  #hero-2436 .cs-flex2 {
+    max-width: 33.75rem;
   }
-  
-  .admin-button:hover {
-    background-color: #0069d9;
+  #hero-2436 .cs-topper {
+    color: var(--secondary);
   }
-  
-  .admin-button-secondary {
-    background-color: #6c757d;
+  #hero-2436 .cs-title {
+    font-size: clamp(2.4375rem, 6vw, 3.8125rem);
+    margin-bottom: 0;
+    max-width: 15ch;
+    color: var(--bodyTextColorWhite);
   }
-  
-  .admin-button-secondary:hover {
-    background-color: #5a6268;
-  }
-</style><div class="admin-panel">
-  <div class="admin-header">
-    <div class="admin-title">Admin Dashboard</div>
-    <div class="admin-user">
-      <span>${props.user.name}</span>
-      <span class="admin-badge">${props.user.role}</span>
-    </div>
-  </div>
-  
-  <div class="admin-content">
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value">${props.stats.users}</div>
-        <div class="stat-label">Registered Users</div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-value">${props.stats.products}</div>
-        <div class="stat-label">Products</div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-value">${props.stats.orders}</div>
-        <div class="stat-label">Orders</div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-value">${props.formatCurrency(props.stats.revenue)}</div>
-        <div class="stat-label">Total Revenue</div>
-      </div>
-    </div>
-    
-    <h3 class="section-title">Recent Activity</h3>
-    <ul class="action-list"><template x-for="action in props.recentActions">
-        <li class="action-item">
-          <div class="action-info">
-            <span class="action-desc"><span x-text="action.action"></span></span>
-            <span class="action-user">by <span x-text="action.user"></span></span>
-          </div>
-          <div class="action-time"><span x-text="formatTimestamp(action.timestamp)"></span></div>
-        </li></template>
-    </ul>
-    
-    <div class="admin-actions">
-      <button class="admin-button">Add New Product</button>
-      <button class="admin-button">Manage Users</button>
-      <button class="admin-button admin-button-secondary">View All Activity</button>
-    </div>
-  </div>
-</div>`,
-  'layouts_global_header_html': (props) => `<style>
-  .header {
-    background-color: #f8f9fa;
-    padding: 1rem 0;
-    border-bottom: 1px solid #e9ecef;
+  #hero-2436 .cs-text {
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    color: var(--bodyTextColorWhite);
     margin-bottom: 2rem;
   }
-
-  .header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 2rem;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
+  #hero-2436 .cs-button-solid {
+    font-size: 1rem;
+    font-weight: 700;
+    /* 46px - 56px */
+    line-height: clamp(2.875rem, 5.5vw, 3.5rem);
+    text-align: center;
     text-decoration: none;
+    min-width: 9.375rem;
+    margin: 0;
+    padding: 0 1.5rem;
+    background-color: var(--primary);
+    color: var(--bodyTextColorWhite);
+    display: inline-block;
+    position: relative;
+    z-index: 1;
   }
-
-  .brand svg {
-    height: 32px;
-    width: auto;
+  #hero-2436 .cs-button-solid:before {
+    content: "";
+    width: 0%;
+    height: 100%;
+    background: #000;
+    opacity: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    transition: width 0.3s;
   }
-
-  .nav {
-    display: flex;
-    gap: 1.5rem;
-  }
-
-  .nav-item {
-    color: #495057;
-    text-decoration: none;
-  }
-
-  .nav-item:hover {
-    color: #228be6;
-  }
-</style><header class="header">
-  <div class="header-container">
-    <a href="/" class="brand">
-      <svg width="36.206mm" height="7.781mm" version="1.1" viewBox="0 0 36.206 7.781" xmlns="http://www.w3.org/2000/svg">
-        <g transform="translate(-264.95 11.104)">
-          <path d="m273.59-6.453-2e-3 1.6107c-7e-3 0.22466-0.12785 0.35734-0.35253 0.36241-0.25549 0-0.36051-0.14631-0.36051-0.36123v-4.6353c0-0.092936 0.0232-0.16264 0.0696-0.20911 0.0464-0.052254 0.11906-0.092936 0.2178-0.12198 0.16852-0.052248 0.37175-0.090037 0.6099-0.11327 0.24404-0.023229 0.47924-0.034889 0.70576-0.034889 0.7377 0 1.2751 0.15683 1.612 0.4705 0.34263 0.30786 0.51403 0.72609 0.51403 1.2547 0 0.54021-0.17425 0.97296-0.52275 1.2982-0.34852 0.31948-0.88589 0.47922-1.612 0.47922zm0.83646-0.59249c0.46468 0 0.82484-0.095841 1.0804-0.28753 0.25564-0.19168 0.38343-0.48792 0.38343-0.88872 0-0.39499-0.12489-0.68252-0.37466-0.86259-0.24395-0.18588-0.59546-0.27882-1.0543-0.27882-0.1568 0-0.31363 0.00874-0.47042 0.026165-0.15106 0.011654-0.2876 0.02902-0.40959 0.052251v2.2393z">
-          <path d="m290.02-4.9895c0.13651 0 0.23267-0.00934 0.28845-0.027942 0.062-0.024852 0.12724-0.037205 0.19548-0.037205 0.068 0 0.13031 0.027942 0.18614 0.083763 0.0561 0.049626 0.0837 0.12719 0.0837 0.23267 0 0.099268-0.0499 0.17062-0.1489 0.21405-0.21711 0.099268-0.40323 0.14891-0.55839 0.14891-0.15512 0-0.29778-0.00934-0.42812-0.027942-0.12403-0.012426-0.24506-0.052715-0.36289-0.12099-0.27922-0.16132-0.41883-0.44672-0.41883-0.8562v-2.3639h-0.53971c-0.0931 0-0.24964-0.10621-0.25249-0.29294-2e-3 -0.17599 0.15385-0.26609 0.23168-0.26866l0.55806-0.00462 0.0103-0.64389c5e-3 -0.12544 0.16669-0.25549 0.33632-0.25619 0.18493 7.719e-4 0.34881 0.12909 0.3458 0.26617v0.60493h0.86549c0.0871 0 0.15818 0.027942 0.21402 0.083754 0.056 0.055807 0.0837 0.12719 0.0837 0.21405 0 0.086862-0.0279 0.15821-0.0837 0.21405-0.0562 0.055807-0.12713 0.083761-0.21402 0.083761h-0.86549v2.308c0 0.19234 0.0588 0.32263 0.17683 0.39087 0.062 0.037205 0.16125 0.055884 0.29781 0.055884z">
-          <g transform="matrix(.77185 0 0 .77185 312.99 -65.312)" fill-rule="evenodd" stroke-width=".26458px">
-            <path d="m-54.57 74.523c-1.7919 1.907-5.3906 2.3551-4.3001 4.9881 0.36199 0.74862-0.27419 1.0155-0.50107 0.61951 0 0-3.4086-2.8786-1.4504-4.6156 0.98084-1.0161 6.9801-5.3003 6.3041-1.3029z" fill="#1c7fc7">
-            <path d="m-57.629 73.238s-1.5075 0.83503-2.7039 1.8531c0 0 3.0859-1.3869 5.7631-0.56799 0 0 0.39145-1.6984-3.0593-1.2851z" fill="#004a77" fill-opacity=".87434">
-            <path d="m-62.252 72.183s0.38056-1.1878 2.1798-1.9508l0.96418 0.28985s6.7226-1.3794 4.5374 4.0016c0 0 0.5771-2.071-4.5695-1.033l-0.70199 0.43123c-1.906-0.26683-2.4099-1.7389-2.4099-1.7389" fill="#22a6ed">
-          </g>
-          <path d="m277.62-9.6188q0-0.14572 0.10242-0.2368 0.10234-0.10019 0.25131-0.10019 0.14885 0 0.24197 0.10019 0.10234 0.091077 0.10234 0.2368v4.8453q0 0.13662-0.10234 0.2368-0.0931 0.10019-0.24197 0.10019-0.14898 0-0.25131-0.10019-0.10242-0.10018-0.10242-0.2368z">
-          <path d="m280.03-6.1675q0.0651 0.51186 0.39083 0.81897 0.33506 0.29781 0.91202 0.29781 0.58636 0 0.99581-0.18613 0.13033-0.065145 0.23266-0.065145 0.10242-0.00934 0.18612 0.074482 0.0931 0.083761 0.0931 0.18613 0 0.20474-0.16752 0.2885-0.15823 0.083758-0.28845 0.14891-0.13034 0.065144-0.27927 0.11168-0.34429 0.093063-0.80033 0.093063-0.93997 0-1.4611-0.52116-0.51184-0.53048-0.51184-1.4984 0-0.83759 0.43737-1.396 0.49331-0.62354 1.3866-0.62354 0.85624 0 1.3495 0.577 0.46533 0.53978 0.46533 1.3494 0 0.1396-0.10234 0.24197-0.0931 0.10237-0.24196 0.10237zm1.126-1.6845q-0.67936 0-0.9865 0.60492-0.11163 0.21405-0.13952 0.51186h2.2521q-0.0277-0.53978-0.4002-0.85621-0.2978-0.26058-0.72589-0.26058z">
-          <path d="m285.85-7.7962q-0.67009 0-1.2564 0.73522v2.2801q0 0.1396-0.10244 0.24197-0.10232 0.10237-0.24199 0.10237-0.13951 0-0.24199-0.10237-0.10232-0.10237-0.10232-0.24197v-3.2666q0-0.14891 0.093-0.25128 0.10246-0.10237 0.2513-0.10237 0.13964 0 0.24199 0.10237 0.10244 0.093062 0.10244 0.25128v0.31642q0.30708-0.31642 0.53042-0.45602 0.42814-0.25128 0.81904-0.25128 0.40014 0 0.65139 0.12099 0.25126 0.11167 0.42812 0.32573 0.35368 0.41879 0.35368 1.0423v2.1684q0 0.1396-0.10242 0.24197-0.10234 0.10237-0.24195 0.10237-0.13958 0-0.24199-0.10237-0.10234-0.10237-0.10234-0.24197v-2.094q0-0.42811-0.19544-0.67007-0.19549-0.25127-0.64217-0.25127z">
-          <path d="m291.49-8.0475q0-0.15821 0.10242-0.25128 0.10234-0.10237 0.25127-0.10237 0.14887 0 0.24197 0.10237 0.093 0.093062 0.093 0.25128v3.2666q0 0.1396-0.093 0.24197-0.0931 0.10237-0.24197 0.10237-0.14894 0-0.25127-0.10237-0.10242-0.10237-0.10242-0.24197zm0.76312-1.4983q0 0.16751-0.11161 0.27919-0.11174 0.11168-0.27921 0.11168h-0.0465q-0.16751 0-0.27921-0.11168-0.10234-0.11168-0.10234-0.27919v-0.027942q0-0.16752 0.11165-0.2792 0.11167-0.11167 0.26989-0.11167h0.0465q0.16747 0 0.27921 0.11167 0.11161 0.11168 0.11161 0.2792z">
-          <path d="m295.26-5.0508q0.42813 0 0.80971-0.20474 0.13025-0.074483 0.24196-0.074483 0.11166-0.00934 0.19538 0.093062 0.0839 0.10237 0.0839 0.24197 0 0.1303-0.17686 0.24198-0.53977 0.35365-1.2098 0.35365-0.84694 0-1.4332-0.53047-0.61426-0.5677-0.60495-1.489 0-0.92135 0.60495-1.489 0.57697-0.53978 1.4332-0.53047 0.45601 0 0.74448 0.12099 0.29781 0.11167 0.46533 0.23266 0.17686 0.11168 0.17686 0.25128 0 0.1396-0.0839 0.23267-0.0837 0.093062-0.16746 0.093062-0.13033 0-0.26988-0.074483-0.39088-0.21405-0.80971-0.20474-0.67006 0-1.0423 0.38156-0.363 0.37226-0.363 0.98649 0 0.61423 0.363 0.99579 0.37224 0.37226 1.0423 0.37226z">
-          <path d="m299.21-8.4383q0.88411 0 1.4239 0.55839 0.53971 0.5677 0.52112 1.4611 0 0.90273-0.52112 1.4611-0.53979 0.55839-1.4239 0.55839-0.89347 0-1.4146-0.55839-0.53979-0.55839-0.53979-1.4611 0-0.91204 0.53979-1.4611 0.52111-0.55839 1.4146-0.55839zm-0.85627 3.0991q0.18617 0.15821 0.40954 0.23267 0.23266 0.074482 0.44673 0.074482 0.21402 0 0.43739-0.074482 0.22337-0.074483 0.40943-0.24197 0.4095-0.37226 0.4095-1.0796 0-0.68868-0.4095-1.0702-0.34429-0.31642-0.84682-0.30712-0.82832 0-1.1447 0.74453-0.11171 0.26988-0.11171 0.64215 0 0.37226 0.11171 0.64215 0.11164 0.26989 0.28846 0.43741z">
-        </g>
-      </svg>
-    </a>
-
-    <nav class="nav">
-      <a href="/" class="nav-item">Home</a>
-      <a href="/products" class="nav-item">Products</a>
-      <a href="/login" class="nav-item">Login</a>
-      <a href="/register" class="nav-item">Register</a>
-    </nav>
-  </div>
-</header>`,
-  'layouts_components_jim_test_advanced_loops_html': (props) => `<div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1.5rem; margin: 2rem 0;">
-  <h2>Advanced Loop Patterns</h2>
-
-  <h3 style="font-size: 1rem; margin: 1rem 0 0.5rem; color: #374151;">Array Spread in Loop:</h3>
-  <div style="background-color: white; padding: 1rem; border-radius: 0.375rem; margin-bottom: 1.5rem;"><template x-for="animal in props.["🦄 unicorn", ...animals]">
-      <div style="padding: 0.25rem 0; color: #1f2937;"><span x-text="animal"></span></div></template>
-  </div>
-
-  <h3 style="font-size: 1rem; margin: 1rem 0 0.5rem; color: #374151;">Inline Array Iteration:</h3>
-  <div style="background-color: white; padding: 1rem; border-radius: 0.375rem;"><template x-for="word in props.["Waller", "loves Plenti", "uses AI", "is Australian"]">
-      <div style="padding: 0.25rem 0; color: #1f2937;">${props.name} <span x-text="word"></span></div></template><template x-for="phrase in props.["rocks", "codes", "innovates"]">
-      <div style="padding: 0.25rem 0; color: #1f2937; font-style: italic;">${props.name} <span x-text="phrase"></span>!</div></template>
-  </div>
-</div><style>
-  h2 {
-    color: #1f2937;
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-  }
-
-  h3 {
-    color: #374151;
-    font-size: 1.125rem;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-  }
-</style>`,
-  'layouts_content__index_html': (props) => `<template x-for="component in props.content.components"></template>`,
-  'layouts_components_jim_test_todos_html': (props) => `<div style="margin: 2rem 0;">
-  <h2>Task List - First 5 Tasks</h2>
-
-  <h2 style="margin-top: 2rem;">Task List - Tasks 6-14</h2>
-</div><style>
-  h2 {
-    color: #1f2937;
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-  }
-
-  /* Todos table styling */
-  table {
+  #hero-2436 .cs-button-solid:hover:before {
     width: 100%;
-    border-collapse: collapse;
-    margin: 1rem 0;
-    background-color: white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border-radius: 0.5rem;
-    overflow: hidden;
   }
-
-  thead {
-    background-color: #f3f4f6;
+  #hero-2436 .cs-logo-feature {
+    width: 100%;
+    height: auto;
+    display: block;
   }
-
-  th {
-    padding: 0.75rem 1rem;
+  #hero-2436 .cs-background {
+    width: 100%;
+    height: 100%;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    object-fit: cover;
+    z-index: -2;
+  }
+  #hero-2436 .cs-background img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    object-fit: cover;
+  }
+}
+/* Desktop - 1024px */
+@media only screen and (min-width: 64rem) {
+  #hero-2436 .cs-content {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  #hero-2436 .cs-flex {
     text-align: left;
-    font-weight: 600;
-    color: #374151;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    align-items: flex-start;
   }
-
-  td {
-    padding: 0.75rem 1rem;
-    border-top: 1px solid #e5e7eb;
-    color: #1f2937;
+  #hero-2436 .cs-flex2 {
+    max-width: 26.0625rem;
   }
-
-  tbody tr:hover {
-    background-color: #f9fafb;
-  }
-</style>`,
-  'layouts_components_CartBadge_html': (props) => `<div class="cart-badge">
-  <div class="cart-icon-wrapper">
-    🛒
-    <template x-if="$cart.items.length > 0">
-      <span class="cart-count"></span></template>
-  </div>
-  <div class="cart-details">
-    <div class="cart-items"><template x-if="$cart.items.length === 0">
-        <span class="empty-cart">Cart is empty</span></template><template x-else>
-        <span class="item-count"> items</span></template>
-    </div><template x-if="$cart.items.length > 0">
-      <div class="cart-total">
-        Total: $<strong x-text="$store.cart.formattedTotal"></strong>
-      </div></template>
-  </div>
-</div><style>
-.cart-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-  min-width: 200px;
-}
-
-.cart-icon-wrapper {
-  position: relative;
-  font-size: 1.5rem;
-  line-height: 1;
-}
-
-.cart-count {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #dc2626;
-  color: white;
-  font-size: 0.75rem;
-  font-weight: bold;
-  padding: 0.15rem 0.4rem;
-  border-radius: 10px;
-  min-width: 20px;
-  text-align: center;
-}
-
-.cart-details {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.cart-items {
-  font-size: 0.9rem;
-}
-
-.empty-cart {
-  color: #6b7280;
-  font-style: italic;
-}
-
-.item-count {
-  color: #374151;
-  font-weight: 500;
-}
-
-.cart-total {
-  font-size: 0.85rem;
-  color: #059669;
 }
 </style>`,
   'layouts_content_admin_html': (props) => `<html lang="en">
@@ -6197,161 +6309,47 @@ import store from './stores/auth.js'
     text-decoration: underline !important;
   }
 </style>`,
-  'layouts_components_jim_test_age_examples_html': (props) => `<div style="margin: 2rem 0;">
-  <h2>Age Component Examples</h2>
-  <div style="margin-bottom: 0.5rem; font-size: 0.875rem; color: #666;">Passing dynamic props to components:</div>
-</div><style>
-  h2 {
-    color: #1f2937;
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-  }
-</style>`,
-  'layouts_components_header_html': (props) => `<style>
-  .header {
-    background-color: #f8f9fa;
-    padding: 1rem 0;
-    border-bottom: 1px solid #e9ecef;
-    margin-bottom: 2rem;
-  }
-  
-  .header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .brand {
-    display: flex;
-    align-items: center;
-    text-decoration: none;
-  }
-
-  .brand svg {
-    height: 32px;
-    width: auto;
-  }
-  
-  .nav {
-    display: flex;
-    gap: 1.5rem;
-  }
-  
-  .nav-item {
-    color: #495057;
-    text-decoration: none;
-  }
-  
-  .nav-item:hover {
-    color: #228be6;
-  }
-  
-  .user-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  
-  .user-badge {
-    background-color: #e9ecef;
-    border-radius: 9999px;
-    padding: 0.25rem 0.75rem;
-    font-size: 0.875rem;
-  }
-  
-  .admin-badge {
-    background-color: #ffe3e3;
-    color: #c92a2a;
-  }
-  
-  .logout-button {
-    background-color: #f1f3f5;
-    border: 1px solid #ced4da;
-    border-radius: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    cursor: pointer;
-  }
-  
-  .logout-button:hover {
-    background-color: #e9ecef;
-  }
-</style><header class="header">
-  <div class="header-container">
-    <div>
-      <a href="/" class="brand">
-        <svg width="36.206mm" height="7.781mm" version="1.1" viewBox="0 0 36.206 7.781" xmlns="http://www.w3.org/2000/svg">
-          <g transform="translate(-264.95 11.104)">
-            <path d="m273.59-6.453-2e-3 1.6107c-7e-3 0.22466-0.12785 0.35734-0.35253 0.36241-0.25549 0-0.36051-0.14631-0.36051-0.36123v-4.6353c0-0.092936 0.0232-0.16264 0.0696-0.20911 0.0464-0.052254 0.11906-0.092936 0.2178-0.12198 0.16852-0.052248 0.37175-0.090037 0.6099-0.11327 0.24404-0.023229 0.47924-0.034889 0.70576-0.034889 0.7377 0 1.2751 0.15683 1.612 0.4705 0.34263 0.30786 0.51403 0.72609 0.51403 1.2547 0 0.54021-0.17425 0.97296-0.52275 1.2982-0.34852 0.31948-0.88589 0.47922-1.612 0.47922zm0.83646-0.59249c0.46468 0 0.82484-0.095841 1.0804-0.28753 0.25564-0.19168 0.38343-0.48792 0.38343-0.88872 0-0.39499-0.12489-0.68252-0.37466-0.86259-0.24395-0.18588-0.59546-0.27882-1.0543-0.27882-0.1568 0-0.31363 0.00874-0.47042 0.026165-0.15106 0.011654-0.2876 0.02902-0.40959 0.052251v2.2393z">
-            <path d="m290.02-4.9895c0.13651 0 0.23267-0.00934 0.28845-0.027942 0.062-0.024852 0.12724-0.037205 0.19548-0.037205 0.068 0 0.13031 0.027942 0.18614 0.083763 0.0561 0.049626 0.0837 0.12719 0.0837 0.23267 0 0.099268-0.0499 0.17062-0.1489 0.21405-0.21711 0.099268-0.40323 0.14891-0.55839 0.14891-0.15512 0-0.29778-0.00934-0.42812-0.027942-0.12403-0.012426-0.24506-0.052715-0.36289-0.12099-0.27922-0.16132-0.41883-0.44672-0.41883-0.8562v-2.3639h-0.53971c-0.0931 0-0.24964-0.10621-0.25249-0.29294-2e-3 -0.17599 0.15385-0.26609 0.23168-0.26866l0.55806-0.00462 0.0103-0.64389c5e-3 -0.12544 0.16669-0.25549 0.33632-0.25619 0.18493 7.719e-4 0.34881 0.12909 0.3458 0.26617v0.60493h0.86549c0.0871 0 0.15818 0.027942 0.21402 0.083754 0.056 0.055807 0.0837 0.12719 0.0837 0.21405 0 0.086862-0.0279 0.15821-0.0837 0.21405-0.0562 0.055807-0.12713 0.083761-0.21402 0.083761h-0.86549v2.308c0 0.19234 0.0588 0.32263 0.17683 0.39087 0.062 0.037205 0.16125 0.055884 0.29781 0.055884z">
-            <g transform="matrix(.77185 0 0 .77185 312.99 -65.312)" fill-rule="evenodd" stroke-width=".26458px">
-              <path d="m-54.57 74.523c-1.7919 1.907-5.3906 2.3551-4.3001 4.9881 0.36199 0.74862-0.27419 1.0155-0.50107 0.61951 0 0-3.4086-2.8786-1.4504-4.6156 0.98084-1.0161 6.9801-5.3003 6.3041-1.3029z" fill="#1c7fc7">
-              <path d="m-57.629 73.238s-1.5075 0.83503-2.7039 1.8531c0 0 3.0859-1.3869 5.7631-0.56799 0 0 0.39145-1.6984-3.0593-1.2851z" fill="#004a77" fill-opacity=".87434">
-              <path d="m-62.252 72.183s0.38056-1.1878 2.1798-1.9508l0.96418 0.28985s6.7226-1.3794 4.5374 4.0016c0 0 0.5771-2.071-4.5695-1.033l-0.70199 0.43123c-1.906-0.26683-2.4099-1.7389-2.4099-1.7389" fill="#22a6ed">
-            </g>
-            <path d="m277.62-9.6188q0-0.14572 0.10242-0.2368 0.10234-0.10019 0.25131-0.10019 0.14885 0 0.24197 0.10019 0.10234 0.091077 0.10234 0.2368v4.8453q0 0.13662-0.10234 0.2368-0.0931 0.10019-0.24197 0.10019-0.14898 0-0.25131-0.10019-0.10242-0.10018-0.10242-0.2368z">
-            <path d="m280.03-6.1675q0.0651 0.51186 0.39083 0.81897 0.33506 0.29781 0.91202 0.29781 0.58636 0 0.99581-0.18613 0.13033-0.065145 0.23266-0.065145 0.10242-0.00934 0.18612 0.074482 0.0931 0.083761 0.0931 0.18613 0 0.20474-0.16752 0.2885-0.15823 0.083758-0.28845 0.14891-0.13034 0.065144-0.27927 0.11168-0.34429 0.093063-0.80033 0.093063-0.93997 0-1.4611-0.52116-0.51184-0.53048-0.51184-1.4984 0-0.83759 0.43737-1.396 0.49331-0.62354 1.3866-0.62354 0.85624 0 1.3495 0.577 0.46533 0.53978 0.46533 1.3494 0 0.1396-0.10234 0.24197-0.0931 0.10237-0.24196 0.10237zm1.126-1.6845q-0.67936 0-0.9865 0.60492-0.11163 0.21405-0.13952 0.51186h2.2521q-0.0277-0.53978-0.4002-0.85621-0.2978-0.26058-0.72589-0.26058z">
-            <path d="m285.85-7.7962q-0.67009 0-1.2564 0.73522v2.2801q0 0.1396-0.10244 0.24197-0.10232 0.10237-0.24199 0.10237-0.13951 0-0.24199-0.10237-0.10232-0.10237-0.10232-0.24197v-3.2666q0-0.14891 0.093-0.25128 0.10246-0.10237 0.2513-0.10237 0.13964 0 0.24199 0.10237 0.10244 0.093062 0.10244 0.25128v0.31642q0.30708-0.31642 0.53042-0.45602 0.42814-0.25128 0.81904-0.25128 0.40014 0 0.65139 0.12099 0.25126 0.11167 0.42812 0.32573 0.35368 0.41879 0.35368 1.0423v2.1684q0 0.1396-0.10242 0.24197-0.10234 0.10237-0.24195 0.10237-0.13958 0-0.24199-0.10237-0.10234-0.10237-0.10234-0.24197v-2.094q0-0.42811-0.19544-0.67007-0.19549-0.25127-0.64217-0.25127z">
-            <path d="m291.49-8.0475q0-0.15821 0.10242-0.25128 0.10234-0.10237 0.25127-0.10237 0.14887 0 0.24197 0.10237 0.093 0.093062 0.093 0.25128v3.2666q0 0.1396-0.093 0.24197-0.0931 0.10237-0.24197 0.10237-0.14894 0-0.25127-0.10237-0.10242-0.10237-0.10242-0.24197zm0.76312-1.4983q0 0.16751-0.11161 0.27919-0.11174 0.11168-0.27921 0.11168h-0.0465q-0.16751 0-0.27921-0.11168-0.10234-0.11168-0.10234-0.27919v-0.027942q0-0.16752 0.11165-0.2792 0.11167-0.11167 0.26989-0.11167h0.0465q0.16747 0 0.27921 0.11167 0.11161 0.11168 0.11161 0.2792z">
-            <path d="m295.26-5.0508q0.42813 0 0.80971-0.20474 0.13025-0.074483 0.24196-0.074483 0.11166-0.00934 0.19538 0.093062 0.0839 0.10237 0.0839 0.24197 0 0.1303-0.17686 0.24198-0.53977 0.35365-1.2098 0.35365-0.84694 0-1.4332-0.53047-0.61426-0.5677-0.60495-1.489 0-0.92135 0.60495-1.489 0.57697-0.53978 1.4332-0.53047 0.45601 0 0.74448 0.12099 0.29781 0.11167 0.46533 0.23266 0.17686 0.11168 0.17686 0.25128 0 0.1396-0.0839 0.23267-0.0837 0.093062-0.16746 0.093062-0.13033 0-0.26988-0.074483-0.39088-0.21405-0.80971-0.20474-0.67006 0-1.0423 0.38156-0.363 0.37226-0.363 0.98649 0 0.61423 0.363 0.99579 0.37224 0.37226 1.0423 0.37226z">
-            <path d="m299.21-8.4383q0.88411 0 1.4239 0.55839 0.53971 0.5677 0.52112 1.4611 0 0.90273-0.52112 1.4611-0.53979 0.55839-1.4239 0.55839-0.89347 0-1.4146-0.55839-0.53979-0.55839-0.53979-1.4611 0-0.91204 0.53979-1.4611 0.52111-0.55839 1.4146-0.55839zm-0.85627 3.0991q0.18617 0.15821 0.40954 0.23267 0.23266 0.074482 0.44673 0.074482 0.21402 0 0.43739-0.074482 0.22337-0.074483 0.40943-0.24197 0.4095-0.37226 0.4095-1.0796 0-0.68868-0.4095-1.0702-0.34429-0.31642-0.84682-0.30712-0.82832 0-1.1447 0.74453-0.11171 0.26988-0.11171 0.64215 0 0.37226 0.11171 0.64215 0.11164 0.26989 0.28846 0.43741z">
-          </g>
-        </svg>
-      </a>
-    </div>
-    
-    <nav class="nav"><template x-for="item in props.navItems">
-        <a :href="item.url" class="nav-item"><span x-text="item.label"></span></a></template>
-    </nav><template x-if="isLoggedIn">
-      <div class="user-info">
-        <span>Welcome, ${props.user.name}</span><template x-if="user.role === \"admin\"">
-          <span class="user-badge admin-badge">Admin</span></template><template x-else>
-          <span class="user-badge">${props.user.role}</span></template>
-      </div></template>
-  </div>
-</header>`,
-  'todos': (props) => registry['layouts_components_todos_html'](props),
+  'footer': (props) => registry['layouts_global_footer_html'](props),
+  'jim_test_animals_loop': (props) => registry['layouts_components_jim_test_animals_loop_html'](props),
+  'admin': (props) => registry['layouts_content_admin_html'](props),
+  '_index': (props) => registry['layouts_content__index_html'](props),
+  'jim_test_user_profiles': (props) => registry['layouts_components_jim_test_user_profiles_html'](props),
+  'nav': (props) => registry['layouts_global_nav_html'](props),
+  'store-test-minimal': (props) => registry['layouts_content_store-test-minimal_html'](props),
+  'whyChoose2425': (props) => registry['layouts_components_whyChoose2425_html'](props),
+  'committee': (props) => registry['layouts_content_committee_html'](props),
+  'userprofile': (props) => registry['layouts_components_userprofile_html'](props),
+  'store-test-with-theme': (props) => registry['layouts_content_store-test-with-theme_html'](props),
   'news': (props) => registry['layouts_content_news_html'](props),
   'store-test': (props) => registry['layouts_content_store-test_html'](props),
-  'html': (props) => registry['layouts_global_html_html'](props),
-  'store-test-minimal': (props) => registry['layouts_content_store-test-minimal_html'](props),
-  'ThemeToggle': (props) => registry['layouts_components_ThemeToggle_html'](props),
-  'LoginStatus': (props) => registry['layouts_components_LoginStatus_html'](props),
-  'store-test-with-theme': (props) => registry['layouts_content_store-test-with-theme_html'](props),
-  'jim_test_user_profiles': (props) => registry['layouts_components_jim_test_user_profiles_html'](props),
-  'jim_test_greeting': (props) => registry['layouts_components_jim_test_greeting_html'](props),
-  'footer-old': (props) => registry['layouts_components_footer-old_html'](props),
-  'store-demo': (props) => registry['layouts_content_store-demo_html'](props),
-  'hero2436': (props) => registry['layouts_components_hero2436_html'](props),
-  'userprofile': (props) => registry['layouts_components_userprofile_html'](props),
-  'featured_posts_sidebar': (props) => registry['layouts_components_featured_posts_sidebar_html'](props),
-  'adminpanel': (props) => registry['layouts_components_adminpanel_html'](props),
-  'committee': (props) => registry['layouts_content_committee_html'](props),
-  'pages': (props) => registry['layouts_content_pages_html'](props),
-  'admin': (props) => registry['layouts_content_admin_html'](props),
-  'services2437': (props) => registry['layouts_components_services2437_html'](props),
-  'footer': (props) => registry['layouts_global_footer_html'](props),
-  'news_page': (props) => registry['layouts_content_news_page_html'](props),
-  'head': (props) => registry['layouts_global_head_html'](props),
-  'jim_test_advanced_loops': (props) => registry['layouts_components_jim_test_advanced_loops_html'](props),
-  'committee_page': (props) => registry['layouts_content_committee_page_html'](props),
-  'header': (props) => registry['layouts_components_header_html'](props),
-  'productcard': (props) => registry['layouts_components_productcard_html'](props),
-  'userdashboard': (props) => registry['layouts_components_userdashboard_html'](props),
-  'headerlogo': (props) => registry['layouts_components_headerlogo_html'](props),
-  'age': (props) => registry['layouts_components_age_html'](props),
-  'whyChoose2425': (props) => registry['layouts_components_whyChoose2425_html'](props),
-  'jim_test_age_examples': (props) => registry['layouts_components_jim_test_age_examples_html'](props),
-  'jim_test_animals_loop': (props) => registry['layouts_components_jim_test_animals_loop_html'](props),
-  'notification': (props) => registry['layouts_components_notification_html'](props),
-  'jim_test_notifications': (props) => registry['layouts_components_jim_test_notifications_html'](props),
-  'jim-test': (props) => registry['layouts_content_jim-test_html'](props),
-  'jim_test_todos': (props) => registry['layouts_components_jim_test_todos_html'](props),
-  'nav': (props) => registry['layouts_global_nav_html'](props),
   'test_all_content': (props) => registry['layouts_components_test_all_content_html'](props),
-  '_index': (props) => registry['layouts_content__index_html'](props),
-  'CartBadge': (props) => registry['layouts_components_CartBadge_html'](props)
+  'adminpanel': (props) => registry['layouts_components_adminpanel_html'](props),
+  'jim-test': (props) => registry['layouts_content_jim-test_html'](props),
+  'jim_test_notifications': (props) => registry['layouts_components_jim_test_notifications_html'](props),
+  'jim_test_greeting': (props) => registry['layouts_components_jim_test_greeting_html'](props),
+  'jim_test_age_examples': (props) => registry['layouts_components_jim_test_age_examples_html'](props),
+  'footer-old': (props) => registry['layouts_components_footer-old_html'](props),
+  'LoginStatus': (props) => registry['layouts_components_LoginStatus_html'](props),
+  'head': (props) => registry['layouts_global_head_html'](props),
+  'headerlogo': (props) => registry['layouts_components_headerlogo_html'](props),
+  'todos': (props) => registry['layouts_components_todos_html'](props),
+  'age': (props) => registry['layouts_components_age_html'](props),
+  'CartBadge': (props) => registry['layouts_components_CartBadge_html'](props),
+  'header': (props) => registry['layouts_components_header_html'](props),
+  'featured_posts_sidebar': (props) => registry['layouts_components_featured_posts_sidebar_html'](props),
+  'jim_test_advanced_loops': (props) => registry['layouts_components_jim_test_advanced_loops_html'](props),
+  'ThemeToggle': (props) => registry['layouts_components_ThemeToggle_html'](props),
+  'news_page': (props) => registry['layouts_content_news_page_html'](props),
+  'productcard': (props) => registry['layouts_components_productcard_html'](props),
+  'store-demo': (props) => registry['layouts_content_store-demo_html'](props),
+  'jim_test_todos': (props) => registry['layouts_components_jim_test_todos_html'](props),
+  'userdashboard': (props) => registry['layouts_components_userdashboard_html'](props),
+  'committee_page': (props) => registry['layouts_content_committee_page_html'](props),
+  'notification': (props) => registry['layouts_components_notification_html'](props),
+  'hero2436': (props) => registry['layouts_components_hero2436_html'](props),
+  'html': (props) => registry['layouts_global_html_html'](props),
+  'pages': (props) => registry['layouts_content_pages_html'](props),
+  'services2437': (props) => registry['layouts_components_services2437_html'](props)
 };
 
 export default registry;

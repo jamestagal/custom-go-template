@@ -47,6 +47,7 @@ const allContent = [
         },
         "name": "Raylene Easton \u0026 Jenni Shoring"
       },
+      "excerpt": "Annual General Meeting held on October 13, 2025, covering the President's Report, Treasurer's Report, 2026 committee elections, tipping competition results, and major raffle winners.",
       "publish": {
         "date": "October 13, 2025",
         "title": "Annual General Meeting"
@@ -105,6 +106,7 @@ const allContent = [
         },
         "name": "Raylene Easton"
       },
+      "excerpt": "Committee meeting held on September 8, 2025, discussing AGM preparation, raffle planning, tipping competition updates, newsletter plans, and website improvements.",
       "publish": {
         "date": "September 8, 2025",
         "title": "Committee Meeting"
@@ -167,6 +169,7 @@ const allContent = [
         },
         "name": "Raylene Easton"
       },
+      "excerpt": "Committee meeting held on July 21, 2025, discussing upcoming September meeting and AGM dates, raffle allocation, tipping competition status, and newsletter strategy.",
       "publish": {
         "date": "July 21, 2025",
         "title": "Committee Meeting"
@@ -235,6 +238,7 @@ const allContent = [
         "src": "https://picsum.photos/1200/600?random=5",
         "width": 1200
       },
+      "excerpt": "Today we're thrilled to announce the launch of our newest product. Built with cutting-edge technology and user feedback, it represents a major leap forward in our product lineup.",
       "figcaption": {
         "attribution": {
           "link": "#",
@@ -305,6 +309,7 @@ const allContent = [
         "src": "https://picsum.photos/1200/600?random=4",
         "width": 1200
       },
+      "excerpt": "We're proud to announce our quarterly results, showing a 25% increase in revenue compared to the same period last year. This growth reflects our commitment to innovation and customer satisfaction.",
       "figcaption": {
         "attribution": {
           "link": "#",
@@ -369,6 +374,7 @@ const allContent = [
         "src": "/media/images/blogImage1.png",
         "width": 1200
       },
+      "excerpt": "We're excited to announce that we're growing our team with 15 new positions across engineering, design, and customer success. This expansion will help us better serve our customers.",
       "figcaption": {
         "attribution": {
           "link": "#",
@@ -376,7 +382,6 @@ const allContent = [
         },
         "caption": "Welcome to our newest team members joining this quarter"
       },
-      "photos": [],
       "publish": {
         "date": "2025-03-10"
       },
