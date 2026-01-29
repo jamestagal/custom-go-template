@@ -17,28 +17,32 @@ export let topper, page_title, allContent
         {if post.type === "news"}
         <li class="cs-item">
           <picture class="cs-picture" aria-hidden="true">
+            {if post.fields.blogImage}
             <img
               loading="lazy"
               decoding="async"
-              src={post.fields.blogImage.src}
-              alt={post.fields.blogImage.alt}
-              width={post.fields.blogImage.width}
-              height={post.fields.blogImage.height}
+              src="{post.fields.blogImage.src}"
+              alt="{post.fields.blogImage.alt}"
+              width="{post.fields.blogImage.width}"
+              height="{post.fields.blogImage.height}"
             />
+            {/if}
           </picture>
           <div class="cs-flex">
+            {if post.fields.publish?.date}
             <span class="cs-date">{post.fields.publish.date}</span>
+            {/if}
             <h3 class="cs-h3">
-              {post.fields.title}
+              {post.fields.title || 'Untitled'}
             </h3>
-            {if post.fields.textItems}
+            {if post.fields.textItems && post.fields.textItems.length > 0}
               <p class="cs-item-text">
                 {post.fields.textItems[0].paragraph}
               </p>
             {else}
               <p class="cs-item-text">No content available</p>
             {/if}
-            <a href={post.path} class="cs-link">
+            <a href="{post.path}" class="cs-link">
               Read post &rarr;
             </a>
           </div>

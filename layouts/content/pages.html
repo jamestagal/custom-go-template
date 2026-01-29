@@ -5,7 +5,7 @@ export let content, components
 ---
 
 <div class="page-content-container">
-  {for component in content.components}
+  {for component in components}
       <Component:dynamic name={component.name} {...component.fields} />
   {/for}
 </div>
