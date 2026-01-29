@@ -13,7 +13,11 @@ async function fetchContentJSON(filepath) {
         // Fetch the JSON content file
         const response = await fetch('/' + filepath);
         if (!response.ok) {
-            console.warn('[CMS] Failed to fetch content:', response.status);
+            // Silently skip 404s (listing pages like news_page, committee_page don't have JSON)
+            // Only log warnings for other HTTP errors
+            if (response.status !== 404) {
+                console.warn('[CMS] Failed to fetch content:', response.status);
+            }
             return null;
         }
         return await response.json();
@@ -148,9 +152,16 @@ async function initCMS() {
     const contentFilePath = getContentFilePath();
     if (contentFilePath) {
         console.log('[CMS] Found content filepath:', contentFilePath);
-        const contentJSON = await fetchContentJSON(contentFilePath);
 
-        if (contentJSON) {
+        // Skip fetching JSON for listing pages (they use allContent prop, not JSON)
+        const listingPages = ['content/pages/news_page.json', 'content/pages/committee_page.json'];
+        if (listingPages.includes(contentFilePath)) {
+            console.log('[CMS] Skipping JSON fetch for listing page');
+            // Fall through to findMainXData below
+        } else {
+            const contentJSON = await fetchContentJSON(contentFilePath);
+
+            if (contentJSON) {
             // Add header showing the file path
             const header = document.createElement('div');
             header.style.cssText = 'font-size: 11px; color: #666; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #ddd;';
@@ -176,6 +187,7 @@ async function initCMS() {
 
             console.log('[CMS] Loaded content from JSON:', contentFilePath);
             return;
+            }
         }
     }
 

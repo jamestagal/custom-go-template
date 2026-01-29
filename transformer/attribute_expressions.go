@@ -202,6 +202,7 @@ func IsSimpleVariable(expr string) bool {
 // EXPORTED for testing
 func TryResolveBuildTimeValue(expr string, dataScope map[string]any) (string, bool) {
 	expr = strings.TrimSpace(expr)
+	log.Printf("[BUILD-TIME-RESOLVE] Attempting to resolve expression: %q", expr)
 
 	// Handle fallback operator (||) at build-time
 	// Example: "post.fields.title || 'Untitled'" → try main value, use fallback if falsy
@@ -263,7 +264,8 @@ func TryResolveBuildTimeValue(expr string, dataScope map[string]any) (string, bo
 // tryResolvePropertyAccess resolves property access expressions like "card.icon.src"
 // by navigating through nested objects in the dataScope
 // Also handles optional chaining (?.) by converting to regular property access
-// Cognitive Load: 10 (property navigation + type assertions)
+// Also handles array bracket notation like "items[0].name" or "user.orders[1].total"
+// Cognitive Load: 14 (property navigation + array access + type assertions)
 func tryResolvePropertyAccess(expr string, dataScope map[string]any) (string, bool) {
 	// Handle optional chaining (?.) by converting to regular property access
 	// JavaScript's ?. returns undefined for missing properties, which we handle gracefully
@@ -271,8 +273,11 @@ func tryResolvePropertyAccess(expr string, dataScope map[string]any) (string, bo
 
 	parts := strings.Split(expr, ".")
 	if len(parts) < 2 {
+		logExpressionDebug("Expression '{%s}' → RUNTIME: Less than 2 parts after split", expr)
 		return "", false
 	}
+
+	logExpressionDebug("Expression '{%s}' → Attempting build-time resolution, parts=%v", expr, parts)
 
 	// Get the base variable from dataScope
 	baseVar := parts[0]
@@ -288,11 +293,64 @@ func tryResolvePropertyAccess(expr string, dataScope map[string]any) (string, bo
 		return "", false
 	}
 
+	logExpressionDebug("Expression '{%s}' → Base variable '%s' found in scope, type=%T", expr, baseVar, value)
+
 	// Navigate through the property chain
 	current := value
 	for i := 1; i < len(parts); i++ {
 		prop := parts[i]
 
+		// Check if property contains array access notation: "propName[index]"
+		// Example: "textItems[0]" → propName="textItems", index=0
+		if strings.Contains(prop, "[") && strings.Contains(prop, "]") {
+			// Parse array access: "propName[index]"
+			bracketStart := strings.Index(prop, "[")
+			bracketEnd := strings.Index(prop, "]")
+
+			if bracketStart < bracketEnd {
+				propName := prop[:bracketStart]
+				indexStr := prop[bracketStart+1 : bracketEnd]
+
+				// Try to parse the index as an integer
+				var arrayIndex int
+				if _, err := fmt.Sscanf(indexStr, "%d", &arrayIndex); err != nil {
+					logExpressionDebug("Expression '{%s}' → RUNTIME: Invalid array index '%s' in property '%s'", expr, indexStr, prop)
+					return "", false
+				}
+
+				// Access the property (should be an array)
+				currentMap, ok := current.(map[string]interface{})
+				if !ok {
+					logExpressionDebug("Expression '{%s}' → RUNTIME: Cannot access property '%s' on non-map type %T", expr, propName, current)
+					return "", false
+				}
+
+				arrayValue, exists := currentMap[propName]
+				if !exists {
+					logExpressionDebug("Expression '{%s}' → RUNTIME: Property '%s' not found in object", expr, propName)
+					return "", false
+				}
+
+				// Value should be an array (slice)
+				arraySlice, ok := arrayValue.([]interface{})
+				if !ok {
+					logExpressionDebug("Expression '{%s}' → RUNTIME: Property '%s' is not an array (type %T)", expr, propName, arrayValue)
+					return "", false
+				}
+
+				// Check array bounds
+				if arrayIndex < 0 || arrayIndex >= len(arraySlice) {
+					logExpressionDebug("Expression '{%s}' → RUNTIME: Array index %d out of bounds (length %d)", expr, arrayIndex, len(arraySlice))
+					return "", false
+				}
+
+				// Get the array element
+				current = arraySlice[arrayIndex]
+				continue
+			}
+		}
+
+		// Regular property access (no array notation)
 		// Current value must be a map to access properties
 		currentMap, ok := current.(map[string]interface{})
 		if !ok {
@@ -550,6 +608,20 @@ func hasExpressionSyntax(value string) bool {
 	return strings.Contains(value, "{") && strings.Contains(value, "}")
 }
 
+// isAlpineObjectLiteral detects if a value is an Alpine.js JavaScript object literal
+// (e.g., ":class="{'active': isActive}"" or ":style="{color: themeColor}")
+// These should NOT be transformed as template expressions
+func isAlpineObjectLiteral(attrName, value string) bool {
+	// Check if it's an Alpine binding attribute (:attr or x-bind:attr)
+	isAlpineBinding := strings.HasPrefix(attrName, ":") || strings.HasPrefix(attrName, "x-bind:")
+
+	// Check if value contains JavaScript object literal syntax
+	// Object literals start with { and contain : (key: value pairs)
+	hasObjectSyntax := strings.Contains(value, "{") && strings.Contains(value, ":")
+
+	return isAlpineBinding && hasObjectSyntax
+}
+
 // transformAttributeExpressions transforms attributes containing store expressions and regular expressions
 // Handles: <div class="{$theme.mode}"> -> <div :class="$store.theme.mode">
 // ALPINE.JS FIX: <button onclick="{expression}"> -> <button @click="expression">
@@ -582,8 +654,9 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 		// These variables need to be in x-data for Alpine.js to evaluate them at runtime
 		// Check both IsAlpine flag AND name pattern (some AST nodes don't have IsAlpine set)
 		// BUT: Skip if value contains {$...} - those need store expression transformation first!
-		// EXCEPTION: x-data contains JavaScript object literals with curly braces - don't treat those as expressions
-		if (attr.IsAlpine || isAlpineByName) && attr.Value != "" && !hasUntransformedStoreExpr && (!hasExpressionSyntax(attr.Value) || isXData) {
+		// EXCEPTION: x-data and Alpine object literals (like :class="{'active': bool}") contain JavaScript object literals with curly braces - don't treat those as expressions
+		isAlpineObjLiteral := isAlpineObjectLiteral(attr.Name, attr.Value)
+		if (attr.IsAlpine || isAlpineByName) && attr.Value != "" && !hasUntransformedStoreExpr && (!hasExpressionSyntax(attr.Value) || isXData || isAlpineObjLiteral) {
 			if tracker := getRuntimeTracker(); tracker != nil {
 				// For x-for, extract the collection name (e.g., "item in items" → "items")
 				if strings.HasPrefix(attr.Name, "x-for") && strings.Contains(attr.Value, " in ") {
@@ -601,8 +674,8 @@ func transformAttributeExpressions(attributes []ast.Attribute, dataScope map[str
 		}
 
 		// Skip other Alpine directives that don't need expression transformation
-		// EXCEPTION: x-data contains JavaScript object literals with curly braces - don't treat those as expressions
-		if (attr.IsAlpine || isAlpineByName) && !hasUntransformedStoreExpr && (!hasExpressionSyntax(attr.Value) || isXData) {
+		// EXCEPTION: x-data and Alpine object literals contain JavaScript object literals with curly braces - don't treat those as expressions
+		if (attr.IsAlpine || isAlpineByName) && !hasUntransformedStoreExpr && (!hasExpressionSyntax(attr.Value) || isXData || isAlpineObjLiteral) {
 			transformedAttributes = append(transformedAttributes, attr)
 			continue
 		}

@@ -9,7 +9,7 @@ export let subtitle, page_title, allContent
     <img
       loading="lazy"
       decoding="async"
-      src="/media/images/meeting-background.jpg"
+      src="https://picsum.photos/522/609?random=meeting"
       alt="committee meeting"
       width="522"
       height="609"
@@ -31,13 +31,9 @@ export let subtitle, page_title, allContent
               <h3 class="cs-h3">
                 {post.fields.title}
               </h3>
-              {if post.fields.textItems}
-                <p class="cs-desc">
-                  {post.fields.textItems[0].paragraph}
-                </p>
-              {else}
-                <p class="cs-desc">No content available</p>
-              {/if}
+              <p class="cs-desc">
+                {post.fields.excerpt}
+              </p>
               <a href={post.path} class="cs-link">
                 <span class="cs-link-text">Read more &rarr;</span>
               </a>

@@ -71,16 +71,16 @@ export let title, author, publish, blogImage, figcaption, textItems, photos, pub
       {/if}
 
       <!-- Photo Gallery (if present) -->
-      {if photos && photos.length > 0}
+      {if photos}
       <section id="photo-gallery">
         <div class="photo-grid">
           {for photo in photos}
           <div class="photo-item">
             <img
               src="{photo.src}"
-              alt="{photo.alt || 'Gallery photo'}"
-              width="{photo.width || 400}"
-              height="{photo.height || 300}"
+              alt="{photo.alt}"
+              width="{photo.width}"
+              height="{photo.height}"
             />
           </div>
           {/for}
