@@ -6,6 +6,123 @@ import ThemeToggle from '../components/ThemeToggle.html'
 import store from './stores/auth.js'
 import store from './stores/cart.js'
 import store from './stores/theme.js'
+
+// ==================================================================================
+// STORE EXPRESSION CONTEXT EXAMPLES - COMPLETE REFERENCE
+// ==================================================================================
+//
+// This file demonstrates ALL context types for store expressions.
+// The syntax changes based on WHERE the expression appears!
+//
+// SUMMARY OF CONTEXTS (20 examples in this file):
+//
+// 1. Dynamic Styling (:style with Template Literals) - Line ~29
+//    Syntax: :style="`...${$store.name.prop}...`"
+//    Rule: MUST use $store.* (JavaScript context)
+//
+// 2. Dynamic Styling with Method Calls - Line ~38
+//    Syntax: :style="`...${$store.name.method()}...`"
+//    Rule: Can call store methods in template literals
+//
+// 3. Dynamic Styling with Nested Properties - Line ~47
+//    Syntax: :style="`...${$store.name.method().prop}...`"
+//    Rule: Can access deeply nested properties
+//
+// 4. Dynamic Styling with Ternary Operators - Line ~63
+//    Syntax: :style="`...${$store.name.prop === 'value' ? 'a' : 'b'}...`"
+//    Rule: Can use JavaScript ternary in template literals
+//
+// 5. Event Handlers (@click) - Line ~80
+//    Syntax: @click="$store.name.method()"
+//    Rule: MUST use $store.* (JavaScript context), NO {}
+//
+// 6. Event Handlers with Method Arguments - Line ~103
+//    Syntax: @click="$store.name.method({ key: value })"
+//    Rule: Can pass objects/arguments to store methods
+//
+// 7. x-text Directive - Line ~142
+//    Syntax: <tag x-text="$store.name.prop"></tag>
+//    Rule: MUST use $store.* (Alpine directive), NO {}
+//
+// 8. Template Conditionals ({if}) - Line ~169
+//    Syntax: {if $name.prop} content {/if}
+//    Rule: CAN use {$name} shorthand (template syntax)
+//    Transforms to: <template x-if="$store.name.prop">
+//
+// 9. Text Content in Curly Braces - Line ~177
+//    Syntax: {$name.prop}
+//    Rule: CAN use {$name} shorthand (template syntax)
+//    Transforms to: <span x-text="$store.name.prop"></span>
+//
+// 10. x-text with Ternary Operator - Line ~191
+//     Syntax: x-text="$store.name.prop ? value : other"
+//     Rule: MUST use $store.* with JavaScript ternary
+//
+// 11. Conditional with Property Access - Line ~214
+//     Syntax: {if $name.prop.length > 0}
+//     Rule: Can access nested properties in conditionals
+//
+// 12. Text Content with Computed Property - Line ~223
+//     Syntax: {$name.computedProperty}
+//     Rule: Getters accessed like regular properties
+//
+// 13. Template Loops ({for}) - Line ~232
+//     Syntax: {for item in $name.collection}
+//     Rule: CAN use {$name} shorthand (template syntax)
+//     Transforms to: <template x-for="item in $store.name.collection">
+//
+// 14. Loop Variable Access - Line ~241
+//     Syntax: {item.prop} (NO $ - item is loop variable)
+//     Rule: Loop variables are NOT stores
+//
+// 15. x-text with String Concatenation - Line ~260
+//     Syntax: x-text="'string' + $store.name.prop + 'string'"
+//     Rule: Can concatenate strings with +
+//
+// 16. Conditional with Equality Comparison - Line ~287
+//     Syntax: {if $name.prop === 'value'}
+//     Rule: Supports ===, !==, etc. in conditionals
+//
+// 17. x-text with Method Call Result - Line ~297
+//     Syntax: x-text="$store.name.method().property"
+//     Rule: Can chain method calls and property access
+//
+// 18. Multiple Event Handlers - Line ~175 (approx)
+//     Syntax: Multiple @click with different methods
+//     Demonstrates: Each button can call different store methods
+//
+// 19. x-show Directive (Conditional Display) - Line ~183 (approx)
+//     Syntax: x-show="$store.name.prop === 'value'"
+//     Rule: MUST use $store.* (Alpine directive)
+//     Note: Element stays in DOM, visibility toggles
+//
+// 20. x-bind:class (Dynamic Classes) - Line ~196 (approx)
+//     Syntax: :class="$store.name.prop"
+//     Rule: :class is shorthand for x-bind:class
+//     Note: Can bind single class or object of classes
+//
+// ==================================================================================
+// QUICK REFERENCE:
+// ==================================================================================
+//
+// ✅ Use {$name.prop} shorthand in:
+//    - Text content: <p>{$theme.mode}</p>
+//    - Template directives: {if $auth.isLoggedIn}
+//    - Template loops: {for item in $cart.items}
+//    - Regular attributes: <div class={$theme.mode}> (gets transformed to :class)
+//
+// ✅ Use $store.name.prop full syntax in:
+//    - Alpine directives: x-show="$store.auth.isLoggedIn"
+//    - Event handlers: @click="$store.auth.login()"
+//    - Reactive bindings: :style, :class, :href, etc.
+//    - Template literals: :style="`...${$store.theme.bg}...`"
+//
+// ❌ NEVER mix:
+//    - {$store.name.prop} - Don't use $store in template syntax
+//    - @click="{$auth.login()}" - Don't use {} in @ directives
+//    - x-text="{$cart.total}" - Don't use {} in x-text
+//
+// ==================================================================================
 ---
 
 <!DOCTYPE html>
@@ -19,13 +136,33 @@ import store from './stores/theme.js'
       src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
     ></script>
   </head>
+  <!--
+    CONTEXT EXAMPLE 1: Dynamic Styling (:style with Template Literals)
+    - Context: Alpine directive with JavaScript template literal
+    - Syntax: MUST use $store.* (full Alpine syntax)
+    - Why: Inside backticks, this is raw JavaScript - no transformation
+    - Rule: :style="`...${$store.name.prop}...`"
+  -->
   <body
     :style="`background-color: ${$store.theme.getCurrentColors().background}; color: ${$store.theme.getCurrentColors().text}; --code-bg: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#5a7ec5'}; transition: all 0.3s ease;`"
   >
     <div class="container">
+      <!--
+        CONTEXT EXAMPLE 2: Dynamic Styling (:style with Method Calls)
+        - Context: Alpine :style directive
+        - Syntax: $store.* with method calls
+        - Why: Calling store methods in Alpine binding
+        - Rule: :style="`...${$store.name.method()}...`"
+      -->
       <h1 :style="`color: ${$store.theme.getCurrentColors().text};`">
         Global Store System - Component Demo
       </h1>
+      <!--
+        CONTEXT EXAMPLE 3: Dynamic Styling (:style with Secondary Color)
+        - Context: Alpine :style directive
+        - Syntax: $store.* accessing nested property
+        - Rule: Can access deeply nested properties in template literals
+      -->
       <p
         class="subtitle"
         :style="`color: ${$store.theme.getCurrentColors().secondary};`"
@@ -34,6 +171,13 @@ import store from './stores/theme.js'
       </p>
 
       <!-- Header with Store Components -->
+      <!--
+        CONTEXT EXAMPLE 4: Dynamic Styling with Ternary Operators
+        - Context: :style directive with conditional logic
+        - Syntax: $store.* with JavaScript ternary operator
+        - Why: Ternary operators are JavaScript expressions
+        - Rule: :style="`...${$store.name.prop === 'value' ? 'a' : 'b'}...`"
+      -->
       <div
         class="header"
         :style="`background: ${$store.theme.mode === 'light' ? 'white' : '#2d3748'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
@@ -60,6 +204,14 @@ import store from './stores/theme.js'
           :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
         >
           <h3>Authentication Actions</h3>
+          <!--
+            CONTEXT EXAMPLE 5: Event Handlers (@click)
+            - Context: Alpine event handler directive
+            - Syntax: MUST use $store.* (full Alpine syntax)
+            - Why: @ directives execute JavaScript directly
+            - Rule: @click="$store.name.method()"
+            - Note: NO curly braces {} needed in @ directives
+          -->
           <button @click="$store.auth.login()" class="btn btn-primary">
             Login as Test User
           </button>
@@ -74,6 +226,13 @@ import store from './stores/theme.js'
           :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
         >
           <h3>Shopping Cart Actions</h3>
+          <!--
+            CONTEXT EXAMPLE 6: Event Handlers with Method Arguments
+            - Context: @click with method calls passing objects
+            - Syntax: $store.* with method arguments
+            - Rule: @click="$store.name.method({ key: value })"
+            - Note: Can pass complex objects as arguments
+          -->
           <button
             @click="$store.cart.addItem({ name: 'Widget', price: 9.99 })"
             class="btn btn-success"
@@ -107,6 +266,12 @@ import store from './stores/theme.js'
             The ThemeToggle component above provides its own buttons, but you
             can also control the theme from anywhere in your app:
           </p>
+          <!--
+            CONTEXT EXAMPLE 18: Multiple Event Handlers (Different Methods)
+            - Context: Multiple buttons with different store method calls
+            - Demonstrates: Each button can call different store methods
+            - Rule: @click="$store.name.method()" for each button
+          -->
           <button @click="$store.theme.setLight()" class="btn btn-light">
             Set Light Mode
           </button>
@@ -125,7 +290,58 @@ import store from './stores/theme.js'
             <strong>Visual Feedback Test:</strong>
             <p style="margin-top: 0.5rem; font-size: 0.95rem">
               Click the theme buttons above and watch the entire page change
+              <!--
+                CONTEXT EXAMPLE 7: x-text Directive
+                - Context: Alpine x-text directive (displays reactive text)
+                - Syntax: MUST use $store.* (full Alpine syntax)
+                - Why: x-text is an Alpine directive, expects JavaScript
+                - Rule: <tag x-text="$store.name.prop"></tag>
+                - Note: NO curly braces {} needed in x-text
+              -->
               colors! Current mode: <strong x-text="$store.theme.mode"></strong>
+            </p>
+          </div>
+
+          <!-- Additional Alpine Directive Examples -->
+          <div style="margin-top: 1rem; padding: 1rem; background: rgba(251, 146, 60, 0.1); border-radius: 6px; border-left: 4px solid #f97316;">
+            <!--
+              CONTEXT EXAMPLE 19: x-show Directive (Conditional Display)
+              - Context: Alpine x-show directive (shows/hides element)
+              - Syntax: x-show="$store.name.prop"
+              - Why: x-show is an Alpine directive, expects JavaScript
+              - Rule: Element stays in DOM, visibility toggles
+              - Note: Different from x-if (which removes from DOM)
+            -->
+            <div x-show="$store.theme.mode === 'dark'">
+              <strong>🌙 Dark Mode Activated!</strong>
+              <p style="margin-top: 0.5rem; font-size: 0.9rem;">This message only shows in dark mode (using x-show)</p>
+            </div>
+            <div x-show="$store.theme.mode === 'light'">
+              <strong>☀️ Light Mode Activated!</strong>
+              <p style="margin-top: 0.5rem; font-size: 0.9rem;">This message only shows in light mode (using x-show)</p>
+            </div>
+          </div>
+
+          <div style="margin-top: 1rem; padding: 1rem; background: rgba(139, 92, 246, 0.1); border-radius: 6px; border-left: 4px solid #8b5cf6;">
+            <!--
+              CONTEXT EXAMPLE 20: x-bind:class (Dynamic Classes)
+              - Context: Alpine x-bind:class directive (or shorthand :class)
+              - Syntax: :class="$store.name.prop"
+              - Why: Reactive class binding
+              - Rule: Can bind single class or object of classes
+              - Note: :class is shorthand for x-bind:class
+            -->
+            <p style="margin-bottom: 0.5rem;">
+              <strong>Dynamic Class Example:</strong>
+            </p>
+            <div
+              :class="$store.theme.mode"
+              style="padding: 0.75rem; border-radius: 4px; font-weight: 500;"
+            >
+              This div has a dynamic class: "<span x-text="$store.theme.mode"></span>"
+            </div>
+            <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #6b7280;">
+              Try toggling the theme to see the class change!
             </p>
           </div>
         </div>
@@ -146,7 +362,23 @@ import store from './stores/theme.js'
             :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
           >
             <h3>🔐 Auth Store</h3>
+            <!--
+              CONTEXT EXAMPLE 8: Template Conditionals ({if})
+              - Context: Template directive (custom syntax)
+              - Syntax: CAN use {$name.prop} shorthand
+              - Why: Template syntax gets transformed by engine
+              - Rule: {if $name.prop} content {/if}
+              - Transforms to: <template x-if="$store.name.prop">
+            -->
             {if $auth.isLoggedIn}
+            <!--
+              CONTEXT EXAMPLE 9: Text Content in Curly Braces
+              - Context: Text content (not an attribute or directive)
+              - Syntax: CAN use {$name.prop} shorthand
+              - Why: Template syntax, gets wrapped in <span x-text>
+              - Rule: {$name.prop}
+              - Transforms to: <span x-text="$store.name.prop"></span>
+            -->
             <p><strong>Status:</strong> ✅ Logged In</p>
             <p><strong>User:</strong> {$auth.user.name}</p>
             <p><strong>Email:</strong> {$auth.user.email}</p>
@@ -156,6 +388,13 @@ import store from './stores/theme.js'
             {/if}
             <small style="color: #6b7280">💡 Hover to see store object</small>
             <div class="tech-details">
+              <!--
+                CONTEXT EXAMPLE 10: x-text with Ternary Operator
+                - Context: x-text directive with conditional expression
+                - Syntax: $store.* with JavaScript ternary
+                - Rule: x-text="$store.name.prop ? value : other"
+                - Note: This is JavaScript, not template syntax
+              -->
               <pre
                 class="state-display"
               >isLoggedIn: <span x-text="$store.auth.isLoggedIn" style="color: #10b981;"></span>
@@ -169,13 +408,42 @@ user: <span x-text="$store.auth.user ? $store.auth.user.name : 'null'" style="co
             :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
           >
             <h3>🛒 Cart Store</h3>
+            <!--
+              CONTEXT EXAMPLE 11: Conditional with Property Access
+              - Context: {if} directive accessing array length
+              - Syntax: {$name.prop.length > 0}
+              - Why: Template conditional, gets transformed
+              - Transforms to: <template x-if="$store.name.prop.length > 0">
+            -->
             {if $cart.items.length > 0}
+            <!--
+              CONTEXT EXAMPLE 12: Text Content with Computed Property
+              - Context: Text content using store getter
+              - Syntax: {$name.computedProperty}
+              - Why: Getters are accessed like regular properties
+              - Note: formattedTotal is a getter in the cart store
+            -->
             <p><strong>Items:</strong> {$cart.items.length}</p>
             <p><strong>Total:</strong> ${$cart.formattedTotal}</p>
             <div class="cart-items-list">
               <strong>Cart Contents:</strong>
               <ul>
+                <!--
+                  CONTEXT EXAMPLE 13: Template Loops ({for})
+                  - Context: Template loop directive
+                  - Syntax: {for item in $name.collection}
+                  - Why: Template syntax, gets transformed
+                  - Transforms to: <template x-for="item in $store.name.collection">
+                  - Note: Loop variable (item) is available in loop body
+                -->
                 {for item in $cart.items}
+                <!--
+                  CONTEXT EXAMPLE 14: Loop Variable Access (Build-Time Expansion)
+                  - Context: Text content inside loop
+                  - Syntax: {item.prop} (no $ because item is loop variable)
+                  - Why: Loop variable, not a store
+                  - Note: If $cart.items is resolvable, loop expands at build-time
+                -->
                 <li>{item.name} - ${item.price}</li>
                 {/for}
               </ul>
@@ -187,6 +455,13 @@ user: <span x-text="$store.auth.user ? $store.auth.user.name : 'null'" style="co
             {/if}
             <small style="color: #6b7280">💡 Hover to see store object</small>
             <div class="tech-details">
+              <!--
+                CONTEXT EXAMPLE 15: x-text with String Concatenation
+                - Context: x-text with JavaScript string concatenation
+                - Syntax: x-text="'string' + $store.name.prop + 'string'"
+                - Why: JavaScript expression, can use + operator
+                - Rule: Use $store.* when concatenating strings
+              -->
               <pre
                 class="state-display"
               >items: <span x-text="'[' + $store.cart.items.length + ' items]'" style="color: #10b981;"></span>
@@ -200,11 +475,26 @@ total: $<span x-text="$store.cart.formattedTotal" style="color: #10b981;"></span
             :style="`background: ${$store.theme.mode === 'light' ? '#f9fafb' : '#1a202c'}; border-color: ${$store.theme.mode === 'light' ? '#e5e7eb' : '#4a5568'};`"
           >
             <h3>🎨 Theme Store</h3>
+            <!--
+              CONTEXT EXAMPLE 16: Conditional with Equality Comparison
+              - Context: {if} with equality operator
+              - Syntax: {if $name.prop === 'value'}
+              - Why: Template conditional with comparison
+              - Transforms to: <template x-if="$store.name.prop === 'value'">
+              - Note: Evaluated at build-time when possible
+            -->
             {if $theme.mode === 'light'}
             <p><strong>Mode:</strong> ☀️ Light</p>
             {else}
             <p><strong>Mode:</strong> 🌙 Dark</p>
             {/if}
+            <!--
+              CONTEXT EXAMPLE 17: x-text with Method Call Result
+              - Context: x-text displaying result of store method
+              - Syntax: x-text="$store.name.method().property"
+              - Why: Calling store method, accessing property of result
+              - Note: getCurrentColors() returns an object, we access its props
+            -->
             <p>
               <strong>Background:</strong>
               <span x-text="$store.theme.getCurrentColors().background"></span>
